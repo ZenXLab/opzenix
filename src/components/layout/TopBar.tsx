@@ -8,10 +8,12 @@ import {
   User,
   ChevronDown,
   FileCode,
-  History
+  History,
+  LayoutDashboard,
+  GitBranch
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useFlowStore, FlowType } from '@/stores/flowStore';
+import { useFlowStore } from '@/stores/flowStore';
 import { cn } from '@/lib/utils';
 
 const TopBar = () => {
@@ -20,7 +22,9 @@ const TopBar = () => {
     activeEnvironment, 
     setActiveEnvironment,
     setConfigEditorOpen,
-    setTimelineOpen
+    setTimelineOpen,
+    activeView,
+    setActiveView
   } = useFlowStore();
 
   const environments = ['production', 'staging', 'development'];
@@ -34,6 +38,34 @@ const TopBar = () => {
             <Activity className="w-4 h-4 text-primary-foreground" />
           </div>
           <span className="text-base font-semibold text-foreground tracking-tight">Opzenix</span>
+        </div>
+
+        {/* View Toggle */}
+        <div className="flex items-center gap-1 px-1 py-0.5 rounded-md bg-secondary/50 border border-border">
+          <button
+            onClick={() => setActiveView('dashboard')}
+            className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded transition-colors',
+              activeView === 'dashboard'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+            )}
+          >
+            <LayoutDashboard className="w-3.5 h-3.5" />
+            Dashboard
+          </button>
+          <button
+            onClick={() => setActiveView('flows')}
+            className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded transition-colors',
+              activeView === 'flows'
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+            )}
+          >
+            <GitBranch className="w-3.5 h-3.5" />
+            Flows
+          </button>
         </div>
 
         <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-secondary/50 border border-border">

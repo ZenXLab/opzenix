@@ -71,6 +71,7 @@ interface FlowState {
   deployments: Deployment[];
   isConfigEditorOpen: boolean;
   isTimelineOpen: boolean;
+  activeView: 'dashboard' | 'flows';
   systemHealth: {
     status: 'healthy' | 'degraded' | 'critical';
     uptime: string;
@@ -85,6 +86,7 @@ interface FlowState {
   setActiveFlowType: (type: FlowType) => void;
   setConfigEditorOpen: (open: boolean) => void;
   setTimelineOpen: (open: boolean) => void;
+  setActiveView: (view: 'dashboard' | 'flows') => void;
   updateExecutionStatus: (executionId: string, status: NodeStatus, progress: number) => void;
   addApprovalRequest: (request: ApprovalRequest) => void;
   updateApprovalRequest: (id: string, updates: Partial<ApprovalRequest>) => void;
@@ -165,6 +167,7 @@ export const useFlowStore = create<FlowState>((set) => ({
   ],
   isConfigEditorOpen: false,
   isTimelineOpen: false,
+  activeView: 'dashboard',
   systemHealth: {
     status: 'healthy',
     uptime: '99.97%',
@@ -179,6 +182,7 @@ export const useFlowStore = create<FlowState>((set) => ({
   setActiveFlowType: (type) => set({ activeFlowType: type }),
   setConfigEditorOpen: (open) => set({ isConfigEditorOpen: open }),
   setTimelineOpen: (open) => set({ isTimelineOpen: open }),
+  setActiveView: (view) => set({ activeView: view }),
   updateExecutionStatus: (executionId, status, progress) => set((state) => ({
     executions: state.executions.map((e) =>
       e.id === executionId ? { ...e, status, progress } : e

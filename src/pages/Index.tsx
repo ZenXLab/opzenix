@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
+import { AnimatePresence } from 'framer-motion';
 import TopBar from '@/components/layout/TopBar';
 import LeftRail from '@/components/layout/LeftRail';
 import FlowCanvas from '@/components/flow/FlowCanvas';
@@ -8,10 +9,13 @@ import ConfigEditorPanel from '@/components/panels/ConfigEditorPanel';
 import DeploymentTimeline from '@/components/panels/DeploymentTimeline';
 import ApprovalPanel from '@/components/governance/ApprovalPanel';
 import AuditLogViewer from '@/components/governance/AuditLogViewer';
+import DashboardView from '@/components/dashboard/DashboardView';
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
+import { useFlowStore } from '@/stores/flowStore';
 
 const Index = () => {
   const [isAuditLogOpen, setAuditLogOpen] = useState(false);
+  const { activeView, setActiveView } = useFlowStore();
   
   // Enable real-time updates
   useRealtimeUpdates();
@@ -24,13 +28,24 @@ const Index = () => {
         
         {/* Main Content */}
         <div className="flex-1 flex overflow-hidden">
-          <LeftRail onOpenAuditLog={() => setAuditLogOpen(true)} />
+          {activeView === 'flows' && (
+            <LeftRail onOpenAuditLog={() => setAuditLogOpen(true)} />
+          )}
           
           <main className="flex-1 relative overflow-hidden">
-            <FlowCanvas />
+            <AnimatePresence mode="wait">
+              {activeView === 'dashboard' ? (
+                <DashboardView 
+                  key="dashboard"
+                  onViewFlows={() => setActiveView('flows')} 
+                />
+              ) : (
+                <FlowCanvas key="flows" />
+              )}
+            </AnimatePresence>
           </main>
           
-          <InspectorPanel />
+          {activeView === 'flows' && <InspectorPanel />}
         </div>
 
         {/* Modals & Overlays */}
