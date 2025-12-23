@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState, useEffect } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import { motion } from 'framer-motion';
 import { 
@@ -12,9 +12,11 @@ import {
   Clock, 
   Zap,
   Shield,
-  ChevronRight
+  ChevronRight,
+  Activity
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface ExecutionNodeData extends Record<string, unknown> {
   label: string;
@@ -25,9 +27,17 @@ export interface ExecutionNodeData extends Record<string, unknown> {
   isCheckpoint?: boolean;
 }
 
+interface TelemetryCount {
+  traces: number;
+  logs: number;
+  metrics: number;
+  hasErrors: boolean;
+}
+
 interface ExecutionNodeProps {
   data: ExecutionNodeData;
   selected?: boolean;
+  id: string;
 }
 
 const statusConfig = {
@@ -63,11 +73,54 @@ const statusConfig = {
   },
 };
 
-const ExecutionNode = ({ data, selected }: ExecutionNodeProps) => {
+const ExecutionNode = ({ data, selected, id }: ExecutionNodeProps) => {
+  const [telemetry, setTelemetry] = useState<TelemetryCount>({ traces: 0, logs: 0, metrics: 0, hasErrors: false });
   const config = statusConfig[data.status];
   const StatusIcon = config.icon;
   const isCheckpoint = data.type === 'checkpoint';
   const isGate = data.type === 'gate';
+
+  // Fetch telemetry counts for this node
+  useEffect(() => {
+    const fetchTelemetry = async () => {
+      const { data: signals, error } = await supabase
+        .from('telemetry_signals')
+        .select('signal_type, status_code')
+        .eq('node_id', id);
+
+      if (!error && signals) {
+        setTelemetry({
+          traces: signals.filter(s => s.signal_type === 'trace').length,
+          logs: signals.filter(s => s.signal_type === 'log').length,
+          metrics: signals.filter(s => s.signal_type === 'metric').length,
+          hasErrors: signals.some(s => s.status_code === 'ERROR'),
+        });
+      }
+    };
+
+    fetchTelemetry();
+
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel(`node-telemetry-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'telemetry_signals',
+          filter: `node_id=eq.${id}`,
+        },
+        () => fetchTelemetry()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id]);
+
+  const hasTelemetry = telemetry.traces > 0 || telemetry.logs > 0 || telemetry.metrics > 0;
 
   return (
     <motion.div
@@ -112,6 +165,19 @@ const ExecutionNode = ({ data, selected }: ExecutionNodeProps) => {
           </p>
         )}
 
+        {/* Telemetry Indicator */}
+        {hasTelemetry && (
+          <div className="flex items-center gap-2 mb-2 text-xs">
+            <div className={cn(
+              "flex items-center gap-1 px-1.5 py-0.5 rounded",
+              telemetry.hasErrors ? "bg-sec-danger/10 text-sec-danger" : "bg-ai-primary/10 text-ai-primary"
+            )}>
+              <Activity className="w-3 h-3" />
+              <span>{telemetry.traces + telemetry.logs}</span>
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="flex items-center justify-between">
           {data.duration && (
@@ -140,7 +206,7 @@ const ExecutionNode = ({ data, selected }: ExecutionNodeProps) => {
             )}
             <button 
               className="p-1 rounded hover:bg-secondary transition-colors"
-              title="Inspect"
+              title="View OTel Telemetry"
             >
               <Eye className="w-3 h-3 text-muted-foreground" />
             </button>
@@ -160,6 +226,11 @@ const ExecutionNode = ({ data, selected }: ExecutionNodeProps) => {
             <Shield className="w-2.5 h-2.5" />
             Gate
           </div>
+        )}
+
+        {/* Error Indicator */}
+        {telemetry.hasErrors && (
+          <div className="absolute -top-1 -left-1 w-3 h-3 bg-sec-danger rounded-full border-2 border-card animate-pulse" />
         )}
       </div>
 
