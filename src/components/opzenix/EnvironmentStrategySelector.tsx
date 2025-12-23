@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Layers, Plus, X, ChevronRight, Shield, Clock, Users,
@@ -15,14 +15,16 @@ interface Environment {
   name: string;
   strategy: DeploymentStrategy;
   approvalRequired: boolean;
-  approvers: number;
-  policies: string[];
+  approvers?: number;
+  policies?: string[];
 }
 
 type DeploymentStrategy = 'rolling' | 'blue-green' | 'canary' | 'feature-toggle' | 'shadow';
 
 interface EnvironmentStrategySelectorProps {
-  onConfigComplete: (environments: Environment[]) => void;
+  environments?: Environment[];
+  onChange?: (environments: Environment[]) => void;
+  onConfigComplete?: (environments: Environment[]) => void;
 }
 
 const strategyInfo: Record<DeploymentStrategy, { label: string; description: string; icon: string; color: string }> = {
@@ -39,26 +41,43 @@ const defaultEnvironments: Environment[] = [
   { id: 'prod', name: 'Production', strategy: 'blue-green', approvalRequired: true, approvers: 2, policies: ['security-scan', 'compliance-check'] },
 ];
 
-const EnvironmentStrategySelector = ({ onConfigComplete }: EnvironmentStrategySelectorProps) => {
-  const [environments, setEnvironments] = useState<Environment[]>(defaultEnvironments);
+const EnvironmentStrategySelector = ({ environments: externalEnvs, onChange, onConfigComplete }: EnvironmentStrategySelectorProps) => {
+  const [environments, setEnvironments] = useState<Environment[]>(externalEnvs || defaultEnvironments);
   const [expandedEnv, setExpandedEnv] = useState<string | null>('staging');
 
+  // Sync with external state
+  useEffect(() => {
+    if (externalEnvs) {
+      setEnvironments(externalEnvs.map(env => ({
+        ...env,
+        approvers: env.approvers ?? 0,
+        policies: env.policies ?? [],
+      })));
+    }
+  }, [externalEnvs]);
+
   const handleStrategyChange = (envId: string, strategy: DeploymentStrategy) => {
-    setEnvironments(prev => prev.map(env => 
+    const updated = environments.map(env => 
       env.id === envId ? { ...env, strategy } : env
-    ));
+    );
+    setEnvironments(updated);
+    onChange?.(updated);
   };
 
   const handleApprovalChange = (envId: string, required: boolean) => {
-    setEnvironments(prev => prev.map(env => 
-      env.id === envId ? { ...env, approvalRequired: required, approvers: required ? Math.max(1, env.approvers) : 0 } : env
-    ));
+    const updated = environments.map(env => 
+      env.id === envId ? { ...env, approvalRequired: required, approvers: required ? Math.max(1, env.approvers || 0) : 0 } : env
+    );
+    setEnvironments(updated);
+    onChange?.(updated);
   };
 
   const handleApproversChange = (envId: string, approvers: number) => {
-    setEnvironments(prev => prev.map(env => 
+    const updated = environments.map(env => 
       env.id === envId ? { ...env, approvers } : env
-    ));
+    );
+    setEnvironments(updated);
+    onChange?.(updated);
   };
 
   const addEnvironment = () => {
@@ -70,12 +89,16 @@ const EnvironmentStrategySelector = ({ onConfigComplete }: EnvironmentStrategySe
       approvers: 0,
       policies: [],
     };
-    setEnvironments(prev => [...prev, newEnv]);
+    const updated = [...environments, newEnv];
+    setEnvironments(updated);
     setExpandedEnv(newEnv.id);
+    onChange?.(updated);
   };
 
   const removeEnvironment = (envId: string) => {
-    setEnvironments(prev => prev.filter(env => env.id !== envId));
+    const updated = environments.filter(env => env.id !== envId);
+    setEnvironments(updated);
+    onChange?.(updated);
   };
 
   const getAIRecommendation = (env: Environment) => {
@@ -85,6 +108,11 @@ const EnvironmentStrategySelector = ({ onConfigComplete }: EnvironmentStrategySe
         : 'Consider Blue-Green or Canary for production safety';
     }
     return null;
+  };
+
+  const handleConfirm = () => {
+    onConfigComplete?.(environments);
+    onChange?.(environments);
   };
 
   return (
@@ -135,13 +163,13 @@ const EnvironmentStrategySelector = ({ onConfigComplete }: EnvironmentStrategySe
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">{env.name}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       <Badge variant="outline" className={cn("text-[10px] h-4", strategyConfig.color)}>
                         {strategyConfig.icon} {strategyConfig.label}
                       </Badge>
                       {env.approvalRequired && (
                         <Badge variant="outline" className="text-[10px] h-4">
-                          <Users className="w-2.5 h-2.5 mr-0.5" /> {env.approvers} approval
+                          <Users className="w-2.5 h-2.5 mr-0.5" /> {env.approvers || 1} approval
                         </Badge>
                       )}
                     </div>
@@ -183,7 +211,7 @@ const EnvironmentStrategySelector = ({ onConfigComplete }: EnvironmentStrategySe
                             <span className="flex items-center gap-2">
                               <span>{info.icon}</span>
                               <span>{info.label}</span>
-                              <span className="text-muted-foreground text-[10px]">- {info.description}</span>
+                              <span className="text-muted-foreground text-[10px] hidden sm:inline">- {info.description}</span>
                             </span>
                           </SelectItem>
                         ))}
@@ -192,7 +220,7 @@ const EnvironmentStrategySelector = ({ onConfigComplete }: EnvironmentStrategySe
                   </div>
 
                   {/* Approval Settings */}
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <Switch 
                         checked={env.approvalRequired}
@@ -202,7 +230,7 @@ const EnvironmentStrategySelector = ({ onConfigComplete }: EnvironmentStrategySe
                     </div>
                     {env.approvalRequired && (
                       <Select 
-                        value={String(env.approvers)} 
+                        value={String(env.approvers || 1)} 
                         onValueChange={(v) => handleApproversChange(env.id, parseInt(v))}
                       >
                         <SelectTrigger className="h-7 w-24 text-xs">
@@ -219,7 +247,7 @@ const EnvironmentStrategySelector = ({ onConfigComplete }: EnvironmentStrategySe
 
                   {/* Policy Badges */}
                   <div className="flex items-center gap-2 flex-wrap">
-                    {env.policies.map(policy => (
+                    {(env.policies || []).map(policy => (
                       <Badge key={policy} variant="secondary" className="text-[10px] gap-1">
                         <Shield className="w-2.5 h-2.5" />
                         {policy}
@@ -249,11 +277,13 @@ const EnvironmentStrategySelector = ({ onConfigComplete }: EnvironmentStrategySe
         })}
       </div>
 
-      {/* Confirm Button */}
-      <Button onClick={() => onConfigComplete(environments)} className="w-full gap-2">
-        <Check className="w-4 h-4" />
-        Confirm Environments
-      </Button>
+      {/* Confirm Button - only show if using standalone mode */}
+      {onConfigComplete && (
+        <Button onClick={handleConfirm} className="w-full gap-2">
+          <Check className="w-4 h-4" />
+          Confirm Environments
+        </Button>
+      )}
     </motion.div>
   );
 };
