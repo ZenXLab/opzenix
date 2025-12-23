@@ -1,96 +1,161 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+/* OPZENIX — ENTERPRISE OPERATIONS CONTROL PLANE
+   Dark, calm, obsidian-based design system
+   All colors MUST be HSL.
 */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Opzenix Obsidian Base - Light fallback (rarely used) */
+    --background: 220 20% 97%;
+    --foreground: 220 20% 10%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 220 20% 98%;
+    --card-foreground: 220 20% 10%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 220 20% 95%;
+    --popover-foreground: 220 20% 10%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 230 75% 55%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 220 15% 90%;
+    --secondary-foreground: 220 20% 10%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 15% 85%;
+    --muted-foreground: 220 10% 40%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 188 94% 43%;
+    --accent-foreground: 220 20% 5%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 220 15% 85%;
+    --input: 220 15% 85%;
+    --ring: 230 75% 55%;
 
-    --radius: 0.5rem;
+    --radius: 0.375rem;
 
-    --sidebar-background: 0 0% 98%;
+    --sidebar-background: 220 20% 96%;
+    --sidebar-foreground: 220 20% 10%;
+    --sidebar-primary: 230 75% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 188 94% 43%;
+    --sidebar-accent-foreground: 220 20% 5%;
+    --sidebar-border: 220 15% 85%;
+    --sidebar-ring: 230 75% 55%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Chart Colors */
+    --chart-1: 230 75% 55%;
+    --chart-2: 188 94% 43%;
+    --chart-3: 142 76% 36%;
+    --chart-4: 38 92% 50%;
+    --chart-5: 0 72% 50%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    /* Font System */
+    --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Shadows */
+    --shadow-low: 0 1px 2px hsla(0, 0%, 0%, 0.4);
+    --shadow-mid: 0 4px 12px hsla(0, 0%, 0%, 0.6);
+    --shadow-glow: 0 0 12px hsla(188, 94%, 43%, 0.15);
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* OPZENIX OBSIDIAN BASE - Primary Dark Theme */
+    --background: 220 25% 7%;
+    --foreground: 220 20% 93%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 220 25% 10%;
+    --card-foreground: 220 20% 93%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 220 22% 14%;
+    --popover-foreground: 220 20% 93%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 230 75% 55%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 220 20% 22%;
+    --secondary-foreground: 220 20% 90%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 220 15% 30%;
+    --muted-foreground: 220 15% 60%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 188 94% 43%;
+    --accent-foreground: 220 25% 7%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --border: 220 18% 18%;
+    --input: 220 18% 18%;
+    --ring: 230 75% 55%;
+
+    --sidebar-background: 220 25% 8%;
+    --sidebar-foreground: 220 20% 93%;
+    --sidebar-primary: 230 75% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 188 94% 43%;
+    --sidebar-accent-foreground: 220 25% 7%;
+    --sidebar-border: 220 18% 18%;
+    --sidebar-ring: 230 75% 55%;
+
+    --chart-1: 230 75% 55%;
+    --chart-2: 188 94% 43%;
+    --chart-3: 142 76% 36%;
+    --chart-4: 38 92% 50%;
+    --chart-5: 0 72% 50%;
+
+    --shadow-low: 0 1px 2px hsla(0, 0%, 0%, 0.4);
+    --shadow-mid: 0 4px 12px hsla(0, 0%, 0%, 0.6);
+    --shadow-glow: 0 0 12px hsla(188, 94%, 43%, 0.15);
+  }
+
+  /* OPZENIX NODE STATE TOKENS */
+  :root, .dark {
+    --node-idle: 220 15% 45%;
+    --node-running: 217 91% 60%;
+    --node-success: 142 76% 36%;
+    --node-warning: 38 92% 50%;
+    --node-failed: 0 84% 60%;
+    --node-paused: 263 70% 50%;
+    --node-checkpoint: 188 94% 43%;
+
+    /* Edge Colors */
+    --edge-default: 220 18% 28%;
+    --edge-active: 239 84% 67%;
+    --edge-rollback: 0 84% 60%;
+    --edge-branch: 188 94% 43%;
+
+    /* AI Intelligence */
+    --ai-primary: 188 94% 43%;
+    --ai-secondary: 263 70% 50%;
+    --ai-glow: 188 94% 43%;
+
+    /* Security */
+    --sec-safe: 142 76% 36%;
+    --sec-warning: 38 92% 50%;
+    --sec-critical: 0 84% 60%;
+
+    /* Execution */
+    --exec-primary: 239 84% 67%;
+    --exec-active: 217 91% 60%;
+
+    /* Runtime */
+    --runtime-ok: 142 76% 36%;
+    --runtime-degraded: 84 80% 44%;
+    --runtime-unstable: 24 94% 50%;
+
+    /* Infrastructure */
+    --infra-primary: 215 16% 47%;
+    --infra-muted: 215 19% 35%;
   }
 }
 
@@ -100,6 +165,112 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+
+  /* Apply dark mode by default for Opzenix */
+  html {
+    @apply dark;
+  }
+}
+
+@layer utilities {
+  /* Opzenix Node States */
+  .node-idle {
+    @apply border-muted text-muted-foreground;
+    background-color: hsl(var(--node-idle) / 0.15);
+    border-color: hsl(var(--node-idle) / 0.4);
+  }
+
+  .node-running {
+    background-color: hsl(var(--node-running) / 0.15);
+    border-color: hsl(var(--node-running) / 0.6);
+    box-shadow: 0 0 0 1px hsl(var(--node-running) / 0.3);
+  }
+
+  .node-success {
+    background-color: hsl(var(--node-success) / 0.15);
+    border-color: hsl(var(--node-success) / 0.6);
+  }
+
+  .node-warning {
+    background-color: hsl(var(--node-warning) / 0.15);
+    border-color: hsl(var(--node-warning) / 0.6);
+  }
+
+  .node-failed {
+    background-color: hsl(var(--node-failed) / 0.15);
+    border-color: hsl(var(--node-failed) / 0.6);
+  }
+
+  .node-paused {
+    background-color: hsl(var(--node-paused) / 0.15);
+    border-color: hsl(var(--node-paused) / 0.6);
+  }
+
+  .node-checkpoint {
+    background-color: hsl(var(--node-checkpoint) / 0.1);
+    border-color: hsl(var(--node-checkpoint) / 0.5);
+    border-style: dashed;
+  }
+
+  /* Subtle pulse for running nodes */
+  @keyframes subtle-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  .animate-subtle-pulse {
+    animation: subtle-pulse 2s ease-in-out infinite;
+  }
+
+  /* Glow effects */
+  .ai-glow {
+    box-shadow: 0 0 20px hsl(var(--ai-glow) / 0.25);
+  }
+
+  .exec-glow {
+    box-shadow: 0 0 12px hsl(var(--exec-primary) / 0.3);
+  }
+
+  /* Control room grid background */
+  .control-grid {
+    background-image: 
+      linear-gradient(hsl(var(--border) / 0.3) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.3) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* Smooth transitions */
+  .transition-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* React Flow Overrides */
+.react-flow__background {
+  background-color: hsl(var(--background)) !important;
+}
+
+.react-flow__minimap {
+  background-color: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 0.375rem !important;
+}
+
+.react-flow__controls {
+  background-color: hsl(var(--card)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 0.375rem !important;
+}
+
+.react-flow__controls-button {
+  background-color: hsl(var(--card)) !important;
+  border-color: hsl(var(--border)) !important;
+  fill: hsl(var(--foreground)) !important;
+}
+
+.react-flow__controls-button:hover {
+  background-color: hsl(var(--secondary)) !important;
 }
