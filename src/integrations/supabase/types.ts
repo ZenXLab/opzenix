@@ -381,6 +381,94 @@ export type Database = {
         }
         Relationships: []
       }
+      telemetry_signals: {
+        Row: {
+          checkpoint_id: string | null
+          created_at: string
+          deployment_version: string | null
+          duration_ms: number | null
+          environment: string | null
+          execution_id: string | null
+          flow_id: string | null
+          id: string
+          node_id: string | null
+          otel_parent_span_id: string | null
+          otel_span_id: string | null
+          otel_trace_id: string | null
+          payload: Json
+          resource_attributes: Json | null
+          severity: string | null
+          signal_type: string
+          span_attributes: Json | null
+          status_code: string | null
+          summary: string | null
+        }
+        Insert: {
+          checkpoint_id?: string | null
+          created_at?: string
+          deployment_version?: string | null
+          duration_ms?: number | null
+          environment?: string | null
+          execution_id?: string | null
+          flow_id?: string | null
+          id?: string
+          node_id?: string | null
+          otel_parent_span_id?: string | null
+          otel_span_id?: string | null
+          otel_trace_id?: string | null
+          payload?: Json
+          resource_attributes?: Json | null
+          severity?: string | null
+          signal_type: string
+          span_attributes?: Json | null
+          status_code?: string | null
+          summary?: string | null
+        }
+        Update: {
+          checkpoint_id?: string | null
+          created_at?: string
+          deployment_version?: string | null
+          duration_ms?: number | null
+          environment?: string | null
+          execution_id?: string | null
+          flow_id?: string | null
+          id?: string
+          node_id?: string | null
+          otel_parent_span_id?: string | null
+          otel_span_id?: string | null
+          otel_trace_id?: string | null
+          payload?: Json
+          resource_attributes?: Json | null
+          severity?: string | null
+          signal_type?: string
+          span_attributes?: Json | null
+          status_code?: string | null
+          summary?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telemetry_signals_checkpoint_id_fkey"
+            columns: ["checkpoint_id"]
+            isOneToOne: false
+            referencedRelation: "checkpoints"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telemetry_signals_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telemetry_signals_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "flow_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
