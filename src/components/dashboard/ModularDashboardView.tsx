@@ -125,19 +125,19 @@ const ModularDashboardView = ({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="h-full overflow-auto bg-background p-6"
+      className="h-full overflow-auto bg-background p-3 sm:p-6"
     >
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h1 className="text-xl sm:text-2xl font-semibold text-foreground">Dashboard</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
               <GripVertical className="w-3.5 h-3.5 inline mr-1" />
               Drag widgets to reorder • Click + to add more
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button 
               variant="outline" 
               size="sm" 
@@ -177,7 +177,7 @@ const ModularDashboardView = ({
                         onClick={() => handleAddWidget(w.type)}
                       >
                         <Icon className="w-3.5 h-3.5" />
-                        {w.label}
+                        <span className="hidden sm:inline">{w.label}</span>
                       </Button>
                     );
                   })}
@@ -187,26 +187,30 @@ const ModularDashboardView = ({
           )}
         </AnimatePresence>
 
-        {/* Key Metrics */}
-        <div className="grid grid-cols-4 gap-4">
+        {/* Key Metrics - Responsive grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <MetricCard label="Active Flows" value={activeExecutions} icon={Sparkles} iconColor="text-node-running" />
-          <MetricCard label="Deployments Today" value={deployments.length} change={{ value: '12%', positive: true }} icon={TrendingUp} iconColor="text-ai-primary" />
+          <MetricCard label="Deployments" value={deployments.length} change={{ value: '12%', positive: true }} icon={TrendingUp} iconColor="text-ai-primary" />
           <MetricCard label="Success Rate" value={`${successRate}%`} icon={Activity} iconColor="text-sec-safe" />
-          <MetricCard label="Pending Approvals" value={pendingApprovals} icon={FileText} iconColor="text-sec-warning" />
+          <MetricCard label="Pending" value={pendingApprovals} icon={FileText} iconColor="text-sec-warning" />
         </div>
 
-        {/* Reorderable Widgets Grid */}
+        {/* Reorderable Widgets Grid - Responsive */}
         <Reorder.Group 
           axis="y" 
           values={widgets} 
           onReorder={handleReorder}
-          className="grid grid-cols-3 gap-4 auto-rows-min"
+          className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4 auto-rows-min"
         >
           {widgets.map((widget) => (
             <Reorder.Item
               key={widget.id}
               value={widget}
-              className={cn("cursor-grab active:cursor-grabbing", getWidgetClasses(widget))}
+              className={cn(
+                "cursor-grab active:cursor-grabbing",
+                widget.type === 'logs' && "md:col-span-2",
+                widget.type === 'audit' && "md:row-span-2"
+              )}
               whileDrag={{ scale: 1.02, zIndex: 50 }}
             >
               {renderWidget(widget)}

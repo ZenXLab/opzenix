@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { Node, Edge } from '@xyflow/react';
 import { cn } from '@/lib/utils';
 
 interface ValidationResult {
@@ -18,8 +19,11 @@ interface ValidationResult {
 }
 
 interface PipelineValidationPanelProps {
-  onValidationComplete: (passed: boolean) => void;
-  onExecute: () => void;
+  nodes?: Node[];
+  edges?: Edge[];
+  config?: any;
+  onValidationComplete?: (passed: boolean) => void;
+  onExecute?: () => void;
 }
 
 const mockValidationResults: ValidationResult[] = [
@@ -79,7 +83,7 @@ const statusColors = {
   pending: 'text-muted-foreground',
 };
 
-const PipelineValidationPanel = ({ onValidationComplete, onExecute }: PipelineValidationPanelProps) => {
+const PipelineValidationPanel = ({ nodes, edges, config, onValidationComplete, onExecute }: PipelineValidationPanelProps) => {
   const [isValidating, setIsValidating] = useState(false);
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
   const [progress, setProgress] = useState(0);
@@ -103,7 +107,7 @@ const PipelineValidationPanel = ({ onValidationComplete, onExecute }: PipelineVa
     const allPassed = mockValidationResults.every(cat => 
       cat.checks.every(check => check.status === 'passed')
     );
-    onValidationComplete(allPassed);
+    onValidationComplete?.(allPassed);
   };
 
   const totalChecks = validationResults.reduce((sum, cat) => sum + cat.checks.length, 0);
@@ -125,6 +129,11 @@ const PipelineValidationPanel = ({ onValidationComplete, onExecute }: PipelineVa
       <div className="flex items-center gap-2 mb-3">
         <Shield className="w-4 h-4 text-ai-primary" />
         <h3 className="text-sm font-medium text-foreground">Pipeline Validation</h3>
+        {nodes && nodes.length > 0 && (
+          <span className="text-xs text-muted-foreground">
+            ({nodes.length} nodes, {edges?.length || 0} edges)
+          </span>
+        )}
       </div>
 
       {/* Validation Progress */}
@@ -140,7 +149,7 @@ const PipelineValidationPanel = ({ onValidationComplete, onExecute }: PipelineVa
 
       {/* Results */}
       {validationResults.length > 0 && (
-        <div className="space-y-3">
+        <div className="space-y-3 max-h-[300px] overflow-y-auto">
           {validationResults.map((category, idx) => (
             <motion.div
               key={category.category}
@@ -158,7 +167,7 @@ const PipelineValidationPanel = ({ onValidationComplete, onExecute }: PipelineVa
                   return (
                     <div key={check.name} className="flex items-center gap-2 p-1.5 rounded bg-secondary/20">
                       <StatusIcon className={cn(
-                        "w-3.5 h-3.5",
+                        "w-3.5 h-3.5 shrink-0",
                         statusColors[check.status],
                         check.status === 'pending' && 'animate-spin'
                       )} />
@@ -204,7 +213,7 @@ const PipelineValidationPanel = ({ onValidationComplete, onExecute }: PipelineVa
       )}
 
       {/* Actions */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         {validationResults.length === 0 ? (
           <Button onClick={runValidation} disabled={isValidating} className="w-full gap-2">
             {isValidating ? (
@@ -225,14 +234,16 @@ const PipelineValidationPanel = ({ onValidationComplete, onExecute }: PipelineVa
               <Shield className="w-4 h-4" />
               Re-validate
             </Button>
-            <Button 
-              onClick={onExecute} 
-              disabled={!allPassed}
-              className="flex-1 gap-2"
-            >
-              <Play className="w-4 h-4" />
-              Execute Pipeline
-            </Button>
+            {onExecute && (
+              <Button 
+                onClick={onExecute} 
+                disabled={!allPassed}
+                className="flex-1 gap-2"
+              >
+                <Play className="w-4 h-4" />
+                Execute Pipeline
+              </Button>
+            )}
           </>
         )}
       </div>

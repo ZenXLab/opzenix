@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   GitBranch, Rocket, Settings, Cloud, Server, 
@@ -14,8 +14,16 @@ type CICDScope = 'ci-only' | 'ci-cd';
 type CDEngine = 'opzenix' | 'external';
 type DeployTarget = 'aws' | 'azure' | 'gcp' | 'on-prem' | 'custom';
 
+interface ScopeConfig {
+  ciOnly: boolean;
+  cdEngine: 'opzenix' | 'external';
+  target: string;
+}
+
 interface CICDScopeSelectorProps {
-  onConfigComplete: (scope: CICDScope, engine: CDEngine, target: DeployTarget) => void;
+  config?: ScopeConfig;
+  onChange?: (config: ScopeConfig) => void;
+  onConfigComplete?: (scope: CICDScope, engine: CDEngine, target: DeployTarget) => void;
 }
 
 const targetConfigs: Record<DeployTarget, { label: string; icon: string; description: string }> = {
@@ -26,18 +34,40 @@ const targetConfigs: Record<DeployTarget, { label: string; icon: string; descrip
   custom: { label: 'Custom', icon: '⚙️', description: 'Custom server / other' },
 };
 
-const CICDScopeSelector = ({ onConfigComplete }: CICDScopeSelectorProps) => {
-  const [scope, setScope] = useState<CICDScope>('ci-cd');
-  const [engine, setEngine] = useState<CDEngine>('opzenix');
-  const [target, setTarget] = useState<DeployTarget>('aws');
+const CICDScopeSelector = ({ config, onChange, onConfigComplete }: CICDScopeSelectorProps) => {
+  const [scope, setScope] = useState<CICDScope>(config?.ciOnly ? 'ci-only' : 'ci-cd');
+  const [engine, setEngine] = useState<CDEngine>(config?.cdEngine || 'opzenix');
+  const [target, setTarget] = useState<DeployTarget>((config?.target as DeployTarget) || 'aws');
   const [validating, setValidating] = useState(false);
   const [validated, setValidated] = useState<Record<string, boolean>>({});
+
+  // Sync with external config
+  useEffect(() => {
+    if (config) {
+      setScope(config.ciOnly ? 'ci-only' : 'ci-cd');
+      setEngine(config.cdEngine);
+      setTarget((config.target as DeployTarget) || 'aws');
+    }
+  }, [config]);
+
+  // Notify parent of changes
+  useEffect(() => {
+    onChange?.({
+      ciOnly: scope === 'ci-only',
+      cdEngine: engine,
+      target,
+    });
+  }, [scope, engine, target, onChange]);
 
   const handleValidate = async (targetId: DeployTarget) => {
     setValidating(true);
     await new Promise(r => setTimeout(r, 1000));
     setValidated(prev => ({ ...prev, [targetId]: true }));
     setValidating(false);
+  };
+
+  const handleConfirm = () => {
+    onConfigComplete?.(scope, engine, target);
   };
 
   return (
@@ -134,7 +164,7 @@ const CICDScopeSelector = ({ onConfigComplete }: CICDScopeSelectorProps) => {
             <h4 className="text-sm font-medium text-foreground">Deployment Target</h4>
           </div>
 
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
             {Object.entries(targetConfigs).map(([key, config]) => {
               const isSelected = target === key;
               const isValidated = validated[key];
@@ -158,7 +188,7 @@ const CICDScopeSelector = ({ onConfigComplete }: CICDScopeSelectorProps) => {
 
           {/* Validation */}
           <div className="mt-3 p-3 bg-secondary/20 rounded-lg">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <Server className="w-4 h-4 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">{targetConfigs[target].description}</span>
@@ -186,15 +216,17 @@ const CICDScopeSelector = ({ onConfigComplete }: CICDScopeSelectorProps) => {
         </motion.div>
       )}
 
-      {/* Confirm */}
-      <Button 
-        onClick={() => onConfigComplete(scope, engine, target)} 
-        className="w-full gap-2"
-        disabled={scope === 'ci-cd' && !validated[target]}
-      >
-        <Check className="w-4 h-4" />
-        {scope === 'ci-only' ? 'Configure CI Pipeline' : 'Configure Full Pipeline'}
-      </Button>
+      {/* Confirm - only show if using standalone mode */}
+      {onConfigComplete && (
+        <Button 
+          onClick={handleConfirm} 
+          className="w-full gap-2"
+          disabled={scope === 'ci-cd' && !validated[target]}
+        >
+          <Check className="w-4 h-4" />
+          {scope === 'ci-only' ? 'Configure CI Pipeline' : 'Configure Full Pipeline'}
+        </Button>
+      )}
     </motion.div>
   );
 };

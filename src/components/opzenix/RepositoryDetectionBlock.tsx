@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   GitBranch, Search, RefreshCw, Check, AlertCircle, Code,
@@ -8,17 +8,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { LanguageStack } from '@/data/languageTemplates';
 import { cn } from '@/lib/utils';
 
-interface DetectedStack {
-  language: string;
+interface RepoConfig {
+  url: string;
+  branch: string;
+  language: LanguageStack | null;
   framework: string;
   buildTool: string;
-  confidence: number;
 }
 
 interface RepositoryDetectionBlockProps {
-  onDetectionComplete: (stack: DetectedStack, repo: string, branch: string) => void;
+  config?: RepoConfig;
+  onChange?: (config: RepoConfig) => void;
+  onDetectionComplete?: (stack: { language: string; framework: string; buildTool: string; confidence: number }, repo: string, branch: string) => void;
 }
 
 const languageConfigs = {
@@ -30,24 +34,37 @@ const languageConfigs = {
   go: { icon: '🐹', frameworks: ['Gin', 'Echo', 'Fiber'], buildTools: ['go build', 'Makefile'] },
 };
 
-const RepositoryDetectionBlock = ({ onDetectionComplete }: RepositoryDetectionBlockProps) => {
-  const [repoUrl, setRepoUrl] = useState('');
-  const [branch, setBranch] = useState('main');
+const RepositoryDetectionBlock = ({ config, onChange, onDetectionComplete }: RepositoryDetectionBlockProps) => {
+  const [repoUrl, setRepoUrl] = useState(config?.url || '');
+  const [branch, setBranch] = useState(config?.branch || 'main');
   const [isDetecting, setIsDetecting] = useState(false);
-  const [detected, setDetected] = useState<DetectedStack | null>(null);
+  const [detected, setDetected] = useState<{ language: string; framework: string; buildTool: string; confidence: number } | null>(null);
   const [manualOverride, setManualOverride] = useState(false);
 
   // Manual override state
-  const [selectedLanguage, setSelectedLanguage] = useState<string>('');
-  const [selectedFramework, setSelectedFramework] = useState<string>('');
-  const [selectedBuildTool, setSelectedBuildTool] = useState<string>('');
+  const [selectedLanguage, setSelectedLanguage] = useState<string>(config?.language || '');
+  const [selectedFramework, setSelectedFramework] = useState<string>(config?.framework || '');
+  const [selectedBuildTool, setSelectedBuildTool] = useState<string>(config?.buildTool || '');
+
+  // Sync with external config
+  useEffect(() => {
+    if (config) {
+      setRepoUrl(config.url);
+      setBranch(config.branch);
+      if (config.language) {
+        setSelectedLanguage(config.language);
+        setSelectedFramework(config.framework);
+        setSelectedBuildTool(config.buildTool);
+      }
+    }
+  }, [config]);
 
   const handleDetect = async () => {
     setIsDetecting(true);
     // Simulate detection
     await new Promise(r => setTimeout(r, 1500));
     
-    const detectedStack: DetectedStack = {
+    const detectedStack = {
       language: 'typescript',
       framework: 'React',
       buildTool: 'npm',
@@ -62,10 +79,25 @@ const RepositoryDetectionBlock = ({ onDetectionComplete }: RepositoryDetectionBl
   };
 
   const handleConfirm = () => {
-    const stack: DetectedStack = manualOverride 
+    const stack = manualOverride 
       ? { language: selectedLanguage, framework: selectedFramework, buildTool: selectedBuildTool, confidence: 100 }
       : detected!;
-    onDetectionComplete(stack, repoUrl, branch);
+    
+    // Call onChange for wizard integration
+    if (onChange) {
+      onChange({
+        url: repoUrl,
+        branch,
+        language: stack.language as LanguageStack,
+        framework: stack.framework,
+        buildTool: stack.buildTool,
+      });
+    }
+    
+    // Call legacy callback
+    if (onDetectionComplete) {
+      onDetectionComplete(stack, repoUrl, branch);
+    }
   };
 
   const currentLangConfig = languageConfigs[selectedLanguage as keyof typeof languageConfigs];
@@ -82,8 +114,8 @@ const RepositoryDetectionBlock = ({ onDetectionComplete }: RepositoryDetectionBl
       </div>
 
       {/* Repository Input */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="col-span-2">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="sm:col-span-2">
           <label className="text-xs text-muted-foreground mb-1.5 block">Repository URL</label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -150,7 +182,7 @@ const RepositoryDetectionBlock = ({ onDetectionComplete }: RepositoryDetectionBl
           </div>
 
           {/* Detected/Override Fields */}
-          <div className="grid grid-cols-3 gap-3 p-3 bg-secondary/20 rounded-lg">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-secondary/20 rounded-lg">
             <div>
               <label className="text-[10px] text-muted-foreground mb-1 block flex items-center gap-1">
                 <Code className="w-3 h-3" /> Language
@@ -213,7 +245,7 @@ const RepositoryDetectionBlock = ({ onDetectionComplete }: RepositoryDetectionBl
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <Button
               variant="ghost"
               size="sm"
