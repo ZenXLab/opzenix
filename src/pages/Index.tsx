@@ -14,8 +14,11 @@ import GitConnectionWizard from '@/components/connect/GitConnectionWizard';
 import SpeechPanel from '@/components/speech/SpeechPanel';
 import VisualPipelineEditor from '@/components/pipeline/VisualPipelineEditor';
 import EnvironmentManager from '@/components/environments/EnvironmentManager';
+import OpzenixWizard from '@/components/opzenix/OpzenixWizard';
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
 import { useFlowStore } from '@/stores/flowStore';
+import { toast } from 'sonner';
+import { Node, Edge } from '@xyflow/react';
 
 const Index = () => {
   const [isAuditLogOpen, setAuditLogOpen] = useState(false);
@@ -23,10 +26,18 @@ const Index = () => {
   const [isSpeechOpen, setSpeechOpen] = useState(false);
   const [isPipelineEditorOpen, setPipelineEditorOpen] = useState(false);
   const [isEnvironmentManagerOpen, setEnvironmentManagerOpen] = useState(false);
+  const [isOpzenixWizardOpen, setOpzenixWizardOpen] = useState(false);
   const { activeView, setActiveView } = useFlowStore();
   
   // Enable real-time updates
   useRealtimeUpdates();
+
+  const handleWizardComplete = (nodes: Node[], edges: Edge[], config: any) => {
+    console.log('Pipeline created:', { nodes, edges, config });
+    toast.success(`Created ${config.repository.language || 'custom'} pipeline with ${nodes.length} stages`);
+    // Open the pipeline editor with the generated nodes
+    setPipelineEditorOpen(true);
+  };
 
   return (
     <ReactFlowProvider>
@@ -37,6 +48,7 @@ const Index = () => {
           onOpenSpeech={() => setSpeechOpen(true)}
           onOpenPipelineEditor={() => setPipelineEditorOpen(true)}
           onOpenEnvironmentManager={() => setEnvironmentManagerOpen(true)}
+          onOpenOpzenixWizard={() => setOpzenixWizardOpen(true)}
         />
         
         {/* Main Content */}
@@ -53,6 +65,7 @@ const Index = () => {
                   onViewFlows={() => setActiveView('flows')}
                   onOpenPipelineEditor={() => setPipelineEditorOpen(true)}
                   onOpenEnvironmentManager={() => setEnvironmentManagerOpen(true)}
+                  onOpenOpzenixWizard={() => setOpzenixWizardOpen(true)}
                 />
               ) : (
                 <FlowCanvas key="flows" />
@@ -72,6 +85,11 @@ const Index = () => {
         <SpeechPanel isOpen={isSpeechOpen} onClose={() => setSpeechOpen(false)} />
         <VisualPipelineEditor isOpen={isPipelineEditorOpen} onClose={() => setPipelineEditorOpen(false)} />
         <EnvironmentManager isOpen={isEnvironmentManagerOpen} onClose={() => setEnvironmentManagerOpen(false)} />
+        <OpzenixWizard 
+          isOpen={isOpzenixWizardOpen} 
+          onClose={() => setOpzenixWizardOpen(false)} 
+          onComplete={handleWizardComplete}
+        />
       </div>
     </ReactFlowProvider>
   );
