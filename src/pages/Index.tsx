@@ -9,7 +9,7 @@ import ConfigEditorPanel from '@/components/panels/ConfigEditorPanel';
 import DeploymentTimeline from '@/components/panels/DeploymentTimeline';
 import ApprovalPanel from '@/components/governance/ApprovalPanel';
 import AuditLogViewer from '@/components/governance/AuditLogViewer';
-import DashboardView from '@/components/dashboard/DashboardView';
+import ModularDashboardView from '@/components/dashboard/ModularDashboardView';
 import GitConnectionWizard from '@/components/connect/GitConnectionWizard';
 import SpeechPanel from '@/components/speech/SpeechPanel';
 import VisualPipelineEditor from '@/components/pipeline/VisualPipelineEditor';
@@ -48,9 +48,11 @@ const Index = () => {
           <main className="flex-1 relative overflow-hidden">
             <AnimatePresence mode="wait">
               {activeView === 'dashboard' ? (
-                <DashboardView 
+                <ModularDashboardView 
                   key="dashboard"
-                  onViewFlows={() => setActiveView('flows')} 
+                  onViewFlows={() => setActiveView('flows')}
+                  onOpenPipelineEditor={() => setPipelineEditorOpen(true)}
+                  onOpenEnvironmentManager={() => setEnvironmentManagerOpen(true)}
                 />
               ) : (
                 <FlowCanvas key="flows" />
