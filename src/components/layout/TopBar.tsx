@@ -2,38 +2,40 @@ import {
   Activity, 
   Shield, 
   Clock, 
-  AlertCircle,
-  ChevronDown,
   Search,
   Bell,
   Settings,
-  User
+  User,
+  ChevronDown,
+  FileCode,
+  History
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { useFlowStore } from '@/stores/flowStore';
+import { useFlowStore, FlowType } from '@/stores/flowStore';
 import { cn } from '@/lib/utils';
 
 const TopBar = () => {
-  const { systemHealth, activeEnvironment, setActiveEnvironment } = useFlowStore();
+  const { 
+    systemHealth, 
+    activeEnvironment, 
+    setActiveEnvironment,
+    setConfigEditorOpen,
+    setTimelineOpen
+  } = useFlowStore();
 
   const environments = ['production', 'staging', 'development'];
 
   return (
     <header className="h-14 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-4">
-      {/* Left - Logo & Environment */}
+      {/* Left */}
       <div className="flex items-center gap-6">
-        {/* Logo */}
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded bg-primary flex items-center justify-center">
             <Activity className="w-4 h-4 text-primary-foreground" />
           </div>
-          <span className="text-base font-semibold text-foreground tracking-tight">
-            Opzenix
-          </span>
+          <span className="text-base font-semibold text-foreground tracking-tight">Opzenix</span>
         </div>
 
-        {/* Environment Selector */}
         <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-secondary/50 border border-border">
           {environments.map((env) => (
             <button
@@ -52,7 +54,7 @@ const TopBar = () => {
         </div>
       </div>
 
-      {/* Center - System Health */}
+      {/* Center */}
       <div className="flex items-center gap-6">
         <StatusIndicator 
           icon={<Activity className="w-3.5 h-3.5" />}
@@ -60,26 +62,24 @@ const TopBar = () => {
           value={systemHealth.status === 'healthy' ? 'Healthy' : systemHealth.status}
           status={systemHealth.status}
         />
+        <StatusIndicator icon={<Clock className="w-3.5 h-3.5" />} label="Uptime" value={systemHealth.uptime} />
+        <StatusIndicator icon={<Activity className="w-3.5 h-3.5" />} label="Active" value={String(systemHealth.activeFlows)} />
         <StatusIndicator 
-          icon={<Clock className="w-3.5 h-3.5" />}
-          label="Uptime"
-          value={systemHealth.uptime}
-        />
-        <StatusIndicator 
-          icon={<Activity className="w-3.5 h-3.5" />}
-          label="Active Flows"
-          value={String(systemHealth.activeFlows)}
-        />
-        <StatusIndicator 
-          icon={<Shield className="w-3.5 h-3.5" />}
-          label="Pending"
+          icon={<Shield className="w-3.5 h-3.5" />} 
+          label="Pending" 
           value={String(systemHealth.pendingApprovals)}
           alert={systemHealth.pendingApprovals > 0}
         />
       </div>
 
-      {/* Right - Actions */}
+      {/* Right */}
       <div className="flex items-center gap-2">
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setConfigEditorOpen(true)}>
+          <FileCode className="w-4 h-4 text-muted-foreground" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTimelineOpen(true)}>
+          <History className="w-4 h-4 text-muted-foreground" />
+        </Button>
         <Button variant="ghost" size="icon" className="h-8 w-8">
           <Search className="w-4 h-4 text-muted-foreground" />
         </Button>
@@ -126,9 +126,7 @@ const StatusIndicator = ({ icon, label, value, status, alert }: StatusIndicatorP
       {icon}
     </div>
     <div className="flex flex-col">
-      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-        {label}
-      </span>
+      <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</span>
       <span className={cn(
         'text-xs font-medium',
         status === 'healthy' && 'text-sec-safe',

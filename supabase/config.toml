@@ -1,1 +1,13 @@
 project_id = "qylqudusmwujpagpfrjg"
+[api]
+enabled = true
+port = 54321
+[db]
+port = 54322
+[studio]
+enabled = true
+port = 54323
+[functions.ai-insights]
+verify_jwt = true
+[functions.explain-config]
+verify_jwt = true
