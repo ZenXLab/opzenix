@@ -15,12 +15,14 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, Play, Undo, Redo, Sparkles, Users, FolderOpen } from 'lucide-react';
+import { X, Save, Play, Undo, Redo, Sparkles, Users, FolderOpen, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { nodeTypes } from './PipelineNodeTypes';
 import PipelineToolbox from './PipelineToolbox';
 import StageConfigPanel from './StageConfigPanel';
 import PipelineTemplatesLibrary from './PipelineTemplatesLibrary';
+import NodeInspector from './NodeInspector';
+import { usePipelineCollaboration } from '@/hooks/usePipelineCollaboration';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -28,14 +30,7 @@ interface VisualPipelineEditorProps {
   isOpen: boolean;
   onClose: () => void;
   onSave?: (nodes: Node[], edges: Edge[]) => void;
-}
-
-interface CollaboratorCursor {
-  id: string;
-  name: string;
-  color: string;
-  x: number;
-  y: number;
+  pipelineId?: string;
 }
 
 // Initial demo pipeline
@@ -61,47 +56,77 @@ const initialEdges: Edge[] = [
   { id: 'e8', source: 'approval-1', target: 'deploy-1', style: { stroke: 'hsl(var(--edge-default))' } },
 ];
 
-// Simulated collaborators
-const mockCollaborators: CollaboratorCursor[] = [
-  { id: 'u1', name: 'Sarah C.', color: 'hsl(var(--ai-primary))', x: 400, y: 200 },
-  { id: 'u2', name: 'Mike J.', color: 'hsl(var(--sec-safe))', x: 800, y: 150 },
-];
-
-const VisualPipelineEditor = ({ isOpen, onClose, onSave }: VisualPipelineEditorProps) => {
+const VisualPipelineEditor = ({ isOpen, onClose, onSave, pipelineId = 'default' }: VisualPipelineEditorProps) => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [inspectedNode, setInspectedNode] = useState<Node | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
-  const [collaboratorCursors, setCollaboratorCursors] = useState<CollaboratorCursor[]>(mockCollaborators);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
 
-  // Simulate cursor movement
+  // Real-time collaboration
+  const {
+    collaborators,
+    isConnected,
+    updateCursor,
+    broadcastNodeChange,
+    broadcastEdgeChange,
+    subscribeToUpdates,
+  } = usePipelineCollaboration(pipelineId, isOpen);
+
+  // Subscribe to updates from collaborators
   useEffect(() => {
     if (!isOpen) return;
-    const interval = setInterval(() => {
-      setCollaboratorCursors(prev => prev.map(c => ({
-        ...c,
-        x: c.x + (Math.random() - 0.5) * 30,
-        y: c.y + (Math.random() - 0.5) * 20,
-      })));
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [isOpen]);
+
+    const unsubscribe = subscribeToUpdates(
+      (remoteNodes) => {
+        setNodes(remoteNodes);
+      },
+      (remoteEdges) => {
+        setEdges(remoteEdges);
+      }
+    );
+
+    return unsubscribe;
+  }, [isOpen, subscribeToUpdates, setNodes, setEdges]);
+
+  // Track mouse movement for cursor sharing
+  const handleMouseMove = useCallback((event: React.MouseEvent) => {
+    if (!reactFlowInstance || !isConnected) return;
+    
+    const bounds = reactFlowWrapper.current?.getBoundingClientRect();
+    if (!bounds) return;
+
+    const position = reactFlowInstance.screenToFlowPosition({
+      x: event.clientX,
+      y: event.clientY,
+    });
+
+    updateCursor(position.x, position.y, selectedNode ? 'editing' : 'viewing');
+  }, [reactFlowInstance, isConnected, updateCursor, selectedNode]);
 
   const handleLoadTemplate = (templateNodes: Node[], templateEdges: Edge[]) => {
-    setNodes(templateNodes);
-    setEdges(templateEdges.map(e => ({ ...e, style: { stroke: 'hsl(var(--edge-default))' } })));
+    const newNodes = templateNodes;
+    const newEdges = templateEdges.map(e => ({ ...e, style: { stroke: 'hsl(var(--edge-default))' } }));
+    setNodes(newNodes);
+    setEdges(newEdges);
+    broadcastNodeChange(newNodes);
+    broadcastEdgeChange(newEdges);
     setShowTemplates(false);
     toast.success('Template loaded');
   };
 
   const onConnect = useCallback((connection: Connection) => {
-    setEdges((eds) => addEdge({
-      ...connection,
-      style: { stroke: 'hsl(var(--edge-default))' },
-    }, eds));
-  }, [setEdges]);
+    setEdges((eds) => {
+      const newEdges = addEdge({
+        ...connection,
+        style: { stroke: 'hsl(var(--edge-default))' },
+      }, eds);
+      broadcastEdgeChange(newEdges);
+      return newEdges;
+    });
+  }, [setEdges, broadcastEdgeChange]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -133,10 +158,14 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave }: VisualPipelineEditorP
         },
       };
 
-      setNodes((nds) => nds.concat(newNode));
+      setNodes((nds) => {
+        const updated = nds.concat(newNode);
+        broadcastNodeChange(updated);
+        return updated;
+      });
       toast.success(`Added ${label} stage`);
     },
-    [reactFlowInstance, setNodes]
+    [reactFlowInstance, setNodes, broadcastNodeChange]
   );
 
   const handleDragStart = (event: React.DragEvent, item: any) => {
@@ -148,16 +177,30 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave }: VisualPipelineEditorP
     setSelectedNode(node);
   }, []);
 
+  const handleNodeDoubleClick = useCallback((_: React.MouseEvent, node: Node) => {
+    setInspectedNode(node);
+  }, []);
+
   const handleUpdateNode = (nodeId: string, data: any) => {
-    setNodes((nds) =>
-      nds.map((node) => (node.id === nodeId ? { ...node, data } : node))
-    );
+    setNodes((nds) => {
+      const updated = nds.map((node) => (node.id === nodeId ? { ...node, data } : node));
+      broadcastNodeChange(updated);
+      return updated;
+    });
     toast.success('Stage updated');
   };
 
   const handleDeleteNode = (nodeId: string) => {
-    setNodes((nds) => nds.filter((node) => node.id !== nodeId));
-    setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId));
+    setNodes((nds) => {
+      const updated = nds.filter((node) => node.id !== nodeId);
+      broadcastNodeChange(updated);
+      return updated;
+    });
+    setEdges((eds) => {
+      const updated = eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId);
+      broadcastEdgeChange(updated);
+      return updated;
+    });
     setSelectedNode(null);
     toast.success('Stage deleted');
   };
@@ -168,6 +211,19 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave }: VisualPipelineEditorP
     }
     toast.success('Pipeline saved');
   };
+
+  // Handle nodes/edges change for collaboration
+  const handleNodesChange = useCallback((changes: any) => {
+    onNodesChange(changes);
+    // Debounce broadcast for performance
+    const hasPositionChange = changes.some((c: any) => c.type === 'position' && c.dragging === false);
+    if (hasPositionChange) {
+      setNodes((nds) => {
+        broadcastNodeChange(nds);
+        return nds;
+      });
+    }
+  }, [onNodesChange, setNodes, broadcastNodeChange]);
 
   return (
     <AnimatePresence>
@@ -184,7 +240,7 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave }: VisualPipelineEditorP
               <Sparkles className="w-5 h-5 text-ai-primary" />
               <div>
                 <h2 className="text-sm font-semibold text-foreground">Visual Pipeline Editor</h2>
-                <p className="text-xs text-muted-foreground">Drag stages • Connect steps • Configure</p>
+                <p className="text-xs text-muted-foreground">Drag stages • Connect steps • Double-click for OTel</p>
               </div>
             </div>
 
@@ -196,13 +252,24 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave }: VisualPipelineEditorP
               <div className="w-px h-6 bg-border mx-1" />
               <div className="flex items-center gap-1 px-2 py-1 bg-secondary/30 rounded">
                 <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                {isConnected && (
+                  <div className="w-1.5 h-1.5 rounded-full bg-sec-safe animate-pulse" />
+                )}
                 <div className="flex -space-x-1.5">
-                  {collaboratorCursors.map(c => (
-                    <div key={c.id} className="w-5 h-5 rounded-full border-2 border-card flex items-center justify-center text-[8px] font-bold text-foreground" style={{ backgroundColor: c.color }}>
+                  {collaborators.map(c => (
+                    <div 
+                      key={c.id} 
+                      className="w-5 h-5 rounded-full border-2 border-card flex items-center justify-center text-[8px] font-bold text-background" 
+                      style={{ backgroundColor: c.color }}
+                      title={`${c.name} (${c.mode})`}
+                    >
                       {c.name.split(' ').map(n => n[0]).join('')}
                     </div>
                   ))}
                 </div>
+                <span className="text-xs text-muted-foreground ml-1">
+                  {collaborators.length + 1}
+                </span>
               </div>
               <div className="w-px h-6 bg-border mx-1" />
               <Button variant="ghost" size="sm" className="gap-1">
@@ -233,17 +300,22 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave }: VisualPipelineEditorP
             <PipelineToolbox onDragStart={handleDragStart} />
 
             {/* Canvas */}
-            <div className="flex-1" ref={reactFlowWrapper}>
+            <div 
+              className="flex-1" 
+              ref={reactFlowWrapper}
+              onMouseMove={handleMouseMove}
+            >
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
-                onNodesChange={onNodesChange}
+                onNodesChange={handleNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}
                 onInit={setReactFlowInstance}
                 onDrop={onDrop}
                 onDragOver={onDragOver}
                 onNodeClick={handleNodeClick}
+                onNodeDoubleClick={handleNodeDoubleClick}
                 nodeTypes={nodeTypes}
                 fitView
                 snapToGrid
@@ -278,7 +350,7 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave }: VisualPipelineEditorP
                 />
                 
                 {/* Collaborator Cursors */}
-                {collaboratorCursors.map(cursor => (
+                {collaborators.map(cursor => (
                   <div
                     key={cursor.id}
                     className="absolute pointer-events-none z-50 transition-all duration-300"
@@ -289,6 +361,7 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave }: VisualPipelineEditorP
                     </svg>
                     <span className="absolute top-4 left-3 px-1.5 py-0.5 text-[9px] font-medium rounded whitespace-nowrap" style={{ backgroundColor: cursor.color, color: 'hsl(var(--background))' }}>
                       {cursor.name}
+                      {cursor.mode === 'editing' && ' ✎'}
                     </span>
                   </div>
                 ))}
@@ -298,7 +371,7 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave }: VisualPipelineEditorP
                   <div className="px-4 py-2 bg-card/90 backdrop-blur border border-border rounded-lg flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-ai-primary" />
                     <span className="text-xs text-muted-foreground">
-                      AI: Consider adding a security scan before deployment
+                      Double-click any node to view OTel traces, logs & metrics
                     </span>
                   </div>
                 </Panel>
@@ -306,7 +379,7 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave }: VisualPipelineEditorP
             </div>
 
             {/* Config Panel */}
-            {selectedNode && (
+            {selectedNode && !inspectedNode && (
               <StageConfigPanel
                 node={selectedNode}
                 onClose={() => setSelectedNode(null)}
@@ -314,6 +387,12 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave }: VisualPipelineEditorP
                 onDelete={handleDeleteNode}
               />
             )}
+
+            {/* Node Inspector (OTel) */}
+            <NodeInspector
+              node={inspectedNode}
+              onClose={() => setInspectedNode(null)}
+            />
           </div>
 
           {/* Templates Library */}

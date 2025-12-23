@@ -13,3 +13,5 @@ verify_jwt = true
 verify_jwt = true
 [functions.elevenlabs-tts]
 verify_jwt = false
+[functions.otel-adapter]
+verify_jwt = false
