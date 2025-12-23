@@ -1,11 +1,10 @@
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { 
-  LayoutGrid, Plus, TrendingUp, Activity, FileText, Terminal,
-  GitBranch, Gauge, Play, Sparkles
+  Plus, TrendingUp, Activity, FileText, Terminal,
+  GitBranch, Gauge, Play, Sparkles, GripVertical
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import MetricCard from './MetricCard';
 import DeploymentGraphWidget from './widgets/DeploymentGraphWidget';
 import AuditActivityWidget from './widgets/AuditActivityWidget';
@@ -16,6 +15,7 @@ import LogStreamWidget from './widgets/LogStreamWidget';
 import QuickActionsWidget from './widgets/QuickActionsWidget';
 import { useFlowStore } from '@/stores/flowStore';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface ModularDashboardViewProps {
   onViewFlows: () => void;
@@ -28,17 +28,17 @@ type WidgetType = 'deployments' | 'audit' | 'metrics' | 'api' | 'pipelines' | 'l
 interface Widget {
   id: string;
   type: WidgetType;
-  enabled: boolean;
+  size: 'small' | 'medium' | 'large';
 }
 
-const availableWidgets: { type: WidgetType; label: string; icon: typeof TrendingUp }[] = [
-  { type: 'deployments', label: 'Deployment Trends', icon: TrendingUp },
-  { type: 'audit', label: 'Audit Activity', icon: FileText },
-  { type: 'metrics', label: 'System Metrics', icon: Activity },
-  { type: 'api', label: 'API Performance', icon: Gauge },
-  { type: 'pipelines', label: 'Pipeline Status', icon: GitBranch },
-  { type: 'logs', label: 'Live Logs', icon: Terminal },
-  { type: 'actions', label: 'Quick Actions', icon: Play },
+const availableWidgets: { type: WidgetType; label: string; icon: typeof TrendingUp; defaultSize: Widget['size'] }[] = [
+  { type: 'deployments', label: 'Deployment Trends', icon: TrendingUp, defaultSize: 'medium' },
+  { type: 'audit', label: 'Audit Activity', icon: FileText, defaultSize: 'medium' },
+  { type: 'metrics', label: 'System Metrics', icon: Activity, defaultSize: 'small' },
+  { type: 'api', label: 'API Performance', icon: Gauge, defaultSize: 'small' },
+  { type: 'pipelines', label: 'Pipeline Status', icon: GitBranch, defaultSize: 'small' },
+  { type: 'logs', label: 'Live Logs', icon: Terminal, defaultSize: 'large' },
+  { type: 'actions', label: 'Quick Actions', icon: Play, defaultSize: 'small' },
 ];
 
 const ModularDashboardView = ({ 
@@ -50,13 +50,13 @@ const ModularDashboardView = ({
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
   
   const [widgets, setWidgets] = useState<Widget[]>([
-    { id: 'w1', type: 'actions', enabled: true },
-    { id: 'w2', type: 'deployments', enabled: true },
-    { id: 'w3', type: 'metrics', enabled: true },
-    { id: 'w4', type: 'pipelines', enabled: true },
-    { id: 'w5', type: 'audit', enabled: true },
-    { id: 'w6', type: 'api', enabled: true },
-    { id: 'w7', type: 'logs', enabled: true },
+    { id: 'w1', type: 'actions', size: 'small' },
+    { id: 'w2', type: 'deployments', size: 'medium' },
+    { id: 'w3', type: 'metrics', size: 'small' },
+    { id: 'w4', type: 'pipelines', size: 'small' },
+    { id: 'w5', type: 'audit', size: 'medium' },
+    { id: 'w6', type: 'api', size: 'small' },
+    { id: 'w7', type: 'logs', size: 'large' },
   ]);
 
   const activeExecutions = executions.filter(e => e.status === 'running').length;
@@ -67,32 +67,44 @@ const ModularDashboardView = ({
 
   const handleRemoveWidget = useCallback((id: string) => {
     setWidgets(prev => prev.filter(w => w.id !== id));
+    toast.success('Widget removed');
   }, []);
 
   const handleAddWidget = (type: WidgetType) => {
-    setWidgets(prev => [...prev, { id: `w-${Date.now()}`, type, enabled: true }]);
+    const config = availableWidgets.find(w => w.type === type);
+    setWidgets(prev => [...prev, { 
+      id: `w-${Date.now()}`, 
+      type, 
+      size: config?.defaultSize || 'small' 
+    }]);
     setShowWidgetPicker(false);
+    toast.success('Widget added');
+  };
+
+  const handleReorder = (newOrder: Widget[]) => {
+    setWidgets(newOrder);
   };
 
   const renderWidget = (widget: Widget) => {
+    const commonProps = { id: widget.id, onRemove: handleRemoveWidget };
+    
     switch (widget.type) {
       case 'deployments':
-        return <DeploymentGraphWidget id={widget.id} onRemove={handleRemoveWidget} />;
+        return <DeploymentGraphWidget {...commonProps} />;
       case 'audit':
-        return <AuditActivityWidget id={widget.id} onRemove={handleRemoveWidget} />;
+        return <AuditActivityWidget {...commonProps} />;
       case 'metrics':
-        return <SystemMetricsWidget id={widget.id} onRemove={handleRemoveWidget} />;
+        return <SystemMetricsWidget {...commonProps} />;
       case 'api':
-        return <APIPerformanceWidget id={widget.id} onRemove={handleRemoveWidget} />;
+        return <APIPerformanceWidget {...commonProps} />;
       case 'pipelines':
-        return <PipelineStatusWidget id={widget.id} onRemove={handleRemoveWidget} />;
+        return <PipelineStatusWidget {...commonProps} />;
       case 'logs':
-        return <LogStreamWidget id={widget.id} onRemove={handleRemoveWidget} />;
+        return <LogStreamWidget {...commonProps} />;
       case 'actions':
         return (
           <QuickActionsWidget 
-            id={widget.id} 
-            onRemove={handleRemoveWidget}
+            {...commonProps}
             onOpenPipelineEditor={onOpenPipelineEditor}
             onOpenEnvironmentManager={onOpenEnvironmentManager}
           />
@@ -100,6 +112,12 @@ const ModularDashboardView = ({
       default:
         return null;
     }
+  };
+
+  const getWidgetClasses = (widget: Widget) => {
+    if (widget.type === 'logs') return 'col-span-2';
+    if (widget.type === 'audit') return 'row-span-2';
+    return '';
   };
 
   return (
@@ -115,6 +133,7 @@ const ModularDashboardView = ({
           <div>
             <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
             <p className="text-sm text-muted-foreground mt-1">
+              <GripVertical className="w-3.5 h-3.5 inline mr-1" />
               Drag widgets to reorder • Click + to add more
             </p>
           </div>
@@ -176,17 +195,24 @@ const ModularDashboardView = ({
           <MetricCard label="Pending Approvals" value={pendingApprovals} icon={FileText} iconColor="text-sec-warning" />
         </div>
 
-        {/* Widgets Grid */}
-        <div className="grid grid-cols-3 gap-4 auto-rows-min">
+        {/* Reorderable Widgets Grid */}
+        <Reorder.Group 
+          axis="y" 
+          values={widgets} 
+          onReorder={handleReorder}
+          className="grid grid-cols-3 gap-4 auto-rows-min"
+        >
           {widgets.map((widget) => (
-            <div key={widget.id} className={cn(
-              widget.type === 'logs' && 'col-span-2',
-              widget.type === 'audit' && 'row-span-2'
-            )}>
+            <Reorder.Item
+              key={widget.id}
+              value={widget}
+              className={cn("cursor-grab active:cursor-grabbing", getWidgetClasses(widget))}
+              whileDrag={{ scale: 1.02, zIndex: 50 }}
+            >
               {renderWidget(widget)}
-            </div>
+            </Reorder.Item>
           ))}
-        </div>
+        </Reorder.Group>
       </div>
     </motion.div>
   );
