@@ -14,7 +14,8 @@ import {
   Mic,
   Plus,
   Workflow,
-  Server
+  Server,
+  Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFlowStore } from '@/stores/flowStore';
@@ -25,9 +26,16 @@ interface TopBarProps {
   onOpenSpeech?: () => void;
   onOpenPipelineEditor?: () => void;
   onOpenEnvironmentManager?: () => void;
+  onOpenOpzenixWizard?: () => void;
 }
 
-const TopBar = ({ onOpenGitWizard, onOpenSpeech, onOpenPipelineEditor, onOpenEnvironmentManager }: TopBarProps) => {
+const TopBar = ({ 
+  onOpenGitWizard, 
+  onOpenSpeech, 
+  onOpenPipelineEditor, 
+  onOpenEnvironmentManager,
+  onOpenOpzenixWizard 
+}: TopBarProps) => {
   const { 
     systemHealth, 
     activeEnvironment, 
@@ -41,14 +49,14 @@ const TopBar = ({ onOpenGitWizard, onOpenSpeech, onOpenPipelineEditor, onOpenEnv
   const environments = ['production', 'staging', 'development'];
 
   return (
-    <header className="h-14 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-4">
+    <header className="h-14 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-2 sm:px-4 overflow-x-auto">
       {/* Left */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-2 sm:gap-4 lg:gap-6 shrink-0">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded bg-primary flex items-center justify-center">
             <Activity className="w-4 h-4 text-primary-foreground" />
           </div>
-          <span className="text-base font-semibold text-foreground tracking-tight">Opzenix</span>
+          <span className="text-base font-semibold text-foreground tracking-tight hidden sm:block">Opzenix</span>
         </div>
 
         {/* View Toggle */}
@@ -56,67 +64,76 @@ const TopBar = ({ onOpenGitWizard, onOpenSpeech, onOpenPipelineEditor, onOpenEnv
           <button
             onClick={() => setActiveView('dashboard')}
             className={cn(
-              'flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded transition-colors',
+              'flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 text-xs font-medium rounded transition-colors',
               activeView === 'dashboard'
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
             )}
           >
             <LayoutDashboard className="w-3.5 h-3.5" />
-            Dashboard
+            <span className="hidden sm:inline">Dashboard</span>
           </button>
           <button
             onClick={() => setActiveView('flows')}
             className={cn(
-              'flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded transition-colors',
+              'flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 text-xs font-medium rounded transition-colors',
               activeView === 'flows'
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
             )}
           >
             <GitBranch className="w-3.5 h-3.5" />
-            Flows
+            <span className="hidden sm:inline">Flows</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-secondary/50 border border-border">
+        {/* Environment Toggle - Hidden on mobile */}
+        <div className="hidden md:flex items-center gap-1 px-2 py-1 rounded-md bg-secondary/50 border border-border">
           {environments.map((env) => (
             <button
               key={env}
               onClick={() => setActiveEnvironment(env)}
               className={cn(
-                'px-3 py-1 text-xs font-medium rounded transition-colors',
+                'px-2 lg:px-3 py-1 text-xs font-medium rounded transition-colors',
                 activeEnvironment === env 
                   ? 'bg-primary text-primary-foreground' 
                   : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
               )}
             >
-              {env.charAt(0).toUpperCase() + env.slice(1)}
+              {env.charAt(0).toUpperCase() + env.slice(1, 4)}
             </button>
           ))}
         </div>
 
-        {/* Connect Repo Button */}
-        <Button variant="outline" size="sm" className="h-8 gap-2" onClick={onOpenGitWizard}>
-          <Plus className="w-3.5 h-3.5" />
-          Connect Repo
+        {/* Opzenix Wizard Button - Primary CTA */}
+        <Button 
+          size="sm" 
+          className="h-8 gap-2 bg-ai-primary hover:bg-ai-primary/90" 
+          onClick={onOpenOpzenixWizard}
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span className="hidden lg:inline">New Pipeline</span>
         </Button>
 
-        {/* Pipeline Editor Button */}
-        <Button variant="outline" size="sm" className="h-8 gap-2" onClick={onOpenPipelineEditor}>
-          <Workflow className="w-3.5 h-3.5" />
-          Pipeline Editor
-        </Button>
-
-        {/* Environment Manager Button */}
-        <Button variant="outline" size="sm" className="h-8 gap-2" onClick={onOpenEnvironmentManager}>
-          <Server className="w-3.5 h-3.5" />
-          Environments
-        </Button>
+        {/* Secondary Actions - Hidden on smaller screens */}
+        <div className="hidden xl:flex items-center gap-2">
+          <Button variant="outline" size="sm" className="h-8 gap-2" onClick={onOpenGitWizard}>
+            <Plus className="w-3.5 h-3.5" />
+            Connect Repo
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 gap-2" onClick={onOpenPipelineEditor}>
+            <Workflow className="w-3.5 h-3.5" />
+            Editor
+          </Button>
+          <Button variant="outline" size="sm" className="h-8 gap-2" onClick={onOpenEnvironmentManager}>
+            <Server className="w-3.5 h-3.5" />
+            Environments
+          </Button>
+        </div>
       </div>
 
-      {/* Center */}
-      <div className="flex items-center gap-6">
+      {/* Center - Hidden on mobile */}
+      <div className="hidden lg:flex items-center gap-4 xl:gap-6">
         <StatusIndicator 
           icon={<Activity className="w-3.5 h-3.5" />}
           label="System"
@@ -134,14 +151,14 @@ const TopBar = ({ onOpenGitWizard, onOpenSpeech, onOpenPipelineEditor, onOpenEnv
       </div>
 
       {/* Right */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setConfigEditorOpen(true)}>
           <FileCode className="w-4 h-4 text-muted-foreground" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTimelineOpen(true)}>
+        <Button variant="ghost" size="icon" className="h-8 w-8 hidden sm:flex" onClick={() => setTimelineOpen(true)}>
           <History className="w-4 h-4 text-muted-foreground" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOpenSpeech}>
+        <Button variant="ghost" size="icon" className="h-8 w-8 hidden sm:flex" onClick={onOpenSpeech}>
           <Mic className="w-4 h-4 text-muted-foreground" />
         </Button>
         <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -153,16 +170,16 @@ const TopBar = ({ onOpenGitWizard, onOpenSpeech, onOpenPipelineEditor, onOpenEnv
             <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-node-warning" />
           )}
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
+        <Button variant="ghost" size="icon" className="h-8 w-8 hidden sm:flex">
           <Settings className="w-4 h-4 text-muted-foreground" />
         </Button>
-        <div className="w-px h-6 bg-border mx-1" />
+        <div className="w-px h-6 bg-border mx-1 hidden sm:block" />
         <Button variant="ghost" size="sm" className="h-8 gap-2">
           <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center">
             <User className="w-3.5 h-3.5 text-muted-foreground" />
           </div>
-          <span className="text-xs text-foreground">Operator</span>
-          <ChevronDown className="w-3 h-3 text-muted-foreground" />
+          <span className="text-xs text-foreground hidden md:inline">Operator</span>
+          <ChevronDown className="w-3 h-3 text-muted-foreground hidden sm:block" />
         </Button>
       </div>
     </header>

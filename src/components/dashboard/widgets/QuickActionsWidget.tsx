@@ -1,6 +1,6 @@
 import { 
   Rocket, GitBranch, RefreshCw, Terminal, Settings, 
-  Plus, Play, Pause, RotateCcw
+  Plus, Play, Pause, RotateCcw, Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import WidgetWrapper from './WidgetWrapper';
@@ -11,27 +11,29 @@ interface QuickActionsWidgetProps {
   onRemove?: (id: string) => void;
   onOpenPipelineEditor?: () => void;
   onOpenEnvironmentManager?: () => void;
+  onOpenOpzenixWizard?: () => void;
 }
 
 const QuickActionsWidget = ({ 
   id, 
   onRemove,
   onOpenPipelineEditor,
-  onOpenEnvironmentManager
+  onOpenEnvironmentManager,
+  onOpenOpzenixWizard
 }: QuickActionsWidgetProps) => {
   
   const actions = [
     { 
-      icon: Rocket, 
-      label: 'Quick Deploy', 
+      icon: Sparkles, 
+      label: 'New Pipeline', 
       color: 'text-ai-primary',
-      onClick: () => toast.info('Opening deploy wizard...')
+      onClick: onOpenOpzenixWizard
     },
     { 
-      icon: Plus, 
-      label: 'New Pipeline', 
+      icon: Rocket, 
+      label: 'Quick Deploy', 
       color: 'text-sec-safe',
-      onClick: onOpenPipelineEditor
+      onClick: () => toast.info('Opening deploy wizard...')
     },
     { 
       icon: Settings, 
@@ -40,10 +42,10 @@ const QuickActionsWidget = ({
       onClick: onOpenEnvironmentManager
     },
     { 
-      icon: RefreshCw, 
-      label: 'Sync All', 
+      icon: Plus, 
+      label: 'Pipeline Editor', 
       color: 'text-primary',
-      onClick: () => toast.success('Syncing all services...')
+      onClick: onOpenPipelineEditor
     },
     { 
       icon: Terminal, 
