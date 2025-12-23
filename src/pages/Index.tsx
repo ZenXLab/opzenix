@@ -10,11 +10,15 @@ import DeploymentTimeline from '@/components/panels/DeploymentTimeline';
 import ApprovalPanel from '@/components/governance/ApprovalPanel';
 import AuditLogViewer from '@/components/governance/AuditLogViewer';
 import DashboardView from '@/components/dashboard/DashboardView';
+import GitConnectionWizard from '@/components/connect/GitConnectionWizard';
+import SpeechPanel from '@/components/speech/SpeechPanel';
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
 import { useFlowStore } from '@/stores/flowStore';
 
 const Index = () => {
   const [isAuditLogOpen, setAuditLogOpen] = useState(false);
+  const [isGitWizardOpen, setGitWizardOpen] = useState(false);
+  const [isSpeechOpen, setSpeechOpen] = useState(false);
   const { activeView, setActiveView } = useFlowStore();
   
   // Enable real-time updates
@@ -24,7 +28,10 @@ const Index = () => {
     <ReactFlowProvider>
       <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">
         {/* Top Bar */}
-        <TopBar />
+        <TopBar 
+          onOpenGitWizard={() => setGitWizardOpen(true)}
+          onOpenSpeech={() => setSpeechOpen(true)}
+        />
         
         {/* Main Content */}
         <div className="flex-1 flex overflow-hidden">
@@ -53,6 +60,8 @@ const Index = () => {
         <DeploymentTimeline />
         <ApprovalPanel />
         <AuditLogViewer isOpen={isAuditLogOpen} onClose={() => setAuditLogOpen(false)} />
+        <GitConnectionWizard isOpen={isGitWizardOpen} onClose={() => setGitWizardOpen(false)} />
+        <SpeechPanel isOpen={isSpeechOpen} onClose={() => setSpeechOpen(false)} />
       </div>
     </ReactFlowProvider>
   );

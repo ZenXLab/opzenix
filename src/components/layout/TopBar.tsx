@@ -10,13 +10,20 @@ import {
   FileCode,
   History,
   LayoutDashboard,
-  GitBranch
+  GitBranch,
+  Mic,
+  Plus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFlowStore } from '@/stores/flowStore';
 import { cn } from '@/lib/utils';
 
-const TopBar = () => {
+interface TopBarProps {
+  onOpenGitWizard?: () => void;
+  onOpenSpeech?: () => void;
+}
+
+const TopBar = ({ onOpenGitWizard, onOpenSpeech }: TopBarProps) => {
   const { 
     systemHealth, 
     activeEnvironment, 
@@ -84,6 +91,12 @@ const TopBar = () => {
             </button>
           ))}
         </div>
+
+        {/* Connect Repo Button */}
+        <Button variant="outline" size="sm" className="h-8 gap-2" onClick={onOpenGitWizard}>
+          <Plus className="w-3.5 h-3.5" />
+          Connect Repo
+        </Button>
       </div>
 
       {/* Center */}
@@ -111,6 +124,9 @@ const TopBar = () => {
         </Button>
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTimelineOpen(true)}>
           <History className="w-4 h-4 text-muted-foreground" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onOpenSpeech}>
+          <Mic className="w-4 h-4 text-muted-foreground" />
         </Button>
         <Button variant="ghost" size="icon" className="h-8 w-8">
           <Search className="w-4 h-4 text-muted-foreground" />
