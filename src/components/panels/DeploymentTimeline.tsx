@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Clock, AlertTriangle, CheckCircle2, XCircle, RotateCcw, ArrowRight } from 'lucide-react';
+import { X, Clock, AlertTriangle, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useFlowStore, Deployment } from '@/stores/flowStore';
 import { cn } from '@/lib/utils';
+import DeploymentCharts from './DeploymentCharts';
 
 const DeploymentTimeline = () => {
   const { isTimelineOpen, setTimelineOpen, deployments } = useFlowStore();
@@ -81,6 +82,9 @@ const DeploymentTimeline = () => {
                 <X className="w-4 h-4" />
               </Button>
             </div>
+
+            {/* D3 Charts */}
+            <DeploymentCharts />
 
             {/* Timeline Content */}
             <ScrollArea className="flex-1 p-4">
