@@ -12,6 +12,8 @@ import AuditLogViewer from '@/components/governance/AuditLogViewer';
 import DashboardView from '@/components/dashboard/DashboardView';
 import GitConnectionWizard from '@/components/connect/GitConnectionWizard';
 import SpeechPanel from '@/components/speech/SpeechPanel';
+import VisualPipelineEditor from '@/components/pipeline/VisualPipelineEditor';
+import EnvironmentManager from '@/components/environments/EnvironmentManager';
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
 import { useFlowStore } from '@/stores/flowStore';
 
@@ -19,6 +21,8 @@ const Index = () => {
   const [isAuditLogOpen, setAuditLogOpen] = useState(false);
   const [isGitWizardOpen, setGitWizardOpen] = useState(false);
   const [isSpeechOpen, setSpeechOpen] = useState(false);
+  const [isPipelineEditorOpen, setPipelineEditorOpen] = useState(false);
+  const [isEnvironmentManagerOpen, setEnvironmentManagerOpen] = useState(false);
   const { activeView, setActiveView } = useFlowStore();
   
   // Enable real-time updates
@@ -31,6 +35,8 @@ const Index = () => {
         <TopBar 
           onOpenGitWizard={() => setGitWizardOpen(true)}
           onOpenSpeech={() => setSpeechOpen(true)}
+          onOpenPipelineEditor={() => setPipelineEditorOpen(true)}
+          onOpenEnvironmentManager={() => setEnvironmentManagerOpen(true)}
         />
         
         {/* Main Content */}
@@ -62,6 +68,8 @@ const Index = () => {
         <AuditLogViewer isOpen={isAuditLogOpen} onClose={() => setAuditLogOpen(false)} />
         <GitConnectionWizard isOpen={isGitWizardOpen} onClose={() => setGitWizardOpen(false)} />
         <SpeechPanel isOpen={isSpeechOpen} onClose={() => setSpeechOpen(false)} />
+        <VisualPipelineEditor isOpen={isPipelineEditorOpen} onClose={() => setPipelineEditorOpen(false)} />
+        <EnvironmentManager isOpen={isEnvironmentManagerOpen} onClose={() => setEnvironmentManagerOpen(false)} />
       </div>
     </ReactFlowProvider>
   );

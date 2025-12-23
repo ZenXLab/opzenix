@@ -12,7 +12,9 @@ import {
   LayoutDashboard,
   GitBranch,
   Mic,
-  Plus
+  Plus,
+  Workflow,
+  Server
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFlowStore } from '@/stores/flowStore';
@@ -21,9 +23,11 @@ import { cn } from '@/lib/utils';
 interface TopBarProps {
   onOpenGitWizard?: () => void;
   onOpenSpeech?: () => void;
+  onOpenPipelineEditor?: () => void;
+  onOpenEnvironmentManager?: () => void;
 }
 
-const TopBar = ({ onOpenGitWizard, onOpenSpeech }: TopBarProps) => {
+const TopBar = ({ onOpenGitWizard, onOpenSpeech, onOpenPipelineEditor, onOpenEnvironmentManager }: TopBarProps) => {
   const { 
     systemHealth, 
     activeEnvironment, 
@@ -96,6 +100,18 @@ const TopBar = ({ onOpenGitWizard, onOpenSpeech }: TopBarProps) => {
         <Button variant="outline" size="sm" className="h-8 gap-2" onClick={onOpenGitWizard}>
           <Plus className="w-3.5 h-3.5" />
           Connect Repo
+        </Button>
+
+        {/* Pipeline Editor Button */}
+        <Button variant="outline" size="sm" className="h-8 gap-2" onClick={onOpenPipelineEditor}>
+          <Workflow className="w-3.5 h-3.5" />
+          Pipeline Editor
+        </Button>
+
+        {/* Environment Manager Button */}
+        <Button variant="outline" size="sm" className="h-8 gap-2" onClick={onOpenEnvironmentManager}>
+          <Server className="w-3.5 h-3.5" />
+          Environments
         </Button>
       </div>
 
