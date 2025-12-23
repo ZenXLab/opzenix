@@ -2,13 +2,17 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   ChevronLeft, ChevronRight, Layers, GitBranch, Box, Database, Brain, Shield, Clock,
-  CheckCircle2, AlertCircle, XCircle, Pause, Zap, Filter
+  CheckCircle2, AlertCircle, XCircle, Pause, Zap, Filter, FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useFlowStore, Execution, FlowType } from '@/stores/flowStore';
 import { cn } from '@/lib/utils';
+
+interface LeftRailProps {
+  onOpenAuditLog?: () => void;
+}
 
 const flowCategories: { id: FlowType; label: string; icon: typeof GitBranch; count: number }[] = [
   { id: 'cicd', label: 'CI/CD', icon: GitBranch, count: 8 },
@@ -27,7 +31,7 @@ const statusIcons = {
   idle: { icon: Clock, className: 'text-muted-foreground' },
 };
 
-const LeftRail = () => {
+const LeftRail = ({ onOpenAuditLog }: LeftRailProps) => {
   const [collapsed, setCollapsed] = useState(false);
   const { executions, selectedExecution, setSelectedExecution, activeFlowType, setActiveFlowType } = useFlowStore();
 
@@ -104,7 +108,18 @@ const LeftRail = () => {
       </ScrollArea>
 
       {!collapsed && (
-        <div className="p-3 border-t border-border">
+        <div className="p-3 border-t border-border space-y-2">
+          {/* Audit Log Button */}
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="w-full justify-start gap-2 h-8"
+            onClick={onOpenAuditLog}
+          >
+            <FileText className="w-4 h-4 text-ai-primary" />
+            <span className="text-xs">Audit Log</span>
+          </Button>
+          
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>Last sync: 12s ago</span>
             <div className="flex items-center gap-1">
