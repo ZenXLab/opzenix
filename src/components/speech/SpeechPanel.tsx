@@ -2,11 +2,12 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Mic, MicOff, Volume2, VolumeX, X, AlertTriangle,
-  Activity, Sparkles, Shield, Clock, CheckCircle2
+  Activity, Sparkles, Shield, Clock, CheckCircle2, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useFlowStore } from '@/stores/flowStore';
+import { toast } from 'sonner';
 
 interface SpeechPanelProps {
   isOpen: boolean;
@@ -28,10 +29,78 @@ const SpeechPanel = ({ isOpen, onClose }: SpeechPanelProps) => {
   const [transcript, setTranscript] = useState('');
   const [speechLogs, setSpeechLogs] = useState<SpeechLog[]>([]);
   const [isHolding, setIsHolding] = useState(false);
+  const [isLoadingTTS, setIsLoadingTTS] = useState(false);
   const holdTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const { systemHealth, executions, deployments } = useFlowStore();
 
-  // Simulated speech responses based on queries
+  // ElevenLabs TTS function
+  const speakWithElevenLabs = useCallback(async (text: string) => {
+    if (isMuted) {
+      setMode('idle');
+      return;
+    }
+
+    setIsLoadingTTS(true);
+    setMode('speaking');
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ 
+            text,
+            voiceId: 'JBFqnCBsd6RMkjVDRZzb' // George - professional voice
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`TTS request failed: ${response.status}`);
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      // Stop any existing audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      
+      audio.onended = () => {
+        setMode('idle');
+        setIsLoadingTTS(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+
+      audio.onerror = () => {
+        console.error('Audio playback error');
+        setMode('idle');
+        setIsLoadingTTS(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+
+      await audio.play();
+      setIsLoadingTTS(false);
+    } catch (error) {
+      console.error('TTS error:', error);
+      toast.error('Voice synthesis unavailable');
+      setMode('idle');
+      setIsLoadingTTS(false);
+    }
+  }, [isMuted]);
+
+  // Process query and generate response
   const processQuery = useCallback((query: string) => {
     const lowerQuery = query.toLowerCase();
     let response = '';
@@ -58,19 +127,46 @@ const SpeechPanel = ({ isOpen, onClose }: SpeechPanelProps) => {
     return response;
   }, [systemHealth, executions, deployments]);
 
+  const handleQuerySubmit = useCallback(async (query: string) => {
+    // Add user query to log
+    const userLog: SpeechLog = {
+      id: `log-${Date.now()}`,
+      type: 'user',
+      text: query,
+      timestamp: new Date(),
+    };
+    setSpeechLogs(prev => [...prev, userLog]);
+
+    // Process and respond
+    setMode('processing');
+    
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const response = processQuery(query);
+    const systemLog: SpeechLog = {
+      id: `log-${Date.now()}-sys`,
+      type: 'system',
+      text: response,
+      timestamp: new Date(),
+    };
+    setSpeechLogs(prev => [...prev, systemLog]);
+    
+    // Speak the response with ElevenLabs
+    await speakWithElevenLabs(response);
+  }, [processQuery, speakWithElevenLabs]);
+
   const handlePushToTalkStart = useCallback(() => {
     setIsHolding(true);
     setMode('listening');
     setTranscript('');
     
-    // Simulate speech recognition
+    // Simulate speech recognition (would use Web Speech API in production)
     holdTimeoutRef.current = setTimeout(() => {
-      // Simulated transcript
       setTranscript('Show me the current system status');
     }, 1500);
   }, []);
 
-  const handlePushToTalkEnd = useCallback(() => {
+  const handlePushToTalkEnd = useCallback(async () => {
     if (!isHolding) return;
     
     setIsHolding(false);
@@ -79,45 +175,37 @@ const SpeechPanel = ({ isOpen, onClose }: SpeechPanelProps) => {
     }
 
     if (transcript) {
-      // Add user query to log
-      const userLog: SpeechLog = {
-        id: `log-${Date.now()}`,
-        type: 'user',
-        text: transcript,
-        timestamp: new Date(),
-      };
-      setSpeechLogs(prev => [...prev, userLog]);
-
-      // Process and respond
-      setMode('processing');
-      setTimeout(() => {
-        const response = processQuery(transcript);
-        const systemLog: SpeechLog = {
-          id: `log-${Date.now()}-sys`,
-          type: 'system',
-          text: response,
-          timestamp: new Date(),
-        };
-        setSpeechLogs(prev => [...prev, systemLog]);
-        
-        setMode('speaking');
-        
-        // Simulate TTS completion
-        setTimeout(() => {
-          setMode('idle');
-          setTranscript('');
-        }, 3000);
-      }, 1000);
+      await handleQuerySubmit(transcript);
+      setTranscript('');
     } else {
       setMode('idle');
     }
-  }, [isHolding, transcript, processQuery]);
+  }, [isHolding, transcript, handleQuerySubmit]);
+
+  const handleQuickQuery = useCallback(async (query: string) => {
+    setTranscript(query);
+    await handleQuerySubmit(query);
+    setTranscript('');
+  }, [handleQuerySubmit]);
+
+  // Stop audio when muted
+  useEffect(() => {
+    if (isMuted && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+      setMode('idle');
+    }
+  }, [isMuted]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (holdTimeoutRef.current) {
         clearTimeout(holdTimeoutRef.current);
+      }
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
       }
     };
   }, []);
@@ -151,7 +239,9 @@ const SpeechPanel = ({ isOpen, onClose }: SpeechPanelProps) => {
               </div>
               <div>
                 <h3 className="text-sm font-medium text-foreground">Voice Intelligence</h3>
-                <p className="text-xs text-muted-foreground capitalize">{mode}</p>
+                <p className="text-xs text-muted-foreground capitalize">
+                  {mode === 'speaking' && isLoadingTTS ? 'Generating voice...' : mode}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -171,6 +261,14 @@ const SpeechPanel = ({ isOpen, onClose }: SpeechPanelProps) => {
                 <X className="w-4 h-4" />
               </Button>
             </div>
+          </div>
+
+          {/* ElevenLabs Badge */}
+          <div className="px-4 py-2 bg-ai-primary/5 border-b border-ai-primary/10 flex items-center gap-2">
+            <Sparkles className="w-3 h-3 text-ai-primary" />
+            <p className="text-xs text-muted-foreground">
+              Powered by <strong className="text-ai-primary">ElevenLabs</strong> Voice AI
+            </p>
           </div>
 
           {/* Permission Notice */}
@@ -233,15 +331,19 @@ const SpeechPanel = ({ isOpen, onClose }: SpeechPanelProps) => {
 
             {mode === 'processing' && (
               <div className="flex items-center gap-2 p-3 text-xs text-muted-foreground">
-                <div className="w-4 h-4 border-2 border-ai-primary border-t-transparent rounded-full animate-spin" />
+                <Loader2 className="w-4 h-4 text-ai-primary animate-spin" />
                 Processing query...
               </div>
             )}
 
             {mode === 'speaking' && (
               <div className="flex items-center gap-2 p-3 text-xs text-ai-primary">
-                <Volume2 className="w-4 h-4 animate-pulse" />
-                Speaking response...
+                {isLoadingTTS ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Volume2 className="w-4 h-4 animate-pulse" />
+                )}
+                {isLoadingTTS ? 'Generating voice...' : 'Speaking response...'}
               </div>
             )}
           </div>
@@ -253,31 +355,12 @@ const SpeechPanel = ({ isOpen, onClose }: SpeechPanelProps) => {
               {['System status', 'Last deployment', 'Failed executions', 'Pending approvals'].map((query) => (
                 <button
                   key={query}
-                  className="px-2 py-1 text-xs bg-secondary hover:bg-secondary/80 text-muted-foreground rounded transition-colors"
-                  onClick={() => {
-                    setTranscript(query);
-                    const userLog: SpeechLog = {
-                      id: `log-${Date.now()}`,
-                      type: 'user',
-                      text: query,
-                      timestamp: new Date(),
-                    };
-                    setSpeechLogs(prev => [...prev, userLog]);
-                    setMode('processing');
-                    
-                    setTimeout(() => {
-                      const response = processQuery(query);
-                      const systemLog: SpeechLog = {
-                        id: `log-${Date.now()}-sys`,
-                        type: 'system',
-                        text: response,
-                        timestamp: new Date(),
-                      };
-                      setSpeechLogs(prev => [...prev, systemLog]);
-                      setMode('speaking');
-                      setTimeout(() => setMode('idle'), 3000);
-                    }, 1000);
-                  }}
+                  disabled={mode !== 'idle'}
+                  className={cn(
+                    'px-2 py-1 text-xs bg-secondary hover:bg-secondary/80 text-muted-foreground rounded transition-colors',
+                    mode !== 'idle' && 'opacity-50 cursor-not-allowed'
+                  )}
+                  onClick={() => handleQuickQuery(query)}
                 >
                   {query}
                 </button>

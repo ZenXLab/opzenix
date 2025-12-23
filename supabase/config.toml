@@ -11,3 +11,5 @@ port = 54323
 verify_jwt = true
 [functions.explain-config]
 verify_jwt = true
+[functions.elevenlabs-tts]
+verify_jwt = false
