@@ -209,11 +209,13 @@ interface ConnectionItemProps {
 }
 
 const ConnectionItem = ({ connection, onValidate, isValidating, onClick }: ConnectionItemProps) => {
-  const Icon = {
+  const iconMap: Record<string, typeof Github> = {
     github: Github,
     kubernetes: Cloud,
+    azure: Cloud,
     vault: Shield,
-  }[connection.type];
+  };
+  const IconComponent = iconMap[connection.type] || Cloud;
 
   const getStatusBadge = (status: Connection['status']) => {
     switch (status) {
@@ -257,7 +259,7 @@ const ConnectionItem = ({ connection, onValidate, isValidating, onClick }: Conne
     >
       <div className="flex items-center gap-4">
         <div className="w-10 h-10 rounded-lg bg-background flex items-center justify-center border">
-          <Icon className="w-5 h-5 text-muted-foreground" />
+          <IconComponent className="w-5 h-5 text-muted-foreground" />
         </div>
         <div>
           <h4 className="text-sm font-medium">{connection.name}</h4>
