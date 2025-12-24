@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard,
@@ -13,12 +13,12 @@ import {
   History,
   GitBranch,
   Lock,
-  Shield,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ControlTowerNavProps {
   activeSection: string;
@@ -96,12 +96,52 @@ const navItems = [
 const ControlTowerNav = ({ 
   activeSection, 
   onSectionChange,
-  onOpenAuditLog,
 }: ControlTowerNavProps) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
+  const [activeExecutionsCount, setActiveExecutionsCount] = useState(0);
+
+  // Fetch and subscribe to real counts
+  useEffect(() => {
+    const fetchCounts = async () => {
+      const [approvalsResult, executionsResult] = await Promise.all([
+        supabase
+          .from('approval_requests')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pending'),
+        supabase
+          .from('executions')
+          .select('id', { count: 'exact', head: true })
+          .in('status', ['running', 'paused'])
+      ]);
+
+      setPendingApprovalsCount(approvalsResult.count || 0);
+      setActiveExecutionsCount(executionsResult.count || 0);
+    };
+
+    fetchCounts();
+
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel('nav-counts')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'approval_requests' }, fetchCounts)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'executions' }, fetchCounts)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const handleNavClick = (id: string) => {
     onSectionChange(id);
+  };
+
+  const getBadgeContent = (badge?: string) => {
+    if (badge === 'count') {
+      return pendingApprovalsCount > 0 ? pendingApprovalsCount : null;
+    }
+    return null;
   };
 
   return (
@@ -135,6 +175,8 @@ const ControlTowerNav = ({
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeSection === item.id;
+            const badgeValue = getBadgeContent(item.badge);
+            const showLiveDot = item.badge === 'live' && activeExecutionsCount > 0;
             
             const buttonContent = (
               <button
@@ -149,15 +191,15 @@ const ControlTowerNav = ({
               >
                 <div className="relative">
                   <Icon className={cn('w-4 h-4 shrink-0', isActive && 'text-primary')} />
-                  {item.badge === 'live' && (
+                  {showLiveDot && (
                     <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-sec-safe animate-pulse" />
                   )}
                 </div>
                 {!collapsed && (
                   <>
                     <span className="flex-1 text-left text-xs">{item.label}</span>
-                    {item.badge === 'count' && (
-                      <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">3</Badge>
+                    {badgeValue !== null && (
+                      <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{badgeValue}</Badge>
                     )}
                   </>
                 )}

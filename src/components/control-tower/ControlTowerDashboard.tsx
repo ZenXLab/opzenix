@@ -68,7 +68,8 @@ const ControlTowerDashboard = ({
   // Use real-time hooks
   const { connections, loading: connectionsLoading, isConnected: connectionsConnected } = useConnectionsRealtime();
   const { 
-    executions, 
+    activeExecutions: executions, 
+    pendingApprovals,
     loading: executionsLoading, 
     isConnected: realtimeConnected 
   } = useControlTowerRealtime();
