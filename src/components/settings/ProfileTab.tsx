@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   User, Mail, Building2, Briefcase, Github, 
-  Globe, Loader2, Save, Camera
+  Globe, Loader2, Save, Camera, Wand2, Upload
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -45,10 +51,21 @@ const TIMEZONES = [
   'Australia/Sydney'
 ];
 
+// Background colors for auto-generated avatars
+const AVATAR_BACKGROUNDS = [
+  '0D47A1', '1565C0', '1976D2', '2196F3', // Blues
+  '00695C', '00897B', '009688', '26A69A', // Teals
+  '4A148C', '6A1B9A', '7B1FA2', '8E24AA', // Purples
+  'BF360C', 'D84315', 'E64A19', 'F4511E', // Deep Orange
+  '1B5E20', '2E7D32', '388E3C', '43A047', // Greens
+];
+
 export function ProfileTab() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Form state
   const [fullName, setFullName] = useState('');
@@ -64,23 +81,55 @@ export function ProfileTab() {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       
-      setProfile(data);
-      setFullName(data.full_name || '');
-      setCompany(data.company || '');
-      setJobTitle(data.job_title || '');
-      setTimezone(data.timezone || 'UTC');
+      if (data) {
+        setProfile(data);
+        setFullName(data.full_name || '');
+        setCompany(data.company || '');
+        setJobTitle(data.job_title || '');
+        setTimezone(data.timezone || 'UTC');
+      } else {
+        // Profile doesn't exist, create one
+        const newProfile = {
+          id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || null,
+          avatar_url: null,
+          company: null,
+          job_title: null,
+          timezone: 'UTC',
+          github_username: null
+        };
+        
+        // Use upsert to handle potential race conditions
+        const { data: createdProfile, error: createError } = await supabase
+          .from('profiles')
+          .upsert(newProfile, { onConflict: 'id' })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Error creating profile:', createError);
+        } else if (createdProfile) {
+          setProfile(createdProfile);
+          setFullName(createdProfile.full_name || '');
+        }
+      }
     } catch (error) {
       console.error('Error fetching profile:', error);
+      toast.error('Failed to load profile');
     } finally {
       setLoading(false);
     }
@@ -114,6 +163,86 @@ export function ProfileTab() {
     }
   };
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !profile) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${profile.id}/${Date.now()}.${fileExt}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // Update profile
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
+        .eq('id', profile.id);
+
+      if (updateError) throw updateError;
+
+      toast.success('Avatar uploaded successfully');
+      fetchProfile();
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      toast.error('Failed to upload avatar');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const generateOpzenixAvatar = async () => {
+    if (!profile) return;
+
+    setUploadingAvatar(true);
+    try {
+      const name = fullName || profile.email?.split('@')[0] || 'User';
+      const randomBg = AVATAR_BACKGROUNDS[Math.floor(Math.random() * AVATAR_BACKGROUNDS.length)];
+      
+      // Use UI Avatars service for auto-generation
+      const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${randomBg}&color=ffffff&size=256&bold=true&format=png`;
+
+      // Update profile with generated avatar URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl, updated_at: new Date().toISOString() })
+        .eq('id', profile.id);
+
+      if (updateError) throw updateError;
+
+      toast.success('Avatar generated by Opzenix');
+      fetchProfile();
+    } catch (error) {
+      console.error('Error generating avatar:', error);
+      toast.error('Failed to generate avatar');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -127,9 +256,14 @@ export function ProfileTab() {
       <div className="text-center py-12">
         <User className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
         <p className="text-muted-foreground">Profile not found</p>
+        <Button onClick={fetchProfile} className="mt-4" variant="outline">
+          Retry
+        </Button>
       </div>
     );
   }
+
+  const displayName = fullName || profile.full_name || profile.email?.split('@')[0] || 'User';
 
   return (
     <div className="space-y-6">
@@ -145,16 +279,46 @@ export function ProfileTab() {
             <div className="relative">
               <Avatar className="w-20 h-20">
                 <AvatarImage src={profile.avatar_url || undefined} />
-                <AvatarFallback className="text-lg">
-                  {profile.full_name?.[0] || profile.email?.[0] || 'U'}
+                <AvatarFallback className="text-lg bg-primary/10 text-primary">
+                  {displayName.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <button className="absolute bottom-0 right-0 p-1.5 bg-primary rounded-full text-primary-foreground hover:bg-primary/90 transition-colors">
-                <Camera className="w-3.5 h-3.5" />
-              </button>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button 
+                    className="absolute bottom-0 right-0 p-1.5 bg-primary rounded-full text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                    disabled={uploadingAvatar}
+                  >
+                    {uploadingAvatar ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Camera className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="gap-2">
+                    <Upload className="w-4 h-4" />
+                    Upload Photo
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={generateOpzenixAvatar} className="gap-2">
+                    <Wand2 className="w-4 h-4" />
+                    Generate by Opzenix
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
             </div>
             <div>
-              <h3 className="font-medium">{profile.full_name || 'No name set'}</h3>
+              <h3 className="font-medium">{displayName}</h3>
               <p className="text-sm text-muted-foreground">{profile.email}</p>
               {profile.github_username && (
                 <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">

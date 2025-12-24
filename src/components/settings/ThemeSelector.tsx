@@ -1,12 +1,10 @@
+import { useState, useEffect } from 'react';
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Label } from '@/components/ui/label';
+import { supabase } from '@/integrations/supabase/client';
 
 export type ThemeOption = 'obsidian' | 'midnight' | 'ocean' | 'forest';
-
-interface ThemeSelectorProps {
-  value: ThemeOption;
-  onChange: (theme: ThemeOption) => void;
-}
 
 const themes: { id: ThemeOption; name: string; description: string; colors: { primary: string; accent: string; bg: string } }[] = [
   {
@@ -35,37 +33,55 @@ const themes: { id: ThemeOption; name: string; description: string; colors: { pr
   },
 ];
 
-export function ThemeSelector({ value, onChange }: ThemeSelectorProps) {
+export function ThemeSelector() {
+  const [value, setValue] = useState<ThemeOption>('obsidian');
+
+  useEffect(() => {
+    const loadPreference = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from('user_preferences').select('ui_preferences').eq('user_id', user.id).maybeSingle();
+      if (data?.ui_preferences?.theme) setValue(data.ui_preferences.theme);
+    };
+    loadPreference();
+  }, []);
+
+  const handleChange = async (theme: ThemeOption) => {
+    setValue(theme);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('user_preferences').upsert({ user_id: user.id, ui_preferences: { theme } }, { onConflict: 'user_id' });
+  };
+
   return (
-    <div className="grid grid-cols-2 gap-3">
-      {themes.map((theme) => (
-        <button
-          key={theme.id}
-          onClick={() => onChange(theme.id)}
-          className={cn(
-            'relative flex flex-col items-start rounded-lg border-2 p-3 text-left transition-all',
-            value === theme.id
-              ? 'border-primary bg-primary/5'
-              : 'border-border hover:border-primary/50 hover:bg-muted/50'
-          )}
-        >
-          {value === theme.id && (
-            <div className="absolute right-2 top-2 rounded-full bg-primary p-0.5">
-              <Check className="h-3 w-3 text-primary-foreground" />
+    <div>
+      <Label className="text-sm font-medium">Theme</Label>
+      <p className="text-xs text-muted-foreground mb-3">Choose your preferred color theme</p>
+      <div className="grid grid-cols-2 gap-3">
+        {themes.map((theme) => (
+          <button
+            key={theme.id}
+            onClick={() => handleChange(theme.id)}
+            className={cn(
+              'relative flex flex-col items-start rounded-lg border-2 p-3 text-left transition-all',
+              value === theme.id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/50'
+            )}
+          >
+            {value === theme.id && (
+              <div className="absolute right-2 top-2 rounded-full bg-primary p-0.5">
+                <Check className="h-3 w-3 text-primary-foreground" />
+              </div>
+            )}
+            <div className="mb-3 flex gap-1.5">
+              <div className={cn('h-6 w-6 rounded', theme.colors.bg)} />
+              <div className={cn('h-6 w-6 rounded', theme.colors.primary)} />
+              <div className={cn('h-6 w-6 rounded', theme.colors.accent)} />
             </div>
-          )}
-          
-          {/* Theme Preview */}
-          <div className="mb-3 flex gap-1.5">
-            <div className={cn('h-6 w-6 rounded', theme.colors.bg)} />
-            <div className={cn('h-6 w-6 rounded', theme.colors.primary)} />
-            <div className={cn('h-6 w-6 rounded', theme.colors.accent)} />
-          </div>
-          
-          <span className="text-sm font-medium">{theme.name}</span>
-          <span className="text-xs text-muted-foreground">{theme.description}</span>
-        </button>
-      ))}
+            <span className="text-sm font-medium">{theme.name}</span>
+            <span className="text-xs text-muted-foreground">{theme.description}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
