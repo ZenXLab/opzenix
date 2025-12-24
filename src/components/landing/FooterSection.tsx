@@ -1,37 +1,36 @@
 import { motion } from 'framer-motion';
-import { Sparkles, ArrowRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Github, Twitter, Linkedin, Zap, Shield } from 'lucide-react';
 
 const FooterSection = () => {
   return (
-    <footer className="py-24 px-8 border-t border-border bg-card/30">
-      <div className="max-w-4xl mx-auto text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-        >
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <Sparkles className="w-8 h-8 text-ai-primary" />
-            <span className="text-2xl font-bold text-foreground">Opzenix</span>
+    <footer className="py-16 px-8 border-t border-border bg-card/30">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-8">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+              <Zap className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <span className="text-lg font-bold text-foreground">Opzenix</span>
           </div>
           
-          <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
-            The universal execution, visibility, and recovery system for enterprise operations.
-          </p>
-
-          <Button size="lg" className="gap-2">
-            Request Private Access
-            <ArrowRight className="w-4 h-4" />
-          </Button>
-
-          <div className="mt-16 pt-8 border-t border-border">
-            <p className="text-sm text-muted-foreground">
-              Built for enterprises that demand complete control.
-            </p>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Shield className="w-4 h-4 text-sec-safe" />
+            <span>Enterprise Execution Control Plane</span>
           </div>
-        </motion.div>
+        </div>
+
+        <div className="pt-8 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">
+            © {new Date().getFullYear()} Opzenix. All rights reserved.
+          </p>
+          <div className="flex items-center gap-4">
+            {[Github, Twitter, Linkedin].map((Icon, i) => (
+              <a key={i} href="#" className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+                <Icon className="w-4 h-4" />
+              </a>
+            ))}
+          </div>
+        </div>
       </div>
     </footer>
   );
