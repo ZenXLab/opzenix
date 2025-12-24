@@ -454,8 +454,17 @@ const ControlTowerDashboard = ({
           </CardContent>
         </Card>
 
-        {/* Last Approval Indicator */}
-        <LastApprovalIndicator />
+        {/* Version History & Rollback Widget */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <VersionHistoryWidget 
+            onViewAll={() => onOpenEnvironments?.()} 
+          />
+          
+          {/* Last Approval Indicator */}
+          <Card>
+            <LastApprovalIndicator />
+          </Card>
+        </div>
       </div>
     </ScrollArea>
   );
