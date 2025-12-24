@@ -1,22 +1,18 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { 
-  Github, GitBranch, Cloud, Server, Shield, Database,
-  Container, Lock, Activity, Layers, Terminal, Cpu,
-  ArrowRight, CheckCircle2, ExternalLink, Zap
-} from 'lucide-react';
+import { ArrowRight, CheckCircle2, ExternalLink, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EnterpriseNavigation } from '@/components/landing/EnterpriseNavigation';
 import FooterSection from '@/components/landing/FooterSection';
+import { IntegrationLogoMap } from '@/components/integrations/IntegrationLogos';
 
 interface Integration {
   id: string;
   name: string;
   category: string;
   description: string;
-  icon: React.ReactNode;
   status: 'available' | 'coming-soon' | 'beta';
   features: string[];
   docsUrl?: string;
@@ -28,7 +24,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'GitHub',
     category: 'Source Control',
     description: 'Native GitHub App integration with webhooks, branch protection sync, and PR status checks.',
-    icon: <Github className="w-8 h-8" />,
     status: 'available',
     features: ['GitHub App installation', 'Webhook events', 'PR status checks', 'Branch protection sync'],
     docsUrl: '/docs/setup-guides/github-app'
@@ -38,7 +33,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'GitLab',
     category: 'Source Control',
     description: 'Full GitLab integration supporting self-hosted and SaaS instances with CI/CD pipeline triggers.',
-    icon: <GitBranch className="w-8 h-8" />,
     status: 'available',
     features: ['OAuth integration', 'Pipeline triggers', 'Merge request gates', 'Self-hosted support']
   },
@@ -324,19 +318,20 @@ export default function Integrations() {
               transition={{ delay: 0.3 }}
               className="mt-16 grid grid-cols-4 md:grid-cols-8 gap-4"
             >
-              {INTEGRATIONS.slice(0, 8).map((integration, i) => (
-                <motion.div
-                  key={integration.id}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.1 * i }}
-                  className="flex items-center justify-center p-4 bg-card/50 border rounded-xl hover:border-primary/50 transition-colors"
-                >
-                  <div className="text-muted-foreground hover:text-foreground transition-colors">
-                    {integration.icon}
-                  </div>
-                </motion.div>
-              ))}
+              {INTEGRATIONS.slice(0, 8).map((integration, i) => {
+                const LogoComponent = IntegrationLogoMap[integration.id];
+                return (
+                  <motion.div
+                    key={integration.id}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.1 * i }}
+                    className="flex items-center justify-center p-4 bg-card/50 border rounded-xl hover:border-primary/50 transition-colors"
+                  >
+                    {LogoComponent && <LogoComponent className="w-8 h-8" />}
+                  </motion.div>
+                );
+              })}
             </motion.div>
           </div>
         </section>
@@ -362,16 +357,18 @@ export default function Integrations() {
                     {category}
                   </h2>
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {categoryIntegrations.map((integration) => (
-                      <Card 
-                        key={integration.id} 
-                        className="group hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/5"
-                      >
-                        <CardHeader>
-                          <div className="flex items-start justify-between">
-                            <div className="p-3 bg-primary/10 rounded-xl text-primary">
-                              {integration.icon}
-                            </div>
+                    {categoryIntegrations.map((integration) => {
+                      const LogoComponent = IntegrationLogoMap[integration.id];
+                      return (
+                        <Card 
+                          key={integration.id} 
+                          className="group hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/5"
+                        >
+                          <CardHeader>
+                            <div className="flex items-start justify-between">
+                              <div className="p-3 bg-primary/10 rounded-xl">
+                                {LogoComponent && <LogoComponent className="w-8 h-8" />}
+                              </div>
                             <Badge 
                               variant={
                                 integration.status === 'available' ? 'default' : 
@@ -408,7 +405,8 @@ export default function Integrations() {
                           )}
                         </CardContent>
                       </Card>
-                    ))}
+                      );
+                    })}
                   </div>
                 </motion.div>
               );
