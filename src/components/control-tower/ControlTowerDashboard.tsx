@@ -13,30 +13,27 @@ import {
   Cloud,
   Shield,
   RefreshCw,
-  Eye
+  Eye,
+  WifiOff,
+  Loader2
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { useConnectionsRealtime, Connection } from '@/hooks/useConnectionsRealtime';
+import { useControlTowerRealtime } from '@/hooks/useControlTowerRealtime';
+import SystemRiskBanner from './SystemRiskBanner';
+import LastApprovalIndicator from './LastApprovalIndicator';
 
 interface ControlTowerDashboardProps {
   onViewExecution?: (executionId: string) => void;
   onOpenConnections?: () => void;
   onOpenEnvironments?: () => void;
   onOpenApprovals?: () => void;
-}
-
-interface ConnectionStatus {
-  id: string;
-  name: string;
-  type: 'github' | 'kubernetes' | 'vault';
-  status: 'connected' | 'invalid' | 'rate-limited' | 'error';
-  lastValidated?: string;
-  details?: string;
 }
 
 interface EnvironmentOverview {
@@ -51,25 +48,14 @@ interface EnvironmentOverview {
   };
 }
 
-interface ActiveExecution {
-  id: string;
-  name: string;
-  repo: string;
-  branch: string;
-  environment: string;
-  currentNode: string;
-  status: 'running' | 'paused' | 'awaiting-approval';
-  progress: number;
-  startedAt: string;
-}
-
-interface SystemWarning {
-  id: string;
-  type: 'deployment-failed' | 'approval-blocked' | 'rate-limit' | 'connectivity';
-  message: string;
-  severity: 'warning' | 'error';
-  timestamp: string;
-  executionId?: string;
+function formatTimeAgo(date: Date): string {
+  const now = new Date();
+  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 }
 
 const ControlTowerDashboard = ({
@@ -78,123 +64,114 @@ const ControlTowerDashboard = ({
   onOpenEnvironments,
   onOpenApprovals,
 }: ControlTowerDashboardProps) => {
-  // Mock data - will be replaced with real data
-  const [connections] = useState<ConnectionStatus[]>([
-    { id: '1', name: 'opzenix/platform-core', type: 'github', status: 'connected', lastValidated: '2 min ago' },
-    { id: '2', name: 'aks-production', type: 'kubernetes', status: 'connected', lastValidated: '1 min ago' },
-    { id: '3', name: 'azure-keyvault-prod', type: 'vault', status: 'connected', lastValidated: '5 min ago' },
-  ]);
+  // Use real-time hooks
+  const { connections, loading: connectionsLoading, isConnected: connectionsConnected } = useConnectionsRealtime();
+  const { 
+    executions, 
+    loading: executionsLoading, 
+    isConnected: realtimeConnected 
+  } = useControlTowerRealtime();
 
-  const [environments] = useState<EnvironmentOverview[]>([
-    { 
-      id: '1', 
-      name: 'Development', 
-      strategy: 'rolling', 
-      approvalRequired: false,
-      lastDeployment: { status: 'success', version: 'v2.4.2', timestamp: '10 min ago' }
-    },
-    { 
-      id: '2', 
-      name: 'Staging', 
-      strategy: 'canary', 
-      approvalRequired: false,
-      lastDeployment: { status: 'running', version: 'v2.4.3', timestamp: '2 min ago' }
-    },
-    { 
-      id: '3', 
-      name: 'Production', 
-      strategy: 'blue-green', 
-      approvalRequired: true,
-      lastDeployment: { status: 'success', version: 'v2.4.1', timestamp: '2 hours ago' }
-    },
-  ]);
+  const [environments, setEnvironments] = useState<EnvironmentOverview[]>([]);
+  const [envLoading, setEnvLoading] = useState(true);
 
-  const [executions, setExecutions] = useState<ActiveExecution[]>([]);
-  const [warnings, setWarnings] = useState<SystemWarning[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Fetch active executions
+  // Fetch environments with last deployment status
   useEffect(() => {
-    const fetchExecutions = async () => {
-      setLoading(true);
+    const fetchEnvironments = async () => {
+      setEnvLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('executions')
+        const { data: envData, error } = await supabase
+          .from('environment_configs')
           .select('*')
-          .in('status', ['running', 'paused'])
-          .order('started_at', { ascending: false })
-          .limit(10);
+          .eq('is_active', true)
+          .order('name');
 
-        if (!error && data) {
-          setExecutions(data.map(e => ({
-            id: e.id,
-            name: e.name,
-            repo: 'platform-core',
-            branch: e.branch || 'main',
-            environment: e.environment,
-            currentNode: 'Deploy',
-            status: e.status === 'paused' ? 'awaiting-approval' : 'running',
-            progress: e.progress || 0,
-            startedAt: new Date(e.started_at).toLocaleTimeString(),
-          })));
-        }
+        if (!error && envData) {
+          // For each environment, get the latest deployment
+          const envsWithDeployments = await Promise.all(
+            envData.map(async (env) => {
+              const { data: deployData } = await supabase
+                .from('deployments')
+                .select('*')
+                .eq('environment', env.environment)
+                .order('deployed_at', { ascending: false })
+                .limit(1)
+                .single();
 
-        // Fetch failed deployments as warnings
-        const { data: failedData } = await supabase
-          .from('deployments')
-          .select('*')
-          .eq('status', 'failed')
-          .order('deployed_at', { ascending: false })
-          .limit(5);
+              const vars = env.variables as Record<string, unknown> || {};
+              
+              return {
+                id: env.id,
+                name: env.name,
+                strategy: (vars.strategy as string || 'rolling') as 'rolling' | 'canary' | 'blue-green',
+                approvalRequired: (vars.approvalRequired as boolean) || env.environment === 'production',
+                lastDeployment: deployData ? {
+                  status: deployData.status as 'success' | 'failed' | 'running',
+                  version: deployData.version,
+                  timestamp: formatTimeAgo(new Date(deployData.deployed_at))
+                } : undefined
+              };
+            })
+          );
 
-        if (failedData) {
-          setWarnings(failedData.map(d => ({
-            id: d.id,
-            type: 'deployment-failed',
-            message: `Deployment ${d.version} to ${d.environment} failed`,
-            severity: 'error',
-            timestamp: new Date(d.deployed_at).toLocaleTimeString(),
-            executionId: d.execution_id || undefined,
-          })));
+          setEnvironments(envsWithDeployments);
         }
       } catch (err) {
-        console.error('Failed to fetch executions:', err);
+        console.error('[ControlTowerDashboard] Error fetching environments:', err);
       } finally {
-        setLoading(false);
+        setEnvLoading(false);
       }
     };
 
-    fetchExecutions();
+    fetchEnvironments();
 
-    // Subscribe to execution updates
+    // Subscribe to environment updates
     const channel = supabase
-      .channel('control-tower-executions')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'executions' }, fetchExecutions)
+      .channel('control-tower-envs')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'environment_configs' }, fetchEnvironments)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deployments' }, fetchEnvironments)
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const getConnectionIcon = (type: ConnectionStatus['type']) => {
+  const getConnectionIcon = (type: Connection['type']) => {
     switch (type) {
       case 'github': return Github;
-      case 'kubernetes': return Cloud;
+      case 'kubernetes': 
+      case 'azure': return Cloud;
       case 'vault': return Shield;
+      default: return Cloud;
     }
   };
 
-  const getStatusColor = (status: ConnectionStatus['status']) => {
+  const getStatusColor = (status: Connection['status']) => {
     switch (status) {
       case 'connected': return 'text-sec-safe';
       case 'invalid': return 'text-sec-critical';
       case 'rate-limited': return 'text-sec-warning';
       case 'error': return 'text-sec-critical';
+      default: return 'text-muted-foreground';
     }
   };
+
+  const isLoading = connectionsLoading || executionsLoading;
+  const isConnected = connectionsConnected && realtimeConnected;
 
   return (
     <ScrollArea className="h-full">
       <div className="p-6 max-w-7xl mx-auto space-y-6">
+        {/* Connection Lost Banner */}
+        {!isConnected && (
+          <div className="bg-sec-warning/20 border border-sec-warning/30 rounded-lg p-3 flex items-center gap-2">
+            <WifiOff className="w-4 h-4 text-sec-warning" />
+            <span className="text-sm text-sec-warning">Live connection lost — data may be stale</span>
+          </div>
+        )}
+
+        {/* System Risk Banner */}
+        <SystemRiskBanner onViewApprovals={onOpenApprovals} onViewExecution={onViewExecution} />
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -203,10 +180,13 @@ const ControlTowerDashboard = ({
               Is the system safe right now?
             </p>
           </div>
-          <Button variant="outline" size="sm" className="gap-2">
-            <RefreshCw className="w-3.5 h-3.5" />
-            Refresh All
-          </Button>
+          <div className="flex items-center gap-2">
+            {isLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+            <Button variant="outline" size="sm" className="gap-2">
+              <RefreshCw className="w-3.5 h-3.5" />
+              Refresh All
+            </Button>
+          </div>
         </div>
 
         {/* Main Grid */}
@@ -225,34 +205,47 @@ const ControlTowerDashboard = ({
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {connections.map((conn) => {
-                const Icon = getConnectionIcon(conn.type);
-                return (
-                  <div 
-                    key={conn.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-md bg-background flex items-center justify-center">
-                        <Icon className="w-4 h-4 text-muted-foreground" />
+              {connectionsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : connections.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Link2 className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No connections configured</p>
+                </div>
+              ) : (
+                connections.map((conn) => {
+                  const Icon = getConnectionIcon(conn.type);
+                  return (
+                    <div 
+                      key={conn.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-md bg-background flex items-center justify-center">
+                          <Icon className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{conn.name}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{conn.type}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-medium">{conn.name}</p>
-                        <p className="text-xs text-muted-foreground capitalize">{conn.type}</p>
+                      <div className="flex items-center gap-2">
+                        <span className={cn('text-xs', getStatusColor(conn.status))}>
+                          {conn.status === 'connected' && <CheckCircle2 className="w-4 h-4" />}
+                          {conn.status !== 'connected' && <XCircle className="w-4 h-4" />}
+                        </span>
+                        {conn.last_validated_at && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatTimeAgo(new Date(conn.last_validated_at))}
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className={cn('text-xs', getStatusColor(conn.status))}>
-                        {conn.status === 'connected' && <CheckCircle2 className="w-4 h-4" />}
-                        {conn.status !== 'connected' && <XCircle className="w-4 h-4" />}
-                      </span>
-                      {conn.lastValidated && (
-                        <span className="text-[10px] text-muted-foreground">{conn.lastValidated}</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </CardContent>
           </Card>
 
@@ -270,47 +263,61 @@ const ControlTowerDashboard = ({
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {environments.map((env) => (
-                <div 
-                  key={env.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      'w-2 h-2 rounded-full',
-                      env.name === 'Production' && 'bg-sec-critical',
-                      env.name === 'Staging' && 'bg-sec-warning',
-                      env.name === 'Development' && 'bg-sec-safe'
-                    )} />
-                    <div>
-                      <p className="text-sm font-medium">{env.name}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <Badge variant="outline" className="text-[10px] h-4 px-1.5 capitalize">
-                          {env.strategy.replace('-', ' ')}
-                        </Badge>
-                        {env.approvalRequired && (
-                          <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
-                            Approval Required
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  {env.lastDeployment && (
-                    <div className="text-right">
-                      <div className="flex items-center gap-1.5 justify-end">
-                        {env.lastDeployment.status === 'success' && <CheckCircle2 className="w-3.5 h-3.5 text-sec-safe" />}
-                        {env.lastDeployment.status === 'failed' && <XCircle className="w-3.5 h-3.5 text-sec-critical" />}
-                        {env.lastDeployment.status === 'running' && (
-                          <div className="w-3.5 h-3.5 rounded-full border-2 border-chart-1 border-t-transparent animate-spin" />
-                        )}
-                        <span className="text-xs font-mono">{env.lastDeployment.version}</span>
-                      </div>
-                      <span className="text-[10px] text-muted-foreground">{env.lastDeployment.timestamp}</span>
-                    </div>
-                  )}
+              {envLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                 </div>
-              ))}
+              ) : environments.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Globe className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No environments configured</p>
+                </div>
+              ) : (
+                environments.map((env) => (
+                  <div 
+                    key={env.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        'w-2 h-2 rounded-full',
+                        env.name.toLowerCase().includes('prod') && 'bg-sec-critical',
+                        env.name.toLowerCase().includes('stag') && 'bg-sec-warning',
+                        env.name.toLowerCase().includes('dev') && 'bg-sec-safe',
+                        !env.name.toLowerCase().includes('prod') && 
+                        !env.name.toLowerCase().includes('stag') && 
+                        !env.name.toLowerCase().includes('dev') && 'bg-muted-foreground'
+                      )} />
+                      <div>
+                        <p className="text-sm font-medium">{env.name}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Badge variant="outline" className="text-[10px] h-4 px-1.5 capitalize">
+                            {env.strategy.replace('-', ' ')}
+                          </Badge>
+                          {env.approvalRequired && (
+                            <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                              Approval Required
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {env.lastDeployment && (
+                      <div className="text-right">
+                        <div className="flex items-center gap-1.5 justify-end">
+                          {env.lastDeployment.status === 'success' && <CheckCircle2 className="w-3.5 h-3.5 text-sec-safe" />}
+                          {env.lastDeployment.status === 'failed' && <XCircle className="w-3.5 h-3.5 text-sec-critical" />}
+                          {env.lastDeployment.status === 'running' && (
+                            <div className="w-3.5 h-3.5 rounded-full border-2 border-chart-1 border-t-transparent animate-spin" />
+                          )}
+                          <span className="text-xs font-mono">{env.lastDeployment.version}</span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">{env.lastDeployment.timestamp}</span>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
         </div>
@@ -323,7 +330,7 @@ const ControlTowerDashboard = ({
                 <Play className="w-4 h-4 text-chart-1" />
                 <CardTitle className="text-base">Active Executions</CardTitle>
                 {executions.length > 0 && (
-                  <Badge variant="secondary" className="text-[10px]">{executions.length} running</Badge>
+                  <Badge variant="secondary" className="text-[10px]">{executions.length} active</Badge>
                 )}
               </div>
               <Button variant="ghost" size="sm">
@@ -332,9 +339,9 @@ const ControlTowerDashboard = ({
             </div>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {executionsLoading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>
             ) : executions.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
@@ -355,22 +362,22 @@ const ControlTowerDashboard = ({
                     <div className={cn(
                       'w-2 h-8 rounded-full',
                       exec.status === 'running' && 'bg-chart-1 animate-pulse',
-                      exec.status === 'paused' && 'bg-sec-warning',
-                      exec.status === 'awaiting-approval' && 'bg-sec-warning animate-pulse'
+                      exec.status === 'paused' && 'bg-sec-warning animate-pulse',
+                      exec.status === 'failed' && 'bg-sec-critical'
                     )} />
 
                     {/* Execution Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-sm font-medium truncate">{exec.name}</span>
-                        <Badge variant={exec.status === 'running' ? 'default' : 'secondary'} className="text-[10px] h-4">
-                          {exec.status === 'awaiting-approval' ? 'Awaiting Approval' : exec.status}
+                        <Badge variant={exec.status === 'running' ? 'default' : 'secondary'} className="text-[10px] h-4 capitalize">
+                          {exec.status === 'paused' ? 'Awaiting Approval' : exec.status}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span>{exec.repo}</span>
+                        <span>{exec.name.split('/')[0] || 'platform-core'}</span>
                         <span>•</span>
-                        <span>{exec.branch}</span>
+                        <span>{exec.branch || 'main'}</span>
                         <span>•</span>
                         <span className="capitalize">{exec.environment}</span>
                       </div>
@@ -379,16 +386,16 @@ const ControlTowerDashboard = ({
                     {/* Progress */}
                     <div className="w-32 hidden sm:block">
                       <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-muted-foreground">{exec.currentNode}</span>
-                        <span className="font-mono">{exec.progress}%</span>
+                        <span className="text-muted-foreground">Progress</span>
+                        <span className="font-mono">{exec.progress || 0}%</span>
                       </div>
-                      <Progress value={exec.progress} className="h-1.5" />
+                      <Progress value={exec.progress || 0} className="h-1.5" />
                     </div>
 
                     {/* Time */}
                     <div className="text-xs text-muted-foreground hidden md:block">
                       <Clock className="w-3 h-3 inline mr-1" />
-                      {exec.startedAt}
+                      {formatTimeAgo(new Date(exec.started_at))}
                     </div>
 
                     {/* Actions */}
@@ -403,39 +410,8 @@ const ControlTowerDashboard = ({
           </CardContent>
         </Card>
 
-        {/* System Warnings */}
-        {warnings.length > 0 && (
-          <Card className="border-sec-warning/50">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-sec-warning" />
-                <CardTitle className="text-base">System Warnings</CardTitle>
-                <Badge variant="destructive" className="text-[10px]">{warnings.length}</Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {warnings.map((warning) => (
-                <div 
-                  key={warning.id}
-                  className={cn(
-                    'flex items-center justify-between p-3 rounded-lg',
-                    warning.severity === 'error' ? 'bg-sec-critical/10' : 'bg-sec-warning/10'
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    {warning.severity === 'error' ? (
-                      <XCircle className="w-4 h-4 text-sec-critical" />
-                    ) : (
-                      <AlertTriangle className="w-4 h-4 text-sec-warning" />
-                    )}
-                    <span className="text-sm">{warning.message}</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">{warning.timestamp}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
+        {/* Last Approval Indicator */}
+        <LastApprovalIndicator />
       </div>
     </ScrollArea>
   );
