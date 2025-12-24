@@ -1,15 +1,14 @@
 import { useState, useCallback } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AnimatePresence } from 'framer-motion';
-import ModeDrivenSidebar from '@/components/layout/ModeDrivenSidebar';
-import TopBar from '@/components/layout/TopBar';
-import FlowCanvas from '@/components/flow/FlowCanvas';
-import InspectorPanel from '@/components/panels/InspectorPanel';
-import ConfigEditorPanel from '@/components/panels/ConfigEditorPanel';
-import DeploymentTimeline from '@/components/panels/DeploymentTimeline';
-import ApprovalPanel from '@/components/governance/ApprovalPanel';
+import ControlTowerLayout from '@/components/control-tower/ControlTowerLayout';
+import ControlTowerDashboard from '@/components/control-tower/ControlTowerDashboard';
+import ExecutionFlowView from '@/components/control-tower/ExecutionFlowView';
+import ConnectionsPanel from '@/components/control-tower/ConnectionsPanel';
+import EnvironmentsPanel from '@/components/control-tower/EnvironmentsPanel';
+import ApprovalsPanel from '@/components/control-tower/ApprovalsPanel';
+import SystemHealthPanel from '@/components/control-tower/SystemHealthPanel';
 import AuditLogViewer from '@/components/governance/AuditLogViewer';
-import ModularDashboardView from '@/components/dashboard/ModularDashboardView';
 import GitConnectionWizard from '@/components/connect/GitConnectionWizard';
 import GitHubConnectionPanel from '@/components/connect/GitHubConnectionPanel';
 import SpeechPanel from '@/components/speech/SpeechPanel';
@@ -38,8 +37,14 @@ import { useFlowStore } from '@/stores/flowStore';
 import { toast } from 'sonner';
 import { Node, Edge } from '@xyflow/react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import EnhancedApprovalPanel from '@/components/governance/EnhancedApprovalPanel';
 
 const Index = () => {
+  // Control Tower section state
+  const [activeSection, setActiveSection] = useState('control-tower');
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
+  
+  // Panel states
   const [isAuditLogOpen, setAuditLogOpen] = useState(false);
   const [isGitWizardOpen, setGitWizardOpen] = useState(false);
   const [isGitHubPanelOpen, setGitHubPanelOpen] = useState(false);
@@ -52,7 +57,6 @@ const Index = () => {
   const [isTelemetryOpen, setTelemetryOpen] = useState(false);
   const [isExecutionHistoryOpen, setExecutionHistoryOpen] = useState(false);
   const [isTemplatesGalleryOpen, setTemplatesGalleryOpen] = useState(false);
-  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [isDemoOpen, setDemoOpen] = useState(false);
   const [isValidationOpen, setValidationOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
@@ -61,12 +65,15 @@ const Index = () => {
   const [isComplianceOpen, setComplianceOpen] = useState(false);
   const [isVaultOpen, setVaultOpen] = useState(false);
   const [isAzureOpen, setAzureOpen] = useState(false);
-  const { activeView, setActiveView, selectedExecution, activeFlowType } = useFlowStore();
+  const [isApprovalOpen, setApprovalOpen] = useState(false);
+  const [approvalNodeId, setApprovalNodeId] = useState<string | null>(null);
+  
+  const { selectedExecution, activeFlowType } = useFlowStore();
   
   // Enable realtime updates
   useRealtimeUpdates();
   
-  // Initialize user role detection - automatically sets sidebar mode based on role
+  // Initialize user role detection
   const { role, loading: roleLoading } = useUserRole();
   
   // User preferences with first-time onboarding detection
@@ -95,201 +102,200 @@ const Index = () => {
     toast.success(`Connected to ${config.owner}/${config.repo}`);
   }, []);
 
-  // Handle metric card clicks - navigate to relevant section
-  const handleMetricClick = useCallback((metricType: string) => {
-    switch (metricType) {
-      case 'active-flows':
-        setActiveView('flows');
-        break;
-      case 'deployments':
-        setActiveView('flows');
-        setExecutionHistoryOpen(true);
-        break;
-      case 'pending':
-        // Open approval panel
-        break;
+  const handleOpenApproval = useCallback((nodeId: string) => {
+    setApprovalNodeId(nodeId);
+    setApprovalOpen(true);
+  }, []);
+
+  const handleRollback = useCallback((checkpointId: string) => {
+    console.log('Rollback to checkpoint:', checkpointId);
+    toast.info(`Rolling back to checkpoint ${checkpointId}`);
+    setRollbackOpen(true);
+  }, []);
+
+  // Render section content based on activeSection
+  const renderSectionContent = () => {
+    switch (activeSection) {
+      case 'control-tower':
+        return (
+          <ControlTowerDashboard 
+            onViewExecution={(id) => {
+              setSelectedExecutionId(id);
+              setActiveSection('executions');
+            }}
+            onOpenConnections={() => setActiveSection('connections')}
+            onOpenEnvironments={() => setActiveSection('environments')}
+            onOpenApprovals={() => setActiveSection('approvals')}
+          />
+        );
+      case 'executions':
+        return (
+          <ExecutionFlowView 
+            executionId={selectedExecutionId || undefined}
+            onOpenApproval={handleOpenApproval}
+            onRollback={handleRollback}
+          />
+        );
+      case 'connections':
+        return <ConnectionsPanel />;
+      case 'environments':
+        return <EnvironmentsPanel />;
+      case 'approvals':
+        return <ApprovalsPanel />;
+      case 'health':
+        return <SystemHealthPanel />;
       default:
-        break;
+        return (
+          <ControlTowerDashboard 
+            onViewExecution={(id) => {
+              setSelectedExecutionId(id);
+              setActiveSection('executions');
+            }}
+            onOpenConnections={() => setActiveSection('connections')}
+            onOpenEnvironments={() => setActiveSection('environments')}
+            onOpenApprovals={() => setActiveSection('approvals')}
+          />
+        );
     }
-  }, [setActiveView]);
+  };
 
   return (
     <ReactFlowProvider>
-      <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">
-        {/* Top Bar with Demo Button and Production Readiness */}
-        <TopBar 
-          onOpenGitWizard={() => setGitWizardOpen(true)}
-          onOpenSpeech={() => setSpeechOpen(true)}
-          onOpenPipelineEditor={() => setPipelineEditorOpen(true)}
-          onOpenEnvironmentManager={() => setEnvironmentManagerOpen(true)}
-          onOpenOpzenixWizard={() => setOpzenixWizardOpen(true)}
-          onOpenDemo={() => setDemoOpen(true)}
-          onOpenValidation={() => setValidationOpen(true)}
-          onOpenSettings={() => setSettingsOpen(true)}
-        />
-        
-        <div className="flex-1 flex overflow-hidden">
-          {/* Left Sidebar - Mode Driven */}
-          <ModeDrivenSidebar 
-            onOpenAuditLog={() => setAuditLogOpen(true)}
-            onOpenAlerts={() => setAlertsOpen(true)}
-            onOpenRollback={() => setRollbackOpen(true)}
-            onOpenTelemetry={() => setTelemetryOpen(true)}
-            onOpenOpzenixWizard={() => setOpzenixWizardOpen(true)}
-            onOpenPipelineEditor={() => setPipelineEditorOpen(true)}
-            onOpenExecutionHistory={() => setExecutionHistoryOpen(true)}
-            onViewDashboard={() => setActiveView('dashboard')}
-            onViewFlows={() => setActiveView('flows')}
-            onOpenExecutionDetail={(id) => setSelectedExecutionId(id)}
-            onOpenReadinessChecklist={() => setReadinessOpen(true)}
-            onOpenImplementationReport={() => setReportOpen(true)}
-            onOpenComplianceAudit={() => setComplianceOpen(true)}
-            onOpenVaultManager={() => setVaultOpen(true)}
+      <ControlTowerLayout
+        activeSection={activeSection}
+        onSectionChange={setActiveSection}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenApprovals={() => setActiveSection('approvals')}
+        onOpenAuditLog={() => setAuditLogOpen(true)}
+      >
+        {renderSectionContent()}
+      </ControlTowerLayout>
+
+      {/* Modals & Overlays */}
+      <AuditLogViewer isOpen={isAuditLogOpen} onClose={() => setAuditLogOpen(false)} />
+      <GitConnectionWizard isOpen={isGitWizardOpen} onClose={() => setGitWizardOpen(false)} />
+      <GitHubConnectionPanel 
+        isOpen={isGitHubPanelOpen} 
+        onClose={() => setGitHubPanelOpen(false)}
+        onConnected={handleGitHubConnected}
+      />
+      <SpeechPanel isOpen={isSpeechOpen} onClose={() => setSpeechOpen(false)} />
+      <VisualPipelineEditor isOpen={isPipelineEditorOpen} onClose={() => setPipelineEditorOpen(false)} />
+      <EnvironmentManager isOpen={isEnvironmentManagerOpen} onClose={() => setEnvironmentManagerOpen(false)} />
+      <OpzenixWizard 
+        isOpen={isOpzenixWizardOpen} 
+        onClose={() => setOpzenixWizardOpen(false)} 
+        onComplete={handleWizardComplete}
+      />
+      <CheckpointRollbackPanel 
+        isOpen={isRollbackOpen} 
+        onClose={() => setRollbackOpen(false)}
+        executionId={selectedExecution?.id}
+      />
+      <AlertsPanel 
+        isOpen={isAlertsOpen} 
+        onClose={() => setAlertsOpen(false)} 
+      />
+      <TelemetryPanel
+        isOpen={isTelemetryOpen}
+        onClose={() => setTelemetryOpen(false)}
+      />
+      <ExecutionHistoryPanel
+        isOpen={isExecutionHistoryOpen}
+        onClose={() => setExecutionHistoryOpen(false)}
+        flowType={activeFlowType}
+      />
+      <PipelineTemplatesGallery
+        isOpen={isTemplatesGalleryOpen}
+        onClose={() => setTemplatesGalleryOpen(false)}
+        onSelectTemplate={handleTemplateSelect}
+      />
+      
+      {/* User Settings Panel */}
+      <UserSettingsPanel 
+        open={isSettingsOpen}
+        onClose={() => setSettingsOpen(false)}
+      />
+      
+      {/* Onboarding Wizard - Auto-shows for first-time users */}
+      <OnboardingWizard 
+        open={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+        onComplete={completeOnboarding}
+      />
+      
+      {/* Guided Demo Flow - For investor presentations */}
+      <GuidedDemoFlow 
+        open={isDemoOpen}
+        onClose={() => setDemoOpen(false)}
+      />
+      
+      {/* Validation Checklist Sheet */}
+      <Sheet open={isValidationOpen} onOpenChange={setValidationOpen}>
+        <SheetContent side="right" className="w-[500px] sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle>System Validation</SheetTitle>
+          </SheetHeader>
+          <div className="mt-6">
+            <ValidationChecklist />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Enterprise Readiness Checklist */}
+      <EnterpriseReadinessChecklist 
+        isOpen={isReadinessOpen} 
+        onClose={() => setReadinessOpen(false)} 
+      />
+
+      {/* Implementation Report */}
+      <ImplementationReport 
+        isOpen={isReportOpen} 
+        onClose={() => setReportOpen(false)} 
+      />
+
+      {/* Compliance Audit Panel */}
+      <Sheet open={isComplianceOpen} onOpenChange={setComplianceOpen}>
+        <SheetContent side="right" className="w-[600px] sm:max-w-2xl overflow-y-auto">
+          <div className="mt-6">
+            <ComplianceAuditPanel />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Vault Manager Panel */}
+      <Sheet open={isVaultOpen} onOpenChange={setVaultOpen}>
+        <SheetContent side="right" className="w-[600px] sm:max-w-2xl overflow-y-auto">
+          <div className="mt-6">
+            <VaultAdapterPanel />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Azure Integration Panel */}
+      <AzureIntegrationPanel 
+        isOpen={isAzureOpen} 
+        onClose={() => setAzureOpen(false)} 
+      />
+
+      {/* Approval Panel */}
+      <Sheet open={isApprovalOpen} onOpenChange={setApprovalOpen}>
+        <SheetContent side="right" className="w-[600px] sm:max-w-2xl overflow-y-auto">
+          <div className="mt-6">
+            <EnhancedApprovalPanel />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Execution Detail Panel - Slide-out */}
+      <AnimatePresence>
+        {selectedExecutionId && activeSection !== 'executions' && (
+          <ExecutionDetailPanel 
+            executionId={selectedExecutionId}
+            onClose={() => setSelectedExecutionId(null)}
           />
-          
-          {/* Main Content - Single instance */}
-          <main className="flex-1 relative overflow-hidden">
-            <AnimatePresence mode="wait">
-              {activeView === 'dashboard' ? (
-                <ModularDashboardView 
-                  key="dashboard"
-                  onViewFlows={() => setActiveView('flows')}
-                  onOpenPipelineEditor={() => setPipelineEditorOpen(true)}
-                  onOpenEnvironmentManager={() => setEnvironmentManagerOpen(true)}
-                  onOpenOpzenixWizard={() => setOpzenixWizardOpen(true)}
-                  onOpenTemplatesGallery={() => setTemplatesGalleryOpen(true)}
-                  onOpenGitHubConnection={() => setGitHubPanelOpen(true)}
-                  onOpenExecutionHistory={() => setExecutionHistoryOpen(true)}
-                  onMetricClick={handleMetricClick}
-                />
-              ) : (
-                <FlowCanvas key="flows" />
-              )}
-            </AnimatePresence>
-            
-            {/* Execution Detail Panel - Slide-out */}
-            <AnimatePresence>
-              {selectedExecutionId && (
-                <ExecutionDetailPanel 
-                  executionId={selectedExecutionId}
-                  onClose={() => setSelectedExecutionId(null)}
-                />
-              )}
-            </AnimatePresence>
-          </main>
-        </div>
-
-        {/* Modals & Overlays */}
-        {activeView === 'flows' && <InspectorPanel />}
-        <ConfigEditorPanel />
-        <DeploymentTimeline />
-        <ApprovalPanel />
-        <AuditLogViewer isOpen={isAuditLogOpen} onClose={() => setAuditLogOpen(false)} />
-        <GitConnectionWizard isOpen={isGitWizardOpen} onClose={() => setGitWizardOpen(false)} />
-        <GitHubConnectionPanel 
-          isOpen={isGitHubPanelOpen} 
-          onClose={() => setGitHubPanelOpen(false)}
-          onConnected={handleGitHubConnected}
-        />
-        <SpeechPanel isOpen={isSpeechOpen} onClose={() => setSpeechOpen(false)} />
-        <VisualPipelineEditor isOpen={isPipelineEditorOpen} onClose={() => setPipelineEditorOpen(false)} />
-        <EnvironmentManager isOpen={isEnvironmentManagerOpen} onClose={() => setEnvironmentManagerOpen(false)} />
-        <OpzenixWizard 
-          isOpen={isOpzenixWizardOpen} 
-          onClose={() => setOpzenixWizardOpen(false)} 
-          onComplete={handleWizardComplete}
-        />
-        <CheckpointRollbackPanel 
-          isOpen={isRollbackOpen} 
-          onClose={() => setRollbackOpen(false)}
-          executionId={selectedExecution?.id}
-        />
-        <AlertsPanel 
-          isOpen={isAlertsOpen} 
-          onClose={() => setAlertsOpen(false)} 
-        />
-        <TelemetryPanel
-          isOpen={isTelemetryOpen}
-          onClose={() => setTelemetryOpen(false)}
-        />
-        <ExecutionHistoryPanel
-          isOpen={isExecutionHistoryOpen}
-          onClose={() => setExecutionHistoryOpen(false)}
-          flowType={activeFlowType}
-        />
-        <PipelineTemplatesGallery
-          isOpen={isTemplatesGalleryOpen}
-          onClose={() => setTemplatesGalleryOpen(false)}
-          onSelectTemplate={handleTemplateSelect}
-        />
-        
-        {/* User Settings Panel */}
-        <UserSettingsPanel 
-          open={isSettingsOpen}
-          onClose={() => setSettingsOpen(false)}
-        />
-        
-        {/* Onboarding Wizard - Auto-shows for first-time users */}
-        <OnboardingWizard 
-          open={showOnboarding}
-          onClose={() => setShowOnboarding(false)}
-          onComplete={completeOnboarding}
-        />
-        
-        {/* Guided Demo Flow - For investor presentations */}
-        <GuidedDemoFlow 
-          open={isDemoOpen}
-          onClose={() => setDemoOpen(false)}
-        />
-        
-        {/* Validation Checklist Sheet */}
-        <Sheet open={isValidationOpen} onOpenChange={setValidationOpen}>
-          <SheetContent side="right" className="w-[500px] sm:max-w-lg">
-            <SheetHeader>
-              <SheetTitle>System Validation</SheetTitle>
-            </SheetHeader>
-            <div className="mt-6">
-              <ValidationChecklist />
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {/* Enterprise Readiness Checklist */}
-        <EnterpriseReadinessChecklist 
-          isOpen={isReadinessOpen} 
-          onClose={() => setReadinessOpen(false)} 
-        />
-
-        {/* Implementation Report */}
-        <ImplementationReport 
-          isOpen={isReportOpen} 
-          onClose={() => setReportOpen(false)} 
-        />
-
-        {/* Compliance Audit Panel */}
-        <Sheet open={isComplianceOpen} onOpenChange={setComplianceOpen}>
-          <SheetContent side="right" className="w-[600px] sm:max-w-2xl overflow-y-auto">
-            <div className="mt-6">
-              <ComplianceAuditPanel />
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {/* Vault Manager Panel */}
-        <Sheet open={isVaultOpen} onOpenChange={setVaultOpen}>
-          <SheetContent side="right" className="w-[600px] sm:max-w-2xl overflow-y-auto">
-            <div className="mt-6">
-              <VaultAdapterPanel />
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {/* Azure Integration Panel */}
-        <AzureIntegrationPanel 
-          isOpen={isAzureOpen} 
-          onClose={() => setAzureOpen(false)} 
-        />
-      </div>
+        )}
+      </AnimatePresence>
     </ReactFlowProvider>
   );
 };

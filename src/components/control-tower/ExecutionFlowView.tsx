@@ -84,26 +84,26 @@ const ExecutionFlowNode = ({ data, selected }: { data: any; selected: boolean })
 
       {/* Node Content */}
       <div className="flex items-center gap-3">
-                <div className={cn(
-                  'w-8 h-8 rounded-lg flex items-center justify-center',
-                  selectedNode?.status === 'running' && 'animate-pulse'
-                )}>
-                  <StatusIcon className={cn(
-                    'w-4 h-4',
-                    selectedNode?.status === 'idle' && 'text-muted-foreground',
-                    selectedNode?.status === 'running' && 'text-chart-1',
-                    selectedNode?.status === 'success' && 'text-sec-safe',
-                    selectedNode?.status === 'failed' && 'text-sec-critical',
-                    selectedNode?.status === 'paused' && 'text-sec-warning',
-                    selectedNode?.status === 'warning' && 'text-sec-warning',
-                  )} />
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-foreground">{String(selectedNode?.label || '')}</h4>
-                  {selectedNode?.duration && (
-                    <p className="text-xs text-muted-foreground">{String(selectedNode.duration)}</p>
-                  )}
-                </div>
+        <div className={cn(
+          'w-8 h-8 rounded-lg flex items-center justify-center',
+          data.status === 'running' && 'animate-pulse'
+        )}>
+          <StatusIcon className={cn(
+            'w-4 h-4',
+            data.status === 'idle' && 'text-muted-foreground',
+            data.status === 'running' && 'text-chart-1',
+            data.status === 'success' && 'text-sec-safe',
+            data.status === 'failed' && 'text-sec-critical',
+            data.status === 'paused' && 'text-sec-warning',
+            data.status === 'warning' && 'text-sec-warning',
+          )} />
+        </div>
+        <div>
+          <h4 className="text-sm font-semibold text-foreground">{String(data.label || '')}</h4>
+          {data.duration && (
+            <p className="text-xs text-muted-foreground">{String(data.duration)}</p>
+          )}
+        </div>
       </div>
 
       {/* Running Indicator */}
@@ -277,7 +277,7 @@ const ExecutionFlowView = ({
               {/* Inspector Header */}
               <div className="p-4 border-b border-border">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-foreground">{selectedNode.label}</h3>
+                  <h3 className="font-semibold text-foreground">{String(selectedNode.label || '')}</h3>
                   <Button 
                     variant="ghost" 
                     size="icon" 
@@ -297,10 +297,10 @@ const ExecutionFlowView = ({
                       selectedNode.status === 'paused' && 'bg-sec-warning text-sec-warning-foreground',
                     )}
                   >
-                    {selectedNode.status}
+                    {String(selectedNode.status || '')}
                   </Badge>
                   {selectedNode.duration && (
-                    <span className="text-xs text-muted-foreground">{selectedNode.duration}</span>
+                    <span className="text-xs text-muted-foreground">{String(selectedNode.duration)}</span>
                   )}
                   {selectedNode.isCheckpoint && (
                     <Badge variant="outline" className="gap-1">
