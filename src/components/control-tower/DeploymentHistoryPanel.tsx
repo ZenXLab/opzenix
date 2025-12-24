@@ -5,24 +5,28 @@ import {
   CheckCircle2, 
   XCircle, 
   Clock,
-  ArrowRight,
   RotateCcw,
   Eye,
   Filter,
   Download,
-  GitBranch,
   User,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Play
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface Deployment {
   id: string;
@@ -52,11 +56,83 @@ function formatTimeAgo(date: Date): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
+interface RollbackDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  deployment: Deployment | null;
+  onConfirm: (reason: string) => void;
+  isLoading: boolean;
+}
+
+const RollbackDialog = ({ open, onOpenChange, deployment, onConfirm, isLoading }: RollbackDialogProps) => {
+  const [reason, setReason] = useState('');
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <RotateCcw className="w-5 h-5 text-sec-warning" />
+            Confirm Rollback
+          </DialogTitle>
+          <DialogDescription>
+            You are about to rollback to version <span className="font-mono font-medium">{deployment?.version}</span> in <span className="capitalize">{deployment?.environment}</span>.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          <div className="p-4 rounded-lg bg-sec-warning/10 border border-sec-warning/30">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-sec-warning shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-foreground">This action will:</p>
+                <ul className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                  <li>• Deploy the previous version to {deployment?.environment}</li>
+                  <li>• Create a new deployment record with rollback reference</li>
+                  <li>• Log the action in the audit trail</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Reason for rollback (optional)</Label>
+            <Textarea 
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g., Performance regression detected in v2.1.0"
+              rows={3}
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button 
+            variant="destructive"
+            onClick={() => onConfirm(reason)}
+            disabled={isLoading}
+            className="gap-2"
+          >
+            {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+            Confirm Rollback
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 const DeploymentHistoryPanel = () => {
   const [deployments, setDeployments] = useState<Deployment[]>([]);
   const [environments, setEnvironments] = useState<EnvironmentConfig[]>([]);
   const [selectedEnv, setSelectedEnv] = useState<string>('all');
   const [loading, setLoading] = useState(true);
+  const [rollbackTarget, setRollbackTarget] = useState<Deployment | null>(null);
+  const [isRollingBack, setIsRollingBack] = useState(false);
+  const [isCreatingTest, setIsCreatingTest] = useState(false);
 
   // Fetch environments
   useEffect(() => {
@@ -127,6 +203,56 @@ const DeploymentHistoryPanel = () => {
     return () => { supabase.removeChannel(channel); };
   }, [selectedEnv]);
 
+  const handleRollback = async (reason: string) => {
+    if (!rollbackTarget) return;
+    
+    setIsRollingBack(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('rollback-deployment', {
+        body: {
+          deploymentId: rollbackTarget.id,
+          targetVersion: rollbackTarget.version,
+          environment: rollbackTarget.environment,
+          reason,
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success(`Rollback to ${rollbackTarget.version} initiated`);
+      setRollbackTarget(null);
+    } catch (error: any) {
+      console.error('[Rollback] Error:', error);
+      toast.error(error.message || 'Failed to initiate rollback');
+    } finally {
+      setIsRollingBack(false);
+    }
+  };
+
+  const handleCreateTestExecution = async () => {
+    setIsCreatingTest(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('create-test-execution', {
+        body: {
+          name: `test-pipeline-${Date.now()}`,
+          environment: selectedEnv !== 'all' ? selectedEnv : 'development',
+          branch: 'main'
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success(data.message || 'Test execution created! Check Execution Flow View.');
+    } catch (error: any) {
+      console.error('[TestExecution] Error:', error);
+      toast.error(error.message || 'Failed to create test execution');
+    } finally {
+      setIsCreatingTest(false);
+    }
+  };
+
   const getStatusIcon = (status: Deployment['status']) => {
     switch (status) {
       case 'success': return <CheckCircle2 className="w-4 h-4 text-sec-safe" />;
@@ -186,6 +312,16 @@ const DeploymentHistoryPanel = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2"
+              onClick={handleCreateTestExecution}
+              disabled={isCreatingTest}
+            >
+              {isCreatingTest ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+              Test Execution
+            </Button>
             <Select value={selectedEnv} onValueChange={setSelectedEnv}>
               <SelectTrigger className="w-40">
                 <Filter className="w-4 h-4 mr-2" />
@@ -227,6 +363,7 @@ const DeploymentHistoryPanel = () => {
                   loading={loading}
                   getStatusIcon={getStatusIcon}
                   getEnvironmentColor={getEnvironmentColor}
+                  onRollback={setRollbackTarget}
                 />
               </TabsContent>
             ))}
@@ -240,8 +377,18 @@ const DeploymentHistoryPanel = () => {
             loading={loading}
             getStatusIcon={getStatusIcon}
             getEnvironmentColor={getEnvironmentColor}
+            onRollback={setRollbackTarget}
           />
         )}
+
+        {/* Rollback Confirmation Dialog */}
+        <RollbackDialog
+          open={!!rollbackTarget}
+          onOpenChange={(open) => !open && setRollbackTarget(null)}
+          deployment={rollbackTarget}
+          onConfirm={handleRollback}
+          isLoading={isRollingBack}
+        />
       </div>
     </ScrollArea>
   );
@@ -252,12 +399,14 @@ const DeploymentList = ({
   deployments, 
   loading, 
   getStatusIcon,
-  getEnvironmentColor 
+  getEnvironmentColor,
+  onRollback
 }: { 
   deployments: Deployment[];
   loading: boolean;
   getStatusIcon: (status: Deployment['status']) => React.ReactNode;
   getEnvironmentColor: (env: string) => string;
+  onRollback: (deployment: Deployment) => void;
 }) => {
   if (loading) {
     return (
@@ -341,7 +490,13 @@ const DeploymentList = ({
                       View Execution
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" className="gap-1.5">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="gap-1.5"
+                    onClick={() => onRollback(deployment)}
+                    disabled={deployment.status === 'running'}
+                  >
                     <RotateCcw className="w-3.5 h-3.5" />
                     Rollback to this
                   </Button>
