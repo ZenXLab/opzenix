@@ -15,11 +15,13 @@ import {
   Plus,
   Workflow,
   Server,
-  Sparkles
+  Sparkles,
+  PlayCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFlowStore } from '@/stores/flowStore';
 import { cn } from '@/lib/utils';
+import { ProductionReadinessIndicator } from '@/components/validation/ProductionReadinessIndicator';
 
 interface TopBarProps {
   onOpenGitWizard?: () => void;
@@ -27,6 +29,8 @@ interface TopBarProps {
   onOpenPipelineEditor?: () => void;
   onOpenEnvironmentManager?: () => void;
   onOpenOpzenixWizard?: () => void;
+  onOpenDemo?: () => void;
+  onOpenValidation?: () => void;
 }
 
 const TopBar = ({ 
@@ -34,7 +38,9 @@ const TopBar = ({
   onOpenSpeech, 
   onOpenPipelineEditor, 
   onOpenEnvironmentManager,
-  onOpenOpzenixWizard 
+  onOpenOpzenixWizard,
+  onOpenDemo,
+  onOpenValidation
 }: TopBarProps) => {
   const { 
     systemHealth, 
@@ -129,6 +135,15 @@ const TopBar = ({
             <Server className="w-3.5 h-3.5" />
             Environments
           </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-8 gap-2 border-primary/50 text-primary hover:bg-primary/10" 
+            onClick={onOpenDemo}
+          >
+            <PlayCircle className="w-3.5 h-3.5" />
+            Demo
+          </Button>
         </div>
       </div>
 
@@ -152,6 +167,11 @@ const TopBar = ({
 
       {/* Right */}
       <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        {/* Production Readiness Indicator */}
+        <ProductionReadinessIndicator />
+        
+        <div className="w-px h-6 bg-border mx-1 hidden sm:block" />
+        
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setConfigEditorOpen(true)}>
           <FileCode className="w-4 h-4 text-muted-foreground" />
         </Button>
