@@ -10,6 +10,9 @@ import ApprovalsPanel from '@/components/control-tower/ApprovalsPanel';
 import SystemHealthPanel from '@/components/control-tower/SystemHealthPanel';
 import AuditLogPanel from '@/components/control-tower/AuditLogPanel';
 import DeploymentHistoryPanel from '@/components/control-tower/DeploymentHistoryPanel';
+import BranchManagementPanel from '@/components/control-tower/BranchManagementPanel';
+import EnvironmentLocksPanel from '@/components/control-tower/EnvironmentLocksPanel';
+import GovernanceBanner from '@/components/control-tower/GovernanceBanner';
 import GitConnectionWizard from '@/components/connect/GitConnectionWizard';
 import GitHubConnectionPanel from '@/components/connect/GitHubConnectionPanel';
 import SpeechPanel from '@/components/speech/SpeechPanel';
@@ -139,6 +142,10 @@ const Index = () => {
         );
       case 'deployments':
         return <DeploymentHistoryPanel />;
+      case 'branch-management':
+        return <BranchManagementPanel />;
+      case 'environment-locks':
+        return <EnvironmentLocksPanel />;
       case 'connections':
         return <ConnectionsPanel />;
       case 'environments':
