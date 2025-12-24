@@ -5,7 +5,7 @@ import {
   GitBranch, Gauge, Sparkles, GripVertical, Radio,
   Database, Shield, Network, BarChart3, PieChart, Layers,
   AlertTriangle, Zap, Eye, Lock, Cloud, Settings, LineChart, Github,
-  RotateCcw, Save
+  RotateCcw, Package
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,8 +18,10 @@ import PipelineStatusWidget from './widgets/PipelineStatusWidget';
 import LogStreamWidget from './widgets/LogStreamWidget';
 import QuickActionsWidget from './widgets/QuickActionsWidget';
 import { SystemHealthWidget } from './widgets/SystemHealthWidget';
+import { ArtifactsRegistryWidget } from './widgets/ArtifactsRegistryWidget';
 import EnhancedWidgetPicker from './EnhancedWidgetPicker';
 import DraggableWidget from './DraggableWidget';
+import { ArtifactTraceabilityPanel } from '@/components/artifacts/ArtifactTraceabilityPanel';
 import { useFlowStore } from '@/stores/flowStore';
 import { useWidgetMetrics } from '@/hooks/useWidgetMetrics';
 import { useDashboardLayout } from '@/hooks/useDashboardLayout';
@@ -60,6 +62,7 @@ const ModularDashboardView = ({
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
   const [draggedWidget, setDraggedWidget] = useState<string | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+  const [traceabilityArtifactId, setTraceabilityArtifactId] = useState<string | null>(null);
   
   // Use persistent dashboard layout
   const {
@@ -178,6 +181,13 @@ const ModularDashboardView = ({
         return <TelemetryWidgetContent />;
       case 'system-health':
         return <SystemHealthWidget onRemove={() => handleRemoveWidget(widget.id)} />;
+      case 'artifacts':
+        return (
+          <ArtifactsRegistryWidget 
+            {...commonProps}
+            onViewTraceability={(id) => setTraceabilityArtifactId(id)}
+          />
+        );
       case 'actions':
         return (
           <QuickActionsWidget 
@@ -203,7 +213,7 @@ const ModularDashboardView = ({
       'actions': <Zap className="w-4 h-4 text-sec-warning" />,
       'telemetry': <Radio className="w-4 h-4 text-ai-primary" />,
       'system-health': <Activity className="w-4 h-4 text-sec-safe" />,
-      'model-registry': <Database className="w-4 h-4 text-ai-primary" />,
+      'artifacts': <Package className="w-4 h-4 text-primary" />,
       'training-jobs': <Zap className="w-4 h-4 text-sec-warning" />,
       'drift-monitor': <AlertTriangle className="w-4 h-4 text-sec-warning" />,
       'feature-store': <Layers className="w-4 h-4 text-ai-primary" />,
@@ -413,6 +423,13 @@ const ModularDashboardView = ({
         isOpen={showWidgetPicker}
         onClose={() => setShowWidgetPicker(false)}
         onAddWidget={handleAddWidget}
+      />
+
+      {/* Artifact Traceability Panel */}
+      <ArtifactTraceabilityPanel
+        open={!!traceabilityArtifactId}
+        onClose={() => setTraceabilityArtifactId(null)}
+        artifactId={traceabilityArtifactId || undefined}
       />
     </motion.div>
   );

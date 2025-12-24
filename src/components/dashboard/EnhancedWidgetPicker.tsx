@@ -306,6 +306,15 @@ const allWidgets: WidgetConfig[] = [
     capabilities: ['Pipeline triggers', 'Deployments', 'Rollbacks', 'Feature flags'],
     useCase: 'Speed up common operations with quick access buttons'
   },
+  { 
+    type: 'artifacts', 
+    label: 'Artifact Registry', 
+    description: 'Track Docker images, digests, and registry URLs',
+    icon: Layers, 
+    category: 'cicd',
+    capabilities: ['Image tracking', 'Digest verification', 'Version history', 'Provenance chain'],
+    useCase: 'Monitor and trace all build artifacts with full provenance'
+  },
 ];
 
 const EnhancedWidgetPicker = ({ isOpen, onClose, onAddWidget }: EnhancedWidgetPickerProps) => {
