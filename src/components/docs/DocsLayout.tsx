@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   Book, ChevronRight, Search, Menu, X, ExternalLink,
   Rocket, Settings, Shield, GitBranch, Terminal, Play,
   CheckCircle2, AlertTriangle, Copy, Github, Cloud,
-  Lock, Users, Eye, History, Webhook, FileCode, Home
+  Lock, Users, Eye, History, Webhook, FileCode, Home, LogIn, LogOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import OpzenixLogo from '@/components/brand/OpzenixLogo';
 
 // Documentation structure
 const DOCS_STRUCTURE = {
@@ -75,7 +77,32 @@ interface DocLayoutProps {
 export function DocsLayout({ children }: DocLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check auth state
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
+      setLoading(false);
+    };
+    
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setIsAuthenticated(false);
+    navigate('/');
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -114,12 +141,39 @@ export function DocsLayout({ children }: DocLayoutProps) {
               </kbd>
             </div>
 
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/app">
-                <Home className="w-4 h-4 mr-2" />
-                Dashboard
-              </Link>
-            </Button>
+            {!loading && (
+              <>
+                {isAuthenticated ? (
+                  <>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to="/app">
+                        <Home className="w-4 h-4 mr-2" />
+                        Dashboard
+                      </Link>
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={handleSignOut}>
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Sign Out
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to="/">
+                        <Home className="w-4 h-4 mr-2" />
+                        Home
+                      </Link>
+                    </Button>
+                    <Button variant="default" size="sm" asChild>
+                      <Link to="/auth">
+                        <LogIn className="w-4 h-4 mr-2" />
+                        Sign In
+                      </Link>
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -173,6 +227,23 @@ export function DocsLayout({ children }: DocLayoutProps) {
           {children}
         </main>
       </div>
+
+      {/* Footer */}
+      <footer className="border-t bg-muted/30 py-8 mt-16">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <OpzenixLogo size="sm" />
+            <p className="text-sm text-muted-foreground text-center">
+              © 2025 Opzenix by Cropxon Innovations Pvt Ltd. All rights reserved.
+            </p>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+              <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+              <Link to="/cookies" className="hover:text-foreground transition-colors">Cookies</Link>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
@@ -193,11 +264,27 @@ function CodeBlock({ code, language = 'bash', title }: CodeBlockProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const getLanguageColor = (lang: string) => {
+    const colors: Record<string, string> = {
+      bash: 'bg-emerald-500/20 text-emerald-400',
+      yaml: 'bg-amber-500/20 text-amber-400',
+      typescript: 'bg-blue-500/20 text-blue-400',
+      javascript: 'bg-yellow-500/20 text-yellow-400',
+      json: 'bg-orange-500/20 text-orange-400',
+      sql: 'bg-purple-500/20 text-purple-400',
+      hcl: 'bg-violet-500/20 text-violet-400',
+    };
+    return colors[lang] || 'bg-muted text-muted-foreground';
+  };
+
   return (
     <div className="relative group my-4 rounded-lg overflow-hidden border">
       {title && (
-        <div className="px-4 py-2 bg-muted/50 border-b text-xs font-medium text-muted-foreground">
-          {title}
+        <div className="px-4 py-2 bg-muted/50 border-b flex items-center justify-between">
+          <span className="text-xs font-medium text-muted-foreground">{title}</span>
+          <Badge variant="outline" className={cn('text-[10px]', getLanguageColor(language))}>
+            {language.toUpperCase()}
+          </Badge>
         </div>
       )}
       <div className="relative">
