@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AnimatePresence } from 'framer-motion';
 import AppSidebar from '@/components/layout/AppSidebar';
-import RightPanel from '@/components/layout/RightPanel';
 import FlowCanvas from '@/components/flow/FlowCanvas';
 import InspectorPanel from '@/components/panels/InspectorPanel';
 import ConfigEditorPanel from '@/components/panels/ConfigEditorPanel';
@@ -17,6 +16,7 @@ import EnvironmentManager from '@/components/environments/EnvironmentManager';
 import OpzenixWizard from '@/components/opzenix/OpzenixWizard';
 import CheckpointRollbackPanel from '@/components/checkpoint/CheckpointRollbackPanel';
 import AlertsPanel from '@/components/alerts/AlertsPanel';
+import TelemetryPanel from '@/components/telemetry/TelemetryPanel';
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
 import { useFlowStore } from '@/stores/flowStore';
 import { toast } from 'sonner';
@@ -31,7 +31,7 @@ const Index = () => {
   const [isOpzenixWizardOpen, setOpzenixWizardOpen] = useState(false);
   const [isRollbackOpen, setRollbackOpen] = useState(false);
   const [isAlertsOpen, setAlertsOpen] = useState(false);
-  const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  const [isTelemetryOpen, setTelemetryOpen] = useState(false);
   const { activeView, setActiveView, selectedExecution } = useFlowStore();
   
   useRealtimeUpdates();
@@ -50,7 +50,9 @@ const Index = () => {
           onOpenAuditLog={() => setAuditLogOpen(true)}
           onOpenAlerts={() => setAlertsOpen(true)}
           onOpenRollback={() => setRollbackOpen(true)}
+          onOpenTelemetry={() => setTelemetryOpen(true)}
           onOpenOpzenixWizard={() => setOpzenixWizardOpen(true)}
+          onOpenPipelineEditor={() => setPipelineEditorOpen(true)}
         />
         
         {/* Main Content */}
@@ -69,12 +71,6 @@ const Index = () => {
             )}
           </AnimatePresence>
         </main>
-        
-        {/* Right Panel */}
-        <RightPanel 
-          isOpen={rightPanelOpen} 
-          onToggle={() => setRightPanelOpen(!rightPanelOpen)} 
-        />
 
         {/* Modals & Overlays */}
         {activeView === 'flows' && <InspectorPanel />}
@@ -99,6 +95,10 @@ const Index = () => {
         <AlertsPanel 
           isOpen={isAlertsOpen} 
           onClose={() => setAlertsOpen(false)} 
+        />
+        <TelemetryPanel
+          isOpen={isTelemetryOpen}
+          onClose={() => setTelemetryOpen(false)}
         />
       </div>
     </ReactFlowProvider>

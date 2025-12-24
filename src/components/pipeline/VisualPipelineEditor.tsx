@@ -12,11 +12,14 @@ import {
   Node,
   BackgroundVariant,
   Panel,
+  NodeChange,
+  XYPosition,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, Play, Undo, Redo, Sparkles, Users, FolderOpen, Activity } from 'lucide-react';
+import { X, Save, Play, Undo, Redo, Sparkles, Users, FolderOpen, GripVertical, Crosshair } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { nodeTypes } from './PipelineNodeTypes';
 import PipelineToolbox from './PipelineToolbox';
 import StageConfigPanel from './StageConfigPanel';
@@ -33,16 +36,20 @@ interface VisualPipelineEditorProps {
   pipelineId?: string;
 }
 
-// Initial demo pipeline
+// Grid configuration
+const GRID_SIZE = 20;
+const SNAP_THRESHOLD = 10;
+
+// Initial demo pipeline with better positioning
 const initialNodes: Node[] = [
-  { id: 'source-1', type: 'pipelineStage', position: { x: 50, y: 150 }, data: { label: 'Checkout', stageType: 'source', status: 'success', description: 'main branch' } },
-  { id: 'build-1', type: 'pipelineStage', position: { x: 280, y: 150 }, data: { label: 'Build', stageType: 'build', status: 'success', description: 'npm run build', duration: '2m 14s' } },
-  { id: 'test-1', type: 'pipelineStage', position: { x: 510, y: 80 }, data: { label: 'Unit Tests', stageType: 'test', status: 'running', description: '142 tests' } },
-  { id: 'test-2', type: 'pipelineStage', position: { x: 510, y: 220 }, data: { label: 'Integration', stageType: 'test', status: 'idle', description: '24 tests' } },
-  { id: 'security-1', type: 'pipelineStage', position: { x: 740, y: 150 }, data: { label: 'Security Scan', stageType: 'security', status: 'idle', description: 'SAST + DAST' } },
-  { id: 'checkpoint-1', type: 'checkpoint', position: { x: 970, y: 150 }, data: { label: 'Pre-Deploy', stageType: 'checkpoint', status: 'checkpoint' } },
-  { id: 'approval-1', type: 'approvalGate', position: { x: 1170, y: 150 }, data: { label: 'Prod Approval', stageType: 'approval', status: 'idle' } },
-  { id: 'deploy-1', type: 'pipelineStage', position: { x: 1370, y: 150 }, data: { label: 'Deploy Prod', stageType: 'deploy', status: 'idle', description: 'Canary 10%' } },
+  { id: 'source-1', type: 'pipelineStage', position: { x: 60, y: 160 }, data: { label: 'Checkout', stageType: 'source', status: 'success', description: 'main branch' } },
+  { id: 'build-1', type: 'pipelineStage', position: { x: 280, y: 160 }, data: { label: 'Build', stageType: 'build', status: 'success', description: 'npm run build', duration: '2m 14s' } },
+  { id: 'test-1', type: 'pipelineStage', position: { x: 500, y: 80 }, data: { label: 'Unit Tests', stageType: 'test', status: 'running', description: '142 tests' } },
+  { id: 'test-2', type: 'pipelineStage', position: { x: 500, y: 240 }, data: { label: 'Integration', stageType: 'test', status: 'idle', description: '24 tests' } },
+  { id: 'security-1', type: 'pipelineStage', position: { x: 720, y: 160 }, data: { label: 'Security Scan', stageType: 'security', status: 'idle', description: 'SAST + DAST' } },
+  { id: 'checkpoint-1', type: 'checkpoint', position: { x: 940, y: 160 }, data: { label: 'Pre-Deploy', stageType: 'checkpoint', status: 'checkpoint' } },
+  { id: 'approval-1', type: 'approvalGate', position: { x: 1140, y: 160 }, data: { label: 'Prod Approval', stageType: 'approval', status: 'idle' } },
+  { id: 'deploy-1', type: 'pipelineStage', position: { x: 1340, y: 160 }, data: { label: 'Deploy Prod', stageType: 'deploy', status: 'idle', description: 'Canary 10%' } },
 ];
 
 const initialEdges: Edge[] = [
@@ -62,6 +69,10 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave, pipelineId = 'default' 
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [inspectedNode, setInspectedNode] = useState<Node | null>(null);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [snapToGrid, setSnapToGrid] = useState(true);
+  const [showGuides, setShowGuides] = useState(true);
+  const [dragPreview, setDragPreview] = useState<{ x: number; y: number } | null>(null);
+  const [alignmentGuides, setAlignmentGuides] = useState<{ horizontal: number[]; vertical: number[] }>({ horizontal: [], vertical: [] });
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
 
@@ -90,6 +101,39 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave, pipelineId = 'default' 
 
     return unsubscribe;
   }, [isOpen, subscribeToUpdates, setNodes, setEdges]);
+
+  // Snap position to grid
+  const snapToGridPosition = useCallback((position: XYPosition): XYPosition => {
+    if (!snapToGrid) return position;
+    return {
+      x: Math.round(position.x / GRID_SIZE) * GRID_SIZE,
+      y: Math.round(position.y / GRID_SIZE) * GRID_SIZE,
+    };
+  }, [snapToGrid]);
+
+  // Find alignment guides for a node being dragged
+  const findAlignmentGuides = useCallback((draggingNodeId: string, position: XYPosition) => {
+    if (!showGuides) return { horizontal: [], vertical: [] };
+    
+    const horizontal: number[] = [];
+    const vertical: number[] = [];
+    
+    nodes.forEach((node) => {
+      if (node.id === draggingNodeId) return;
+      
+      // Check horizontal alignment (same Y)
+      if (Math.abs(node.position.y - position.y) < SNAP_THRESHOLD) {
+        horizontal.push(node.position.y);
+      }
+      
+      // Check vertical alignment (same X)
+      if (Math.abs(node.position.x - position.x) < SNAP_THRESHOLD) {
+        vertical.push(node.position.x);
+      }
+    });
+    
+    return { horizontal, vertical };
+  }, [nodes, showGuides]);
 
   // Track mouse movement for cursor sharing
   const handleMouseMove = useCallback((event: React.MouseEvent) => {
@@ -122,6 +166,7 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave, pipelineId = 'default' 
       const newEdges = addEdge({
         ...connection,
         style: { stroke: 'hsl(var(--edge-default))' },
+        type: 'smoothstep',
       }, eds);
       broadcastEdgeChange(newEdges);
       return newEdges;
@@ -131,20 +176,37 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave, pipelineId = 'default' 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
+    
+    // Show drag preview
+    if (reactFlowInstance) {
+      const position = reactFlowInstance.screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+      const snappedPosition = snapToGridPosition(position);
+      setDragPreview(snappedPosition);
+    }
+  }, [reactFlowInstance, snapToGridPosition]);
+
+  const onDragLeave = useCallback(() => {
+    setDragPreview(null);
   }, []);
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
+      setDragPreview(null);
 
       const dataStr = event.dataTransfer.getData('application/reactflow');
       if (!dataStr || !reactFlowInstance) return;
 
       const { type, stageType, label } = JSON.parse(dataStr);
-      const position = reactFlowInstance.screenToFlowPosition({
+      const rawPosition = reactFlowInstance.screenToFlowPosition({
         x: event.clientX,
         y: event.clientY,
       });
+      
+      const position = snapToGridPosition(rawPosition);
 
       const newNode: Node = {
         id: `${stageType}-${Date.now()}`,
@@ -163,14 +225,25 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave, pipelineId = 'default' 
         broadcastNodeChange(updated);
         return updated;
       });
-      toast.success(`Added ${label} stage`);
+      toast.success(`Added ${label} stage at (${position.x}, ${position.y})`);
     },
-    [reactFlowInstance, setNodes, broadcastNodeChange]
+    [reactFlowInstance, setNodes, broadcastNodeChange, snapToGridPosition]
   );
 
   const handleDragStart = (event: React.DragEvent, item: any) => {
     event.dataTransfer.setData('application/reactflow', JSON.stringify(item));
     event.dataTransfer.effectAllowed = 'move';
+    
+    // Create a custom drag image
+    const dragImage = document.createElement('div');
+    dragImage.className = 'px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium shadow-lg';
+    dragImage.textContent = item.label;
+    dragImage.style.position = 'absolute';
+    dragImage.style.top = '-1000px';
+    document.body.appendChild(dragImage);
+    event.dataTransfer.setDragImage(dragImage, 50, 20);
+    
+    setTimeout(() => document.body.removeChild(dragImage), 0);
   };
 
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
@@ -212,18 +285,45 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave, pipelineId = 'default' 
     toast.success('Pipeline saved');
   };
 
-  // Handle nodes/edges change for collaboration
-  const handleNodesChange = useCallback((changes: any) => {
-    onNodesChange(changes);
-    // Debounce broadcast for performance
-    const hasPositionChange = changes.some((c: any) => c.type === 'position' && c.dragging === false);
+  // Enhanced nodes change handler with snapping and alignment
+  const handleNodesChange = useCallback((changes: NodeChange<Node>[]) => {
+    // Process position changes with snapping
+    const processedChanges = changes.map((change) => {
+      if (change.type === 'position' && change.position && snapToGrid) {
+        const snappedPosition = snapToGridPosition(change.position);
+        
+        // Find alignment guides while dragging
+        if (change.dragging) {
+          const guides = findAlignmentGuides(change.id, snappedPosition);
+          setAlignmentGuides(guides);
+          
+          // Snap to alignment if close enough
+          if (guides.horizontal.length > 0) {
+            snappedPosition.y = guides.horizontal[0];
+          }
+          if (guides.vertical.length > 0) {
+            snappedPosition.x = guides.vertical[0];
+          }
+        } else {
+          setAlignmentGuides({ horizontal: [], vertical: [] });
+        }
+        
+        return { ...change, position: snappedPosition };
+      }
+      return change;
+    });
+    
+    onNodesChange(processedChanges);
+    
+    // Broadcast on drag end
+    const hasPositionChange = changes.some((c) => c.type === 'position' && !c.dragging);
     if (hasPositionChange) {
       setNodes((nds) => {
         broadcastNodeChange(nds);
         return nds;
       });
     }
-  }, [onNodesChange, setNodes, broadcastNodeChange]);
+  }, [onNodesChange, setNodes, broadcastNodeChange, snapToGrid, snapToGridPosition, findAlignmentGuides]);
 
   return (
     <AnimatePresence>
@@ -240,11 +340,30 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave, pipelineId = 'default' 
               <Sparkles className="w-5 h-5 text-ai-primary" />
               <div>
                 <h2 className="text-sm font-semibold text-foreground">Visual Pipeline Editor</h2>
-                <p className="text-xs text-muted-foreground">Drag stages • Connect steps • Double-click for OTel</p>
+                <p className="text-xs text-muted-foreground">Drag stages • Click to configure • Double-click for OTel</p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Grid Controls */}
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary/30 rounded-md">
+                <Crosshair className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Snap</span>
+                <Switch 
+                  checked={snapToGrid} 
+                  onCheckedChange={setSnapToGrid}
+                  className="scale-75"
+                />
+                <span className="text-xs text-muted-foreground ml-2">Guides</span>
+                <Switch 
+                  checked={showGuides} 
+                  onCheckedChange={setShowGuides}
+                  className="scale-75"
+                />
+              </div>
+              
+              <div className="w-px h-6 bg-border mx-1" />
+              
               <Button variant="outline" size="sm" className="gap-1" onClick={() => setShowTemplates(true)}>
                 <FolderOpen className="w-4 h-4" />
                 Templates
@@ -301,7 +420,7 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave, pipelineId = 'default' 
 
             {/* Canvas */}
             <div 
-              className="flex-1" 
+              className="flex-1 relative" 
               ref={reactFlowWrapper}
               onMouseMove={handleMouseMove}
             >
@@ -314,12 +433,13 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave, pipelineId = 'default' 
                 onInit={setReactFlowInstance}
                 onDrop={onDrop}
                 onDragOver={onDragOver}
+                onDragLeave={onDragLeave}
                 onNodeClick={handleNodeClick}
                 onNodeDoubleClick={handleNodeDoubleClick}
                 nodeTypes={nodeTypes}
                 fitView
-                snapToGrid
-                snapGrid={[16, 16]}
+                snapToGrid={snapToGrid}
+                snapGrid={[GRID_SIZE, GRID_SIZE]}
                 defaultEdgeOptions={{
                   style: { stroke: 'hsl(var(--edge-default))', strokeWidth: 2 },
                   type: 'smoothstep',
@@ -328,7 +448,7 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave, pipelineId = 'default' 
               >
                 <Background 
                   variant={BackgroundVariant.Dots} 
-                  gap={24} 
+                  gap={GRID_SIZE} 
                   size={1}
                   color="hsl(var(--border))"
                 />
@@ -349,6 +469,38 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave, pipelineId = 'default' 
                   maskColor="hsl(var(--background) / 0.8)"
                 />
                 
+                {/* Drop Preview */}
+                {dragPreview && (
+                  <div
+                    className="absolute pointer-events-none z-40"
+                    style={{
+                      left: dragPreview.x,
+                      top: dragPreview.y,
+                      transform: 'translate(-50%, -50%)',
+                    }}
+                  >
+                    <div className="w-32 h-16 border-2 border-dashed border-primary/50 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <GripVertical className="w-4 h-4 text-primary/50" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Alignment Guides */}
+                {showGuides && alignmentGuides.horizontal.map((y, i) => (
+                  <div
+                    key={`h-${i}`}
+                    className="absolute left-0 right-0 pointer-events-none z-30"
+                    style={{ top: y, height: 1, backgroundColor: 'hsl(var(--ai-primary) / 0.5)' }}
+                  />
+                ))}
+                {showGuides && alignmentGuides.vertical.map((x, i) => (
+                  <div
+                    key={`v-${i}`}
+                    className="absolute top-0 bottom-0 pointer-events-none z-30"
+                    style={{ left: x, width: 1, backgroundColor: 'hsl(var(--ai-primary) / 0.5)' }}
+                  />
+                ))}
+                
                 {/* Collaborator Cursors */}
                 {collaborators.map(cursor => (
                   <div
@@ -368,10 +520,11 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave, pipelineId = 'default' 
                 
                 {/* AI Hint Panel */}
                 <Panel position="bottom-center" className="mb-4">
-                  <div className="px-4 py-2 bg-card/90 backdrop-blur border border-border rounded-lg flex items-center gap-2">
+                  <div className="px-4 py-2 bg-card/90 backdrop-blur border border-border rounded-lg flex items-center gap-3">
                     <Sparkles className="w-4 h-4 text-ai-primary" />
                     <span className="text-xs text-muted-foreground">
-                      Double-click any node to view OTel traces, logs & metrics
+                      {snapToGrid ? `Grid: ${GRID_SIZE}px` : 'Free positioning'} • 
+                      Double-click for OTel traces
                     </span>
                   </div>
                 </Panel>
