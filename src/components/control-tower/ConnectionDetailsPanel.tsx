@@ -18,7 +18,8 @@ import {
   Radio,
   Loader2,
   ExternalLink,
-  Copy
+  Copy,
+  Webhook
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,6 +46,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Connection } from '@/hooks/useConnectionsRealtime';
+import WebhookSetupWizard from './WebhookSetupWizard';
 
 interface HealthEvent {
   id: string;
@@ -77,6 +79,7 @@ const ConnectionDetailsPanel = ({ connection, onClose, onConnectionUpdated }: Co
   const [saving, setSaving] = useState(false);
   const [validating, setValidating] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showWebhookWizard, setShowWebhookWizard] = useState(false);
   
   const [editConfig, setEditConfig] = useState<Record<string, unknown>>({});
   const [editName, setEditName] = useState('');
@@ -456,6 +459,31 @@ const ConnectionDetailsPanel = ({ connection, onClose, onConnectionUpdated }: Co
                   </CardContent>
                 </Card>
               )}
+
+              {/* Webhook Setup for GitHub connections */}
+              {connection.type === 'github' && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Webhook className="w-4 h-4" />
+                      Webhook Configuration
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Set up webhooks to automatically trigger pipelines when code is pushed to your repository.
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      className="w-full gap-2"
+                      onClick={() => setShowWebhookWizard(true)}
+                    >
+                      <Webhook className="w-4 h-4" />
+                      Configure Webhook
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
             <TabsContent value="health" className="space-y-4 mt-4">
@@ -553,6 +581,14 @@ const ConnectionDetailsPanel = ({ connection, onClose, onConnectionUpdated }: Co
           </AlertDialog>
         </div>
       </div>
+
+      {/* Webhook Setup Wizard */}
+      <WebhookSetupWizard
+        open={showWebhookWizard}
+        onOpenChange={setShowWebhookWizard}
+        repositoryOwner={(editConfig as any).owner}
+        repositoryName={(editConfig as any).repo}
+      />
     </motion.div>
   );
 };
