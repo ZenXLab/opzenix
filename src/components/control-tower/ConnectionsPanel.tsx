@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Github, 
@@ -11,149 +11,44 @@ import {
   Plus,
   ExternalLink,
   Clock,
-  Loader2
+  Loader2,
+  WifiOff
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
+import { useConnectionsRealtime, Connection } from '@/hooks/useConnectionsRealtime';
 import { toast } from 'sonner';
 
-interface Connection {
-  id: string;
-  type: 'github' | 'kubernetes' | 'vault';
-  name: string;
-  status: 'connected' | 'invalid' | 'rate-limited' | 'error' | 'validating';
-  lastValidated?: string;
-  permissions?: string[];
-  errorReason?: string;
-  details?: Record<string, any>;
-}
-
 const ConnectionsPanel = () => {
-  const [connections, setConnections] = useState<Connection[]>([
-    {
-      id: '1',
-      type: 'github',
-      name: 'opzenix/platform-core',
-      status: 'connected',
-      lastValidated: new Date().toISOString(),
-      permissions: ['repo', 'workflow', 'read:org'],
-    },
-    {
-      id: '2',
-      type: 'kubernetes',
-      name: 'aks-production-cluster',
-      status: 'connected',
-      lastValidated: new Date().toISOString(),
-      permissions: ['get', 'list', 'create', 'delete'],
-    },
-    {
-      id: '3',
-      type: 'vault',
-      name: 'azure-keyvault-prod',
-      status: 'connected',
-      lastValidated: new Date().toISOString(),
-      permissions: ['read', 'list'],
-    },
-  ]);
-
-  const [validatingId, setValidatingId] = useState<string | null>(null);
-
-  const getConnectionIcon = (type: Connection['type']) => {
-    switch (type) {
-      case 'github': return Github;
-      case 'kubernetes': return Cloud;
-      case 'vault': return Shield;
-    }
-  };
-
-  const getStatusBadge = (status: Connection['status']) => {
-    switch (status) {
-      case 'connected':
-        return <Badge className="bg-sec-safe/20 text-sec-safe border-0"><CheckCircle2 className="w-3 h-3 mr-1" />Connected</Badge>;
-      case 'invalid':
-        return <Badge className="bg-sec-critical/20 text-sec-critical border-0"><XCircle className="w-3 h-3 mr-1" />Invalid</Badge>;
-      case 'rate-limited':
-        return <Badge className="bg-sec-warning/20 text-sec-warning border-0"><AlertTriangle className="w-3 h-3 mr-1" />Rate Limited</Badge>;
-      case 'error':
-        return <Badge className="bg-sec-critical/20 text-sec-critical border-0"><XCircle className="w-3 h-3 mr-1" />Error</Badge>;
-      case 'validating':
-        return <Badge className="bg-primary/20 text-primary border-0"><Loader2 className="w-3 h-3 mr-1 animate-spin" />Validating</Badge>;
-    }
-  };
+  const { 
+    connections, 
+    loading, 
+    validatingId, 
+    isConnected,
+    validateAzureConnection 
+  } = useConnectionsRealtime();
 
   const handleValidate = async (connectionId: string) => {
-    setValidatingId(connectionId);
     const conn = connections.find(c => c.id === connectionId);
-    
     if (!conn) return;
 
-    // Update status to validating
-    setConnections(prev => prev.map(c => 
-      c.id === connectionId ? { ...c, status: 'validating' as const } : c
-    ));
-
-    try {
-      // Call the azure-validate edge function for actual validation
-      if (conn.type === 'kubernetes' || conn.type === 'vault') {
-        const { data, error } = await supabase.functions.invoke('azure-validate', {
-          body: {
-            type: conn.type === 'kubernetes' ? 'aks' : 'keyvault',
-            // In real implementation, these would come from stored credentials
-            tenantId: 'demo-tenant',
-            clientId: 'demo-client',
-          }
-        });
-
-        if (error) throw error;
-
-        setConnections(prev => prev.map(c => 
-          c.id === connectionId ? { 
-            ...c, 
-            status: data.valid ? 'connected' : 'error',
-            lastValidated: new Date().toISOString(),
-            errorReason: data.valid ? undefined : data.error,
-          } : c
-        ));
-
-        if (data.valid) {
-          toast.success(`${conn.name} validated successfully`);
-        } else {
-          toast.error(`Validation failed: ${data.error}`);
-        }
-      } else {
-        // Simulate GitHub validation
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        setConnections(prev => prev.map(c => 
-          c.id === connectionId ? { 
-            ...c, 
-            status: 'connected',
-            lastValidated: new Date().toISOString(),
-          } : c
-        ));
-
-        toast.success(`${conn.name} validated successfully`);
-      }
-    } catch (err) {
-      console.error('Validation failed:', err);
-      setConnections(prev => prev.map(c => 
-        c.id === connectionId ? { 
-          ...c, 
-          status: 'error',
-          errorReason: 'Validation request failed',
-        } : c
-      ));
-      toast.error('Validation failed');
-    } finally {
-      setValidatingId(null);
-    }
+    // For demo: use placeholder credentials - in production these come from secure storage
+    await validateAzureConnection(connectionId, {
+      tenantId: (conn.config?.tenantId as string) || '',
+      clientId: (conn.config?.clientId as string) || '',
+      clientSecret: (conn.config?.clientSecret as string) || '',
+      subscriptionId: (conn.config?.subscriptionId as string) || '',
+      acrName: (conn.config?.acrName as string) || undefined,
+      aksClusterName: (conn.config?.aksClusterName as string) || undefined,
+      aksResourceGroup: (conn.config?.aksResourceGroup as string) || undefined,
+      keyVaultName: (conn.config?.keyVaultName as string) || undefined,
+    });
   };
 
-  const formatTime = (isoString?: string) => {
+  const formatTime = (isoString?: string | null) => {
     if (!isoString) return 'Never';
     const date = new Date(isoString);
     const now = new Date();
@@ -166,19 +61,35 @@ const ConnectionsPanel = () => {
 
   const connectionsByType = {
     github: connections.filter(c => c.type === 'github'),
-    kubernetes: connections.filter(c => c.type === 'kubernetes'),
+    kubernetes: connections.filter(c => c.type === 'kubernetes' || c.type === 'azure'),
     vault: connections.filter(c => c.type === 'vault'),
   };
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <ScrollArea className="h-full">
       <div className="p-6 max-w-4xl mx-auto space-y-6">
+        {/* Connection Status Banner */}
+        {!isConnected && (
+          <div className="bg-sec-warning/20 border border-sec-warning/30 rounded-lg p-3 flex items-center gap-2">
+            <WifiOff className="w-4 h-4 text-sec-warning" />
+            <span className="text-sm text-sec-warning">Live connection lost - data may be stale</span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-foreground">Connections</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Manage GitHub, Kubernetes, and Vault integrations
+              Manage GitHub, Kubernetes, and Vault integrations — Real-time validated
             </p>
           </div>
           <Button className="gap-2">
