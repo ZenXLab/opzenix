@@ -152,20 +152,12 @@ export function ModeDrivenSidebar({
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
         className="h-full border-r border-border bg-sidebar flex flex-col overflow-hidden shrink-0"
       >
-        {/* Header */}
-        <div className="h-14 flex items-center justify-between px-3 border-b border-border">
-          {!collapsed && (
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded bg-primary flex items-center justify-center">
-                <Activity className="w-4 h-4 text-primary-foreground" />
-              </div>
-              <span className="text-base font-semibold text-foreground tracking-tight">Opzenix</span>
-            </div>
-          )}
+        {/* Collapse Toggle Header */}
+        <div className="h-10 flex items-center justify-center px-2 border-b border-border">
           <Button 
             variant="ghost" 
             size="icon" 
-            className={cn("h-7 w-7", collapsed && "mx-auto")} 
+            className="h-7 w-7" 
             onClick={toggleCollapsed}
           >
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
