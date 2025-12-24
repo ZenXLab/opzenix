@@ -188,6 +188,47 @@ export type Database = {
         }
         Relationships: []
       }
+      branch_mappings: {
+        Row: {
+          branch_pattern: string
+          created_at: string
+          created_by: string | null
+          environment: string
+          github_integration_id: string | null
+          id: string
+          is_deployable: boolean
+          updated_at: string
+        }
+        Insert: {
+          branch_pattern: string
+          created_at?: string
+          created_by?: string | null
+          environment: string
+          github_integration_id?: string | null
+          id?: string
+          is_deployable?: boolean
+          updated_at?: string
+        }
+        Update: {
+          branch_pattern?: string
+          created_at?: string
+          created_by?: string | null
+          environment?: string
+          github_integration_id?: string | null
+          id?: string
+          is_deployable?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branch_mappings_github_integration_id_fkey"
+            columns: ["github_integration_id"]
+            isOneToOne: false
+            referencedRelation: "github_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checkpoints: {
         Row: {
           created_at: string
@@ -388,6 +429,45 @@ export type Database = {
         }
         Relationships: []
       }
+      environment_locks: {
+        Row: {
+          created_at: string
+          environment: string
+          id: string
+          is_locked: boolean
+          lock_reason: string | null
+          required_role: Database["public"]["Enums"]["app_role"]
+          requires_approval: boolean
+          unlocked_at: string | null
+          unlocked_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          environment: string
+          id?: string
+          is_locked?: boolean
+          lock_reason?: string | null
+          required_role?: Database["public"]["Enums"]["app_role"]
+          requires_approval?: boolean
+          unlocked_at?: string | null
+          unlocked_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          environment?: string
+          id?: string
+          is_locked?: boolean
+          lock_reason?: string | null
+          required_role?: Database["public"]["Enums"]["app_role"]
+          requires_approval?: boolean
+          unlocked_at?: string | null
+          unlocked_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       execution_logs: {
         Row: {
           created_at: string
@@ -510,11 +590,13 @@ export type Database = {
       }
       executions: {
         Row: {
+          blocked_reason: string | null
           branch: string | null
           commit_hash: string | null
           completed_at: string | null
           environment: string
           flow_template_id: string | null
+          governance_status: string | null
           id: string
           metadata: Json | null
           name: string
@@ -524,11 +606,13 @@ export type Database = {
           status: Database["public"]["Enums"]["execution_status"]
         }
         Insert: {
+          blocked_reason?: string | null
           branch?: string | null
           commit_hash?: string | null
           completed_at?: string | null
           environment?: string
           flow_template_id?: string | null
+          governance_status?: string | null
           id?: string
           metadata?: Json | null
           name: string
@@ -538,11 +622,13 @@ export type Database = {
           status?: Database["public"]["Enums"]["execution_status"]
         }
         Update: {
+          blocked_reason?: string | null
           branch?: string | null
           commit_hash?: string | null
           completed_at?: string | null
           environment?: string
           flow_template_id?: string | null
+          governance_status?: string | null
           id?: string
           metadata?: Json | null
           name?: string
