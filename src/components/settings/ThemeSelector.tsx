@@ -6,6 +6,13 @@ import { supabase } from '@/integrations/supabase/client';
 
 export type ThemeOption = 'obsidian' | 'midnight' | 'ocean' | 'forest';
 
+interface UiPreferences {
+  theme?: ThemeOption;
+  typography?: string;
+  iconStyle?: string;
+  [key: string]: unknown;
+}
+
 const themes: { id: ThemeOption; name: string; description: string; colors: { primary: string; accent: string; bg: string } }[] = [
   {
     id: 'obsidian',
@@ -41,7 +48,8 @@ export function ThemeSelector() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase.from('user_preferences').select('ui_preferences').eq('user_id', user.id).maybeSingle();
-      if (data?.ui_preferences?.theme) setValue(data.ui_preferences.theme);
+      const uiPrefs = data?.ui_preferences as UiPreferences | null;
+      if (uiPrefs?.theme) setValue(uiPrefs.theme);
     };
     loadPreference();
   }, []);
@@ -50,7 +58,14 @@ export function ThemeSelector() {
     setValue(theme);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    await supabase.from('user_preferences').upsert({ user_id: user.id, ui_preferences: { theme } }, { onConflict: 'user_id' });
+    
+    const { data: existing } = await supabase.from('user_preferences').select('ui_preferences').eq('user_id', user.id).maybeSingle();
+    const currentPrefs = (existing?.ui_preferences as UiPreferences) || {};
+    
+    await supabase.from('user_preferences').upsert({ 
+      user_id: user.id, 
+      ui_preferences: { ...currentPrefs, theme } 
+    }, { onConflict: 'user_id' });
   };
 
   return (
