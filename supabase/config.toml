@@ -35,3 +35,7 @@ verify_jwt = false
 verify_jwt = false
 [functions.notify-event]
 verify_jwt = false
+[functions.artifact-webhook]
+verify_jwt = false
+[functions.azure-validate]
+verify_jwt = false
