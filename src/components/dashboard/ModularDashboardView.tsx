@@ -16,6 +16,7 @@ import APIPerformanceWidget from './widgets/APIPerformanceWidget';
 import PipelineStatusWidget from './widgets/PipelineStatusWidget';
 import LogStreamWidget from './widgets/LogStreamWidget';
 import QuickActionsWidget from './widgets/QuickActionsWidget';
+import { SystemHealthWidget } from './widgets/SystemHealthWidget';
 import EnhancedWidgetPicker from './EnhancedWidgetPicker';
 import DraggableWidget from './DraggableWidget';
 import { useFlowStore } from '@/stores/flowStore';
@@ -34,7 +35,7 @@ interface ModularDashboardViewProps {
   onMetricClick?: (metricType: string) => void;
 }
 
-type WidgetType = 'deployments' | 'audit' | 'metrics' | 'api' | 'pipelines' | 'logs' | 'actions' | 'telemetry' 
+type WidgetType = 'deployments' | 'audit' | 'metrics' | 'api' | 'pipelines' | 'logs' | 'actions' | 'telemetry' | 'system-health'
   | 'model-registry' | 'training-jobs' | 'drift-monitor' | 'feature-store'
   | 'prompt-library' | 'token-usage' | 'guardrails' | 'latency-monitor'
   | 'anomaly-detection' | 'incident-prediction' | 'smart-alerts'
@@ -66,8 +67,8 @@ const ModularDashboardView = ({
   
   const [widgets, setWidgets] = useState<Widget[]>([
     { id: 'w1', type: 'actions', size: 'small', name: 'Quick Actions' },
-    { id: 'w2', type: 'deployments', size: 'medium', name: 'Deployments' },
-    { id: 'w3', type: 'metrics', size: 'small', name: 'System Metrics' },
+    { id: 'w2', type: 'system-health', size: 'medium', name: 'System Health' },
+    { id: 'w3', type: 'deployments', size: 'medium', name: 'Deployments' },
     { id: 'w4', type: 'pipelines', size: 'small', name: 'Pipeline Status' },
     { id: 'w5', type: 'audit', size: 'medium', name: 'Audit Activity' },
     { id: 'w6', type: 'api', size: 'small', name: 'API Performance' },
@@ -163,6 +164,8 @@ const ModularDashboardView = ({
         return <LogStreamWidget {...commonProps} />;
       case 'telemetry':
         return <TelemetryWidgetContent />;
+      case 'system-health':
+        return <SystemHealthWidget onRemove={() => handleRemoveWidget(widget.id)} />;
       case 'actions':
         return (
           <QuickActionsWidget 
@@ -187,6 +190,7 @@ const ModularDashboardView = ({
       'logs': <Terminal className="w-4 h-4 text-muted-foreground" />,
       'actions': <Zap className="w-4 h-4 text-sec-warning" />,
       'telemetry': <Radio className="w-4 h-4 text-ai-primary" />,
+      'system-health': <Activity className="w-4 h-4 text-sec-safe" />,
       'model-registry': <Database className="w-4 h-4 text-ai-primary" />,
       'training-jobs': <Zap className="w-4 h-4 text-sec-warning" />,
       'drift-monitor': <AlertTriangle className="w-4 h-4 text-sec-warning" />,

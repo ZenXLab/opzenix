@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AnimatePresence } from 'framer-motion';
 import ModeDrivenSidebar from '@/components/layout/ModeDrivenSidebar';
@@ -22,6 +22,7 @@ import ExecutionHistoryPanel from '@/components/execution/ExecutionHistoryPanel'
 import { ExecutionDetailPanel } from '@/components/execution/ExecutionDetailPanel';
 import PipelineTemplatesGallery from '@/components/templates/PipelineTemplatesGallery';
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useFlowStore } from '@/stores/flowStore';
 import { toast } from 'sonner';
 import { Node, Edge } from '@xyflow/react';
@@ -44,6 +45,9 @@ const Index = () => {
   
   // Enable realtime updates
   useRealtimeUpdates();
+  
+  // Initialize user role detection - automatically sets sidebar mode based on role
+  const { role, loading: roleLoading } = useUserRole();
 
   const handleWizardComplete = useCallback((nodes: Node[], edges: Edge[], config: any) => {
     console.log('Pipeline created:', { nodes, edges, config });
@@ -115,6 +119,16 @@ const Index = () => {
               />
             ) : (
               <FlowCanvas key="flows" />
+            )}
+          </AnimatePresence>
+          
+          {/* Execution Detail Panel - Slide-out */}
+          <AnimatePresence>
+            {selectedExecutionId && (
+              <ExecutionDetailPanel 
+                executionId={selectedExecutionId}
+                onClose={() => setSelectedExecutionId(null)}
+              />
             )}
           </AnimatePresence>
         </main>
