@@ -9,6 +9,7 @@ import EnvironmentsPanel from '@/components/control-tower/EnvironmentsPanel';
 import ApprovalsPanel from '@/components/control-tower/ApprovalsPanel';
 import SystemHealthPanel from '@/components/control-tower/SystemHealthPanel';
 import AuditLogPanel from '@/components/control-tower/AuditLogPanel';
+import DeploymentHistoryPanel from '@/components/control-tower/DeploymentHistoryPanel';
 import GitConnectionWizard from '@/components/connect/GitConnectionWizard';
 import GitHubConnectionPanel from '@/components/connect/GitHubConnectionPanel';
 import SpeechPanel from '@/components/speech/SpeechPanel';
@@ -133,8 +134,11 @@ const Index = () => {
             executionId={selectedExecutionId || undefined}
             onOpenApproval={handleOpenApproval}
             onRollback={handleRollback}
+            onBack={() => setActiveSection('control-tower')}
           />
         );
+      case 'deployments':
+        return <DeploymentHistoryPanel />;
       case 'connections':
         return <ConnectionsPanel />;
       case 'environments':
