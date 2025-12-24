@@ -1,4 +1,5 @@
 import { ReactFlowProvider } from '@xyflow/react';
+import EnterpriseNavigation from '@/components/landing/EnterpriseNavigation';
 import HeroSection from '@/components/landing/HeroSection';
 import TrustStripSection from '@/components/landing/TrustStripSection';
 import ProblemSection from '@/components/landing/ProblemSection';
@@ -15,6 +16,7 @@ const Landing = () => {
   return (
     <ReactFlowProvider>
       <div className="min-h-screen bg-background overflow-x-hidden">
+        <EnterpriseNavigation />
         <HeroSection />
         <TrustStripSection />
         <ProblemSection />
