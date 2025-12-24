@@ -24,12 +24,10 @@ interface WidgetConfig {
   useCase: string;
 }
 
-type DockSide = 'left' | 'right' | 'none';
-
 interface EnhancedWidgetPickerProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddWidget: (type: string, docked: DockSide) => void;
+  onAddWidget: (type: string) => void;
 }
 
 const widgetCategories = [
@@ -313,15 +311,13 @@ const allWidgets: WidgetConfig[] = [
 const EnhancedWidgetPicker = ({ isOpen, onClose, onAddWidget }: EnhancedWidgetPickerProps) => {
   const [selectedCategory, setSelectedCategory] = useState('cicd');
   const [selectedWidget, setSelectedWidget] = useState<WidgetConfig | null>(null);
-  const [selectedDock, setSelectedDock] = useState<DockSide>('none');
 
   const filteredWidgets = allWidgets.filter(w => w.category === selectedCategory);
 
   const handleAddWidget = () => {
     if (selectedWidget) {
-      onAddWidget(selectedWidget.type, selectedDock);
+      onAddWidget(selectedWidget.type);
       setSelectedWidget(null);
-      setSelectedDock('none');
       onClose();
     }
   };
@@ -443,28 +439,6 @@ const EnhancedWidgetPicker = ({ isOpen, onClose, onAddWidget }: EnhancedWidgetPi
                               <p className="text-[11px] font-medium mb-1">Use Case</p>
                               <p className="text-[11px] text-muted-foreground">{selectedWidget.useCase}</p>
                             </div>
-                          </div>
-                        </div>
-
-                        <div>
-                          <h4 className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">Placement</h4>
-                          <div className="grid grid-cols-3 gap-2">
-                            {(['none', 'left', 'right'] as DockSide[]).map((dock) => (
-                              <button
-                                key={dock}
-                                onClick={() => setSelectedDock(dock)}
-                                className={cn(
-                                  "p-3 rounded-lg border text-center transition-all",
-                                  selectedDock === dock 
-                                    ? "border-primary bg-primary/5" 
-                                    : "border-border hover:border-primary/50"
-                                )}
-                              >
-                                <p className="text-xs font-medium capitalize">
-                                  {dock === 'none' ? 'Main Area' : `${dock} Panel`}
-                                </p>
-                              </button>
-                            ))}
                           </div>
                         </div>
 
