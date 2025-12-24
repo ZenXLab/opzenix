@@ -17,3 +17,5 @@ verify_jwt = false
 verify_jwt = false
 [functions.ai-telemetry-analysis]
 verify_jwt = false
+[functions.pipeline-execute]
+verify_jwt = false
