@@ -5,6 +5,8 @@ import TrustStripSection from '@/components/landing/TrustStripSection';
 import ProblemSection from '@/components/landing/ProblemSection';
 import SolutionSection from '@/components/landing/SolutionSection';
 import HowItWorksSection from '@/components/landing/HowItWorksSection';
+import EnterpriseCapabilitiesSection from '@/components/landing/EnterpriseCapabilitiesSection';
+import LiveFlowPreviewSection from '@/components/landing/LiveFlowPreviewSection';
 import ComparisonSection from '@/components/landing/ComparisonSection';
 import SecuritySection from '@/components/landing/SecuritySection';
 import AudienceSection from '@/components/landing/AudienceSection';
@@ -21,6 +23,8 @@ const Landing = () => {
         <TrustStripSection />
         <ProblemSection />
         <SolutionSection />
+        <EnterpriseCapabilitiesSection />
+        <LiveFlowPreviewSection />
         <HowItWorksSection />
         <ComparisonSection />
         <SecuritySection />

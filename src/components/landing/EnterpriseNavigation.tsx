@@ -5,10 +5,12 @@ import {
   ChevronDown, Rocket, Shield, GitBranch, Eye, History,
   Building2, Cpu, Lock, Puzzle, BookOpen, Github, Cloud,
   Terminal, Users, Briefcase, Mail, Menu, X, ArrowRight,
-  LayoutDashboard, CheckCircle2, RotateCcw, Globe, Radio
+  LayoutDashboard, CheckCircle2, RotateCcw, Globe, Radio,
+  DollarSign, Layers, Activity, Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import OpzenixLogo from '@/components/brand/OpzenixLogo';
 
 interface NavItem {
   label: string;
@@ -26,93 +28,46 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Product',
     items: [
       {
-        label: 'Control Tower',
-        description: 'Unified command center for all delivery operations',
-        href: '/features/control-tower',
-        icon: <LayoutDashboard className="w-5 h-5" />
+        label: 'Features',
+        description: 'Complete platform capabilities overview',
+        href: '/product/features',
+        icon: <Zap className="w-5 h-5" />
       },
       {
-        label: 'Execution Governance',
-        description: 'RBAC-enforced approval gates and environment locks',
-        href: '/features/governance',
-        icon: <Shield className="w-5 h-5" />
+        label: 'Pricing',
+        description: 'Simple, transparent pricing plans',
+        href: '/product/pricing',
+        icon: <DollarSign className="w-5 h-5" />
       },
       {
-        label: 'Checkpoints & Rewind',
-        description: 'State capture and instant rollback capabilities',
-        href: '/features/checkpoints',
-        icon: <RotateCcw className="w-5 h-5" />
+        label: 'Enterprise',
+        description: 'Enterprise-grade security and scale',
+        href: '/product/enterprise',
+        icon: <Building2 className="w-5 h-5" />
       },
-      {
-        label: 'Environments & Approvals',
-        description: 'Branch-to-environment mapping with approval flows',
-        href: '/features/environments',
-        icon: <Globe className="w-5 h-5" />
-      },
-      {
-        label: 'Observability Correlation',
-        description: 'OpenTelemetry-native traces, logs, and metrics',
-        href: '/features/observability',
-        icon: <Radio className="w-5 h-5" />
-      }
     ]
   },
   {
     label: 'Solutions',
     items: [
       {
-        label: 'Enterprise CI/CD',
-        description: 'Governance layer for complex delivery pipelines',
-        href: '/solutions/enterprise-cicd',
-        icon: <Building2 className="w-5 h-5" />
+        label: 'DevOps Teams',
+        description: 'Complete visibility and control for DevOps',
+        href: '/solutions/devops',
+        icon: <Terminal className="w-5 h-5" />
       },
       {
-        label: 'Kubernetes Delivery',
-        description: 'AKS/EKS/GKE deployment orchestration',
-        href: '/solutions/kubernetes',
-        icon: <Cloud className="w-5 h-5" />
+        label: 'Platform Engineering',
+        description: 'Build your internal developer platform',
+        href: '/solutions/platform',
+        icon: <Layers className="w-5 h-5" />
       },
       {
-        label: 'DevSecOps Governance',
-        description: 'Security-first delivery with audit trails',
-        href: '/solutions/devsecops',
-        icon: <Lock className="w-5 h-5" />
-      },
-      {
-        label: 'ML/AI Delivery Control',
-        description: 'MLOps and LLMOps pipeline governance',
-        href: '/solutions/mlops',
-        icon: <Cpu className="w-5 h-5" />
-      }
-    ]
-  },
-  {
-    label: 'Platform',
-    items: [
-      {
-        label: 'How It Works',
-        description: 'Understand the Opzenix control plane model',
-        href: '/platform/how-it-works',
-        icon: <Rocket className="w-5 h-5" />
-      },
-      {
-        label: 'Architecture',
-        description: 'Technical deep-dive into our infrastructure',
-        href: '/platform/architecture',
-        icon: <Puzzle className="w-5 h-5" />
-      },
-      {
-        label: 'Security & Compliance',
-        description: 'SOC2, ISO 27001, and enterprise security',
-        href: '/platform/security',
+        label: 'Enterprise Security',
+        description: 'Security-first delivery with compliance',
+        href: '/solutions/security',
         icon: <Shield className="w-5 h-5" />
       },
-      {
-        label: 'Integrations',
-        description: 'GitHub, Azure, Vault, OTel, and more',
-        href: '/platform/integrations',
-        icon: <Puzzle className="w-5 h-5" />
-      }
     ]
   },
   {
@@ -125,22 +80,22 @@ const NAV_ITEMS: NavItem[] = [
         icon: <BookOpen className="w-5 h-5" />
       },
       {
+        label: 'Quickstart Guide',
+        description: 'Get up and running in 5 minutes',
+        href: '/docs/getting-started/quickstart',
+        icon: <Rocket className="w-5 h-5" />
+      },
+      {
         label: 'GitHub App Setup',
-        description: 'Connect your repositories in minutes',
-        href: '/docs/github-setup',
+        description: 'Connect your repositories',
+        href: '/docs/setup-guides/github-app',
         icon: <Github className="w-5 h-5" />
       },
       {
-        label: 'AKS/Kubernetes Setup',
-        description: 'Deploy to any Kubernetes cluster',
-        href: '/docs/kubernetes-setup',
+        label: 'Kubernetes Setup',
+        description: 'Deploy to AKS/EKS/GKE',
+        href: '/docs/setup-guides/kubernetes',
         icon: <Cloud className="w-5 h-5" />
-      },
-      {
-        label: 'API Reference',
-        description: 'REST and GraphQL API documentation',
-        href: '/docs/api',
-        icon: <Terminal className="w-5 h-5" />
       }
     ]
   },
@@ -150,19 +105,19 @@ const NAV_ITEMS: NavItem[] = [
       {
         label: 'About',
         description: 'Our mission and story',
-        href: '/about',
+        href: '/company/about',
         icon: <Building2 className="w-5 h-5" />
       },
       {
         label: 'Careers',
         description: 'Join the Opzenix team',
-        href: '/careers',
+        href: '/company/careers',
         icon: <Users className="w-5 h-5" />
       },
       {
         label: 'Contact',
         description: 'Get in touch with our team',
-        href: '/contact',
+        href: '/company/contact',
         icon: <Mail className="w-5 h-5" />
       }
     ]
@@ -179,11 +134,8 @@ export function EnterpriseNavigation() {
       <div className="max-w-7xl mx-auto px-4 md:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Rocket className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-lg">Opzenix</span>
+          <Link to="/" className="flex items-center">
+            <OpzenixLogo size="md" animate={false} />
           </Link>
 
           {/* Desktop Navigation */}
