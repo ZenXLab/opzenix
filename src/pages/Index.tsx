@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AnimatePresence } from 'framer-motion';
-import AppSidebar from '@/components/layout/AppSidebar';
+import ModeDrivenSidebar from '@/components/layout/ModeDrivenSidebar';
 import FlowCanvas from '@/components/flow/FlowCanvas';
 import InspectorPanel from '@/components/panels/InspectorPanel';
 import ConfigEditorPanel from '@/components/panels/ConfigEditorPanel';
@@ -19,6 +19,7 @@ import CheckpointRollbackPanel from '@/components/checkpoint/CheckpointRollbackP
 import AlertsPanel from '@/components/alerts/AlertsPanel';
 import TelemetryPanel from '@/components/telemetry/TelemetryPanel';
 import ExecutionHistoryPanel from '@/components/execution/ExecutionHistoryPanel';
+import { ExecutionDetailPanel } from '@/components/execution/ExecutionDetailPanel';
 import PipelineTemplatesGallery from '@/components/templates/PipelineTemplatesGallery';
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
 import { useFlowStore } from '@/stores/flowStore';
@@ -38,6 +39,7 @@ const Index = () => {
   const [isTelemetryOpen, setTelemetryOpen] = useState(false);
   const [isExecutionHistoryOpen, setExecutionHistoryOpen] = useState(false);
   const [isTemplatesGalleryOpen, setTemplatesGalleryOpen] = useState(false);
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const { activeView, setActiveView, selectedExecution, activeFlowType } = useFlowStore();
   
   // Enable realtime updates
@@ -82,8 +84,8 @@ const Index = () => {
   return (
     <ReactFlowProvider>
       <div className="h-screen w-screen flex overflow-hidden bg-background">
-        {/* Left Sidebar */}
-        <AppSidebar 
+        {/* Left Sidebar - Mode Driven */}
+        <ModeDrivenSidebar 
           onOpenAuditLog={() => setAuditLogOpen(true)}
           onOpenAlerts={() => setAlertsOpen(true)}
           onOpenRollback={() => setRollbackOpen(true)}
@@ -91,6 +93,9 @@ const Index = () => {
           onOpenOpzenixWizard={() => setOpzenixWizardOpen(true)}
           onOpenPipelineEditor={() => setPipelineEditorOpen(true)}
           onOpenExecutionHistory={() => setExecutionHistoryOpen(true)}
+          onViewDashboard={() => setActiveView('dashboard')}
+          onViewFlows={() => setActiveView('flows')}
+          onOpenExecutionDetail={(id) => setSelectedExecutionId(id)}
         />
         
         {/* Main Content */}
