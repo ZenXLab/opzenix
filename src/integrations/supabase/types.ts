@@ -99,6 +99,62 @@ export type Database = {
           },
         ]
       }
+      artifacts: {
+        Row: {
+          build_duration_ms: number | null
+          created_at: string
+          created_by: string | null
+          execution_id: string | null
+          id: string
+          image_digest: string
+          image_tag: string | null
+          metadata: Json | null
+          name: string
+          registry_url: string
+          size_bytes: number | null
+          type: string
+          version: string | null
+        }
+        Insert: {
+          build_duration_ms?: number | null
+          created_at?: string
+          created_by?: string | null
+          execution_id?: string | null
+          id?: string
+          image_digest: string
+          image_tag?: string | null
+          metadata?: Json | null
+          name: string
+          registry_url: string
+          size_bytes?: number | null
+          type?: string
+          version?: string | null
+        }
+        Update: {
+          build_duration_ms?: number | null
+          created_at?: string
+          created_by?: string | null
+          execution_id?: string | null
+          id?: string
+          image_digest?: string
+          image_tag?: string | null
+          metadata?: Json | null
+          name?: string
+          registry_url?: string
+          size_bytes?: number | null
+          type?: string
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artifacts_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
