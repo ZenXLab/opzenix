@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
-  GitBranch, Mail, Lock, Eye, EyeOff, ArrowRight, 
+  Mail, Lock, Eye, EyeOff, ArrowRight, 
   Loader2, CheckCircle2, AlertCircle, Rocket,
   Building2, User
 } from 'lucide-react';
@@ -11,10 +11,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { SocialLoginButtons } from '@/components/auth/SocialLoginButtons';
 
 // Validation schemas
 const emailSchema = z.string().email('Please enter a valid email address');
@@ -405,10 +405,7 @@ const Auth = () => {
               </Tabs>
               
               <div className="mt-6">
-                <Separator className="my-4" />
-                <p className="text-xs text-center text-muted-foreground">
-                  After signing in, you can connect your GitHub account to access repositories.
-                </p>
+                <SocialLoginButtons isLoading={isLoading} mode={activeTab} />
               </div>
             </CardContent>
           </Card>
