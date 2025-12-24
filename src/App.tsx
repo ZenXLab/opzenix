@@ -47,6 +47,7 @@ import Features from "./pages/product/Features";
 import Pricing from "./pages/product/Pricing";
 import Enterprise from "./pages/product/Enterprise";
 import Integrations from "./pages/product/Integrations";
+import Comparison from "./pages/product/Comparison";
 
 // Solutions
 import DevOps from "./pages/solutions/DevOps";
@@ -85,6 +86,7 @@ const App = () => (
           <Route path="/product/pricing" element={<Pricing />} />
           <Route path="/product/enterprise" element={<Enterprise />} />
           <Route path="/product/integrations" element={<Integrations />} />
+          <Route path="/product/comparison" element={<Comparison />} />
           <Route path="/product/changelog" element={<Changelog />} />
           
           {/* Solutions Routes */}

@@ -6,7 +6,7 @@ import {
   Building2, Cpu, Lock, Puzzle, BookOpen, Github, Cloud,
   Terminal, Users, Briefcase, Mail, Menu, X, ArrowRight,
   LayoutDashboard, CheckCircle2, RotateCcw, Globe, Radio,
-  DollarSign, Layers, Activity, Zap
+  DollarSign, Layers, Activity, Zap, BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -38,6 +38,12 @@ const NAV_ITEMS: NavItem[] = [
         description: '25+ native integrations for your stack',
         href: '/product/integrations',
         icon: <Puzzle className="w-5 h-5" />
+      },
+      {
+        label: 'Comparison',
+        description: 'Compare Opzenix vs competitors',
+        href: '/product/comparison',
+        icon: <BarChart3 className="w-5 h-5" />
       },
       {
         label: 'Pricing',
