@@ -743,6 +743,14 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
                       )}
                     </>
                   )}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSecrets(!showSecrets)}
+                    className="mt-2"
+                  >
                     {showSecrets ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
                     {showSecrets ? 'Hide Secrets' : 'Show Secrets'}
                   </Button>
