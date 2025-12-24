@@ -27,3 +27,11 @@ verify_jwt = false
 verify_jwt = false
 [functions.fetch-node-logs]
 verify_jwt = false
+[functions.create-environment]
+verify_jwt = false
+[functions.update-environment-config]
+verify_jwt = false
+[functions.execution-cancel]
+verify_jwt = false
+[functions.notify-event]
+verify_jwt = false
