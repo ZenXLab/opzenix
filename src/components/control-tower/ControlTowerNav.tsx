@@ -153,15 +153,25 @@ const ControlTowerNav = ({
         className="h-full border-r border-border bg-sidebar flex flex-col overflow-hidden shrink-0"
       >
         {/* Collapse Toggle */}
-        <div className="h-10 flex items-center justify-center px-2 border-b border-border">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-7 w-7" 
-            onClick={() => setCollapsed(!collapsed)}
-          >
-            {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          </Button>
+        <div className={cn(
+          "h-12 flex items-center border-b border-border",
+          collapsed ? "justify-center px-2" : "justify-end px-3"
+        )}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 rounded-md hover:bg-muted" 
+                onClick={() => setCollapsed(!collapsed)}
+              >
+                {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              {collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            </TooltipContent>
+          </Tooltip>
         </div>
 
         {/* Navigation Items */}
