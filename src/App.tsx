@@ -7,6 +7,8 @@ import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import Changelog from "./pages/Changelog";
+import Status from "./pages/Status";
 
 // Docs
 import DocsHome from "./pages/docs/DocsHome";
@@ -16,6 +18,7 @@ import RBACModelDocs from "./pages/docs/governance/RBACModelDocs";
 import SecurityPermissionModelDocs from "./pages/docs/security/SecurityPermissionModelDocs";
 import QuickstartDocs from "./pages/docs/getting-started/QuickstartDocs";
 import CoreConceptsDocs from "./pages/docs/getting-started/CoreConceptsDocs";
+import IntroductionDocs from "./pages/docs/getting-started/IntroductionDocs";
 import ExecutionsFlowsDocs from "./pages/docs/operations/ExecutionsFlowsDocs";
 import CheckpointsRewindDocs from "./pages/docs/operations/CheckpointsRewindDocs";
 import KubernetesDocs from "./pages/docs/setup-guides/KubernetesDocs";
@@ -55,6 +58,8 @@ const App = () => (
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/app" element={<Index />} />
+          <Route path="/changelog" element={<Changelog />} />
+          <Route path="/status" element={<Status />} />
           
           {/* Product Routes */}
           <Route path="/product/features" element={<Features />} />
@@ -79,6 +84,7 @@ const App = () => (
           
           {/* Documentation Routes */}
           <Route path="/docs" element={<DocsHome />} />
+          <Route path="/docs/getting-started/introduction" element={<IntroductionDocs />} />
           <Route path="/docs/getting-started/quickstart" element={<QuickstartDocs />} />
           <Route path="/docs/getting-started/core-concepts" element={<CoreConceptsDocs />} />
           <Route path="/docs/setup-guides/github-app" element={<GitHubAppSetupDocs />} />
