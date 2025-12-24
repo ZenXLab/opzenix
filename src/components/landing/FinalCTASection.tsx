@@ -1,14 +1,19 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { ArrowRight, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
+import { EnhancedPlatformDemo } from '@/components/demo/EnhancedPlatformDemo';
 
 const FinalCTASection = () => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const [demoOpen, setDemoOpen] = useState(false);
 
   return (
     <section ref={ref} className="py-24 px-8 bg-gradient-to-b from-card/50 to-background">
+      <EnhancedPlatformDemo open={demoOpen} onClose={() => setDemoOpen(false)} />
+      
       <div className="max-w-3xl mx-auto text-center">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -25,11 +30,18 @@ const FinalCTASection = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button size="lg" className="gap-2 h-12 px-8 text-base">
-              Schedule an Enterprise Demo
-              <ArrowRight className="w-4 h-4" />
+            <Button size="lg" className="gap-2 h-12 px-8 text-base" asChild>
+              <Link to="/company/contact">
+                Schedule an Enterprise Demo
+                <ArrowRight className="w-4 h-4" />
+              </Link>
             </Button>
-            <Button size="lg" variant="outline" className="gap-2 h-12 px-8 text-base">
+            <Button 
+              size="lg" 
+              variant="outline" 
+              className="gap-2 h-12 px-8 text-base"
+              onClick={() => setDemoOpen(true)}
+            >
               <Play className="w-4 h-4" />
               See a Live Execution Flow
             </Button>

@@ -1,11 +1,14 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { ArrowRight, Sparkles, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 import LiveDashboardPreview from './LiveDashboardPreview';
+import { EnhancedPlatformDemo } from '@/components/demo/EnhancedPlatformDemo';
 
 const HeroSection = () => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [demoOpen, setDemoOpen] = useState(false);
   
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -17,6 +20,8 @@ const HeroSection = () => {
 
   return (
     <section ref={containerRef} className="relative min-h-screen w-full flex flex-col overflow-hidden">
+      <EnhancedPlatformDemo open={demoOpen} onClose={() => setDemoOpen(false)} />
+      
       {/* Animated Background */}
       <div className="absolute inset-0">
         <motion.div 
@@ -70,11 +75,18 @@ const HeroSection = () => {
             
             {/* CTAs - Enterprise focused */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-8">
-              <Button size="lg" className="gap-2 h-11 px-6 text-sm">
-                Request Enterprise Demo
-                <ArrowRight className="w-4 h-4" />
+              <Button size="lg" className="gap-2 h-11 px-6 text-sm" asChild>
+                <Link to="/company/contact">
+                  Request Enterprise Demo
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
               </Button>
-              <Button size="lg" variant="outline" className="gap-2 h-11 px-6 text-sm">
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="gap-2 h-11 px-6 text-sm"
+                onClick={() => setDemoOpen(true)}
+              >
                 <Sparkles className="w-4 h-4" />
                 View Live Execution Flow
               </Button>
