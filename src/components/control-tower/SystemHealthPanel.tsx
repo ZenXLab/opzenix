@@ -53,16 +53,16 @@ const SystemHealthPanel = () => {
     { id: 'checkpoints', name: 'Checkpoint Storage', status: 'healthy', responseTime: 23, lastCheck: new Date().toISOString(), icon: HardDrive },
   ]);
 
-  const [metrics] = useState<SystemMetric[]>([
-    { name: 'Active Executions', value: 3, max: 50, unit: 'flows', status: 'normal' },
-    { name: 'Webhook Queue', value: 12, max: 1000, unit: 'pending', status: 'normal' },
-    { name: 'Checkpoint Storage', value: 2.4, max: 10, unit: 'GB', status: 'normal' },
-    { name: 'API Rate Limit', value: 4250, max: 5000, unit: 'remaining', status: 'warning' },
+  const [metrics, setMetrics] = useState<SystemMetric[]>([
+    { name: 'Active Executions', value: 0, max: 50, unit: 'flows', status: 'normal' },
+    { name: 'Pending Approvals', value: 0, max: 100, unit: 'requests', status: 'normal' },
+    { name: 'Connections', value: 0, max: 20, unit: 'active', status: 'normal' },
+    { name: 'Deployments Today', value: 0, max: 100, unit: 'completed', status: 'normal' },
   ]);
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Perform health checks
+  // Perform health checks and fetch real metrics
   useEffect(() => {
     const checkHealth = async () => {
       try {
@@ -96,6 +96,48 @@ const SystemHealthPanel = () => {
           }
           return s;
         }));
+
+        // Fetch real metrics
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const [execResult, approvalsResult, connResult, deploymentsResult] = await Promise.all([
+          supabase.from('executions').select('id', { count: 'exact', head: true }).in('status', ['running', 'paused']),
+          supabase.from('approval_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+          supabase.from('connections').select('id', { count: 'exact', head: true }).eq('status', 'connected'),
+          supabase.from('deployments').select('id', { count: 'exact', head: true }).gte('deployed_at', today.toISOString())
+        ]);
+
+        setMetrics([
+          { 
+            name: 'Active Executions', 
+            value: execResult.count || 0, 
+            max: 50, 
+            unit: 'flows', 
+            status: (execResult.count || 0) > 40 ? 'warning' : 'normal' 
+          },
+          { 
+            name: 'Pending Approvals', 
+            value: approvalsResult.count || 0, 
+            max: 100, 
+            unit: 'requests', 
+            status: (approvalsResult.count || 0) > 10 ? 'warning' : 'normal' 
+          },
+          { 
+            name: 'Active Connections', 
+            value: connResult.count || 0, 
+            max: 20, 
+            unit: 'connected', 
+            status: (connResult.count || 0) === 0 ? 'warning' : 'normal' 
+          },
+          { 
+            name: 'Deployments Today', 
+            value: deploymentsResult.count || 0, 
+            max: 100, 
+            unit: 'completed', 
+            status: 'normal' 
+          },
+        ]);
       } catch (err) {
         console.error('Health check failed:', err);
       }
@@ -103,7 +145,20 @@ const SystemHealthPanel = () => {
 
     checkHealth();
     const interval = setInterval(checkHealth, 30000);
-    return () => clearInterval(interval);
+
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel('system-health-metrics')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'executions' }, checkHealth)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'approval_requests' }, checkHealth)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'connections' }, checkHealth)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deployments' }, checkHealth)
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleRefresh = async () => {
