@@ -34,6 +34,12 @@ const NAV_ITEMS: NavItem[] = [
         icon: <Zap className="w-5 h-5" />
       },
       {
+        label: 'Integrations',
+        description: '25+ native integrations for your stack',
+        href: '/product/integrations',
+        icon: <Puzzle className="w-5 h-5" />
+      },
+      {
         label: 'Pricing',
         description: 'Simple, transparent pricing plans',
         href: '/product/pricing',

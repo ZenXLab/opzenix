@@ -55,7 +55,7 @@ const DEMO_PHASES: { id: DemoPhase; title: string; description: string; duration
   { id: 'intro', title: 'Welcome to Opzenix', description: 'Enterprise CI/CD Control Plane', duration: 3000 },
   { id: 'github', title: 'Step 1: Connect GitHub', description: 'One-click repository integration', duration: 5000 },
   { id: 'pipeline', title: 'Step 2: Build Pipeline', description: 'Visual drag-and-drop flow creation', duration: 5000 },
-  { id: 'execution', title: 'Step 3: Execute Pipeline', description: 'Watch your pipeline run in real-time', duration: 7000 },
+  { id: 'execution', title: 'Step 3: Execute Pipeline', description: 'Watch your pipeline run in real-time', duration: 8000 },
   { id: 'analytics', title: 'Step 4: Monitor & Observe', description: 'Deep observability with OpenTelemetry', duration: 5000 },
   { id: 'failure', title: 'Step 5: Failure Detected', description: 'Intelligent failure handling', duration: 4000 },
   { id: 'rollback', title: 'Step 6: Recovery', description: 'Resume from checkpoint instantly', duration: 5000 },
@@ -169,30 +169,39 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
     if (currentPhase === 'execution') {
       resetPipeline();
       const runPipeline = async () => {
-        const durations = ['1.2s', '45.8s', '32.4s', '12.1s', '28.3s', '—', '15.7s'];
-        for (let i = 0; i < pipelineNodes.length - 2; i++) { // Stop before approval
-          await new Promise(r => setTimeout(r, 800));
+        const durations = ['1.2s', '45.8s', '32.4s', '12.1s', '28.3s', '2.1s', '15.7s'];
+        const nodeLabels = ['Git Push', 'Build', 'Test', 'Security', 'Staging', 'Approval', 'Production'];
+        
+        // Run through all nodes with smooth animation
+        for (let i = 0; i < 7; i++) {
+          await new Promise(r => setTimeout(r, 600));
           setCurrentNodeIndex(i);
+          
+          // Set current node to running
           setPipelineNodes(nodes => 
             nodes.map((n, idx) => ({
               ...n,
               status: idx < i ? 'success' : idx === i ? 'running' : 'pending',
-              duration: idx <= i ? durations[idx] : '0s'
+              duration: idx < i ? durations[idx] : '0s'
             }))
           );
-          addLog('info', `Running ${pipelineNodes[i].label}...`, pipelineNodes[i].id);
+          addLog('info', `Running ${nodeLabels[i]}...`, nodeLabels[i].toLowerCase().replace(' ', '-'));
           
-          await new Promise(r => setTimeout(r, 600));
+          await new Promise(r => setTimeout(r, 400));
           
+          // Complete current node
           setPipelineNodes(nodes =>
             nodes.map((n, idx) => ({
               ...n,
-              status: idx <= i ? 'success' : idx === i + 1 ? 'running' : 'pending',
-              duration: durations[idx]
+              status: idx <= i ? 'success' : 'pending',
+              duration: idx <= i ? durations[idx] : '0s'
             }))
           );
-          addLog('success', `${pipelineNodes[i].label} completed in ${durations[i]}`, pipelineNodes[i].id);
+          addLog('success', `${nodeLabels[i]} completed in ${durations[i]}`, nodeLabels[i].toLowerCase().replace(' ', '-'));
         }
+        
+        // Final success message
+        addLog('success', 'Pipeline execution completed successfully!');
       };
       runPipeline();
     }
