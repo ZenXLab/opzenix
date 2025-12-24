@@ -138,52 +138,51 @@ const SystemRiskBanner = ({ onViewApprovals, onViewExecution }: SystemRiskBanner
   }
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        className="space-y-2"
-      >
-        {riskMessages.map((risk, index) => (
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className={cn(
-              'flex items-center justify-between px-4 py-2.5 rounded-lg border',
-              risk.severity === 'error' 
-                ? 'bg-sec-critical/10 border-sec-critical/30' 
-                : 'bg-sec-warning/10 border-sec-warning/30'
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <risk.icon className={cn(
-                'w-4 h-4',
-                risk.severity === 'error' ? 'text-sec-critical' : 'text-sec-warning'
-              )} />
-              <span className={cn(
-                'text-sm font-medium',
-                risk.severity === 'error' ? 'text-sec-critical' : 'text-sec-warning'
-              )}>
-                {risk.message}
-              </span>
-            </div>
-            {risk.action && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-7 gap-1 text-xs"
-                onClick={risk.action}
-              >
-                View <ChevronRight className="w-3 h-3" />
-              </Button>
-            )}
-          </motion.div>
-        ))}
-      </motion.div>
-    </AnimatePresence>
+    <div className="space-y-2">
+      <AnimatePresence mode="sync">
+        {riskMessages.map((risk, index) => {
+          const Icon = risk.icon;
+          return (
+            <motion.div
+              key={`risk-${index}-${risk.message}`}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ delay: index * 0.1 }}
+              className={cn(
+                'flex items-center justify-between px-4 py-2.5 rounded-lg border',
+                risk.severity === 'error' 
+                  ? 'bg-sec-critical/10 border-sec-critical/30' 
+                  : 'bg-sec-warning/10 border-sec-warning/30'
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <Icon className={cn(
+                  'w-4 h-4',
+                  risk.severity === 'error' ? 'text-sec-critical' : 'text-sec-warning'
+                )} />
+                <span className={cn(
+                  'text-sm font-medium',
+                  risk.severity === 'error' ? 'text-sec-critical' : 'text-sec-warning'
+                )}>
+                  {risk.message}
+                </span>
+              </div>
+              {risk.action && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-7 gap-1 text-xs"
+                  onClick={risk.action}
+                >
+                  View <ChevronRight className="w-3 h-3" />
+                </Button>
+              )}
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
+    </div>
   );
 };
 
