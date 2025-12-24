@@ -15,7 +15,9 @@ import {
   RefreshCw,
   Eye,
   WifiOff,
-  Loader2
+  Loader2,
+  Container,
+  Radio
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -67,7 +69,13 @@ const ControlTowerDashboard = ({
   onOpenApprovals,
 }: ControlTowerDashboardProps) => {
   // Use real-time hooks
-  const { connections, loading: connectionsLoading, isConnected: connectionsConnected } = useConnectionsRealtime();
+  const { 
+    connections, 
+    loading: connectionsLoading, 
+    isConnected: connectionsConnected,
+    lastHealthCheck,
+    triggerHealthCheck 
+  } = useConnectionsRealtime();
   const { 
     activeExecutions: executions, 
     pendingApprovals,
@@ -144,6 +152,8 @@ const ControlTowerDashboard = ({
       case 'kubernetes': 
       case 'azure': return Cloud;
       case 'vault': return Shield;
+      case 'registry': return Container;
+      case 'otel': return Radio;
       default: return Cloud;
     }
   };
@@ -151,9 +161,12 @@ const ControlTowerDashboard = ({
   const getStatusColor = (status: Connection['status']) => {
     switch (status) {
       case 'connected': return 'text-sec-safe';
-      case 'invalid': return 'text-sec-critical';
-      case 'rate-limited': return 'text-sec-warning';
+      case 'invalid': 
+      case 'failed':
       case 'error': return 'text-sec-critical';
+      case 'rate-limited': 
+      case 'validating': return 'text-sec-warning';
+      case 'pending': return 'text-muted-foreground';
       default: return 'text-muted-foreground';
     }
   };
@@ -204,10 +217,26 @@ const ControlTowerDashboard = ({
                 <div className="flex items-center gap-2">
                   <Link2 className="w-4 h-4 text-primary" />
                   <CardTitle className="text-base">Connections Status</CardTitle>
+                  {lastHealthCheck && (
+                    <span className="text-[10px] text-muted-foreground">
+                      Last check: {formatTimeAgo(lastHealthCheck)}
+                    </span>
+                  )}
                 </div>
-                <Button variant="ghost" size="sm" onClick={onOpenConnections}>
-                  Manage <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-7 w-7"
+                    onClick={() => triggerHealthCheck()}
+                    title="Run health check"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={onOpenConnections}>
+                    Manage <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -226,18 +255,35 @@ const ControlTowerDashboard = ({
                       className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-md bg-background flex items-center justify-center">
-                          <Icon className="w-4 h-4 text-muted-foreground" />
+                        <div className={cn(
+                          'w-8 h-8 rounded-md flex items-center justify-center',
+                          conn.status === 'connected' ? 'bg-sec-safe/10' : 
+                          conn.status === 'failed' || conn.status === 'error' ? 'bg-sec-critical/10' : 
+                          'bg-background'
+                        )}>
+                          <Icon className={cn(
+                            'w-4 h-4',
+                            conn.status === 'connected' ? 'text-sec-safe' :
+                            conn.status === 'failed' || conn.status === 'error' ? 'text-sec-critical' :
+                            'text-muted-foreground'
+                          )} />
                         </div>
                         <div>
                           <p className="text-sm font-medium">{conn.name}</p>
-                          <p className="text-xs text-muted-foreground capitalize">{conn.type}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-muted-foreground capitalize">{conn.type}</p>
+                            {conn.blocked && (
+                              <span className="text-[10px] text-sec-critical font-medium">BLOCKED</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={cn('text-xs', getStatusColor(conn.status))}>
+                        <span className={cn('flex items-center gap-1', getStatusColor(conn.status))}>
                           {conn.status === 'connected' && <CheckCircle2 className="w-4 h-4" />}
-                          {conn.status !== 'connected' && <XCircle className="w-4 h-4" />}
+                          {conn.status === 'validating' && <Loader2 className="w-4 h-4 animate-spin" />}
+                          {(conn.status === 'failed' || conn.status === 'error') && <XCircle className="w-4 h-4" />}
+                          {conn.status === 'pending' && <Clock className="w-4 h-4" />}
                         </span>
                         {conn.last_validated_at && (
                           <span className="text-[10px] text-muted-foreground">

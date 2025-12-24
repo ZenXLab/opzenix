@@ -1,17 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export interface Connection {
   id: string;
   user_id: string | null;
-  type: 'github' | 'azure' | 'kubernetes' | 'vault';
+  type: 'github' | 'azure' | 'kubernetes' | 'vault' | 'registry' | 'otel';
   name: string;
   provider: string;
-  status: 'connected' | 'pending' | 'validating' | 'error' | 'invalid' | 'rate-limited';
+  status: 'connected' | 'pending' | 'validating' | 'error' | 'invalid' | 'rate-limited' | 'failed';
   validated: boolean;
   validation_message: string | null;
   last_validated_at: string | null;
+  blocked: boolean;
+  health_check_interval_minutes: number;
   resource_status: {
     acr?: { status: string; message: string; latencyMs?: number; details?: Record<string, unknown> };
     aks?: { status: string; message: string; latencyMs?: number; details?: Record<string, unknown> };
@@ -34,16 +36,19 @@ interface AzureValidationRequest {
   keyVaultName?: string;
 }
 
+const HEALTH_CHECK_INTERVAL_MS = 60000; // Check every 60 seconds
+
 export const useConnectionsRealtime = () => {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
   const [validatingId, setValidatingId] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(true);
+  const [lastHealthCheck, setLastHealthCheck] = useState<Date | null>(null);
+  const healthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch connections from database using raw SQL via RPC or direct fetch
+  // Fetch connections from database
   const fetchConnections = useCallback(async () => {
     try {
-      // Use type assertion since connections table is new
       const { data, error } = await (supabase
         .from('connections' as any)
         .select('*')
@@ -51,7 +56,6 @@ export const useConnectionsRealtime = () => {
 
       if (error) {
         console.error('[useConnectionsRealtime] Fetch error:', error);
-        // If table doesn't exist yet, return empty array
         if (error.code === '42P01') {
           setConnections([]);
           return;
@@ -67,6 +71,58 @@ export const useConnectionsRealtime = () => {
       setLoading(false);
     }
   }, []);
+
+  // Trigger health check for all connections
+  const triggerHealthCheck = useCallback(async (connectionId?: string) => {
+    try {
+      console.log('[useConnectionsRealtime] Triggering health check...');
+      
+      const { data, error } = await supabase.functions.invoke('connection-health-check', {
+        body: connectionId ? { connection_id: connectionId } : {}
+      });
+
+      if (error) {
+        console.error('[useConnectionsRealtime] Health check error:', error);
+        return null;
+      }
+
+      console.log('[useConnectionsRealtime] Health check result:', data);
+      setLastHealthCheck(new Date());
+      
+      // Refetch connections to get updated statuses
+      await fetchConnections();
+      
+      return data;
+    } catch (err) {
+      console.error('[useConnectionsRealtime] Health check failed:', err);
+      return null;
+    }
+  }, [fetchConnections]);
+
+  // Validate a specific connection
+  const validateConnection = useCallback(async (connectionId: string) => {
+    setValidatingId(connectionId);
+    
+    try {
+      // Update status to validating
+      await (supabase
+        .from('connections' as any)
+        .update({ status: 'validating' })
+        .eq('id', connectionId) as any);
+
+      const result = await triggerHealthCheck(connectionId);
+      
+      if (result?.results?.[0]?.status === 'connected') {
+        toast.success('Connection validated successfully');
+      } else {
+        toast.error('Connection validation failed');
+      }
+      
+      return result;
+    } finally {
+      setValidatingId(null);
+    }
+  }, [triggerHealthCheck]);
 
   // Create a new connection
   const createConnection = useCallback(async (
@@ -253,9 +309,19 @@ export const useConnectionsRealtime = () => {
     }
   }, []);
 
-  // Set up realtime subscription
+  // Set up realtime subscription and periodic health checks
   useEffect(() => {
     fetchConnections();
+
+    // Initial health check after 5 seconds
+    const initialCheckTimeout = setTimeout(() => {
+      triggerHealthCheck();
+    }, 5000);
+
+    // Set up periodic health checks
+    healthCheckIntervalRef.current = setInterval(() => {
+      triggerHealthCheck();
+    }, HEALTH_CHECK_INTERVAL_MS);
 
     const channel = supabase
       .channel('connections-realtime')
@@ -286,17 +352,24 @@ export const useConnectionsRealtime = () => {
       });
 
     return () => {
+      clearTimeout(initialCheckTimeout);
+      if (healthCheckIntervalRef.current) {
+        clearInterval(healthCheckIntervalRef.current);
+      }
       supabase.removeChannel(channel);
     };
-  }, [fetchConnections]);
+  }, [fetchConnections, triggerHealthCheck]);
 
   return {
     connections,
     loading,
     validatingId,
     isConnected,
+    lastHealthCheck,
     createConnection,
     validateAzureConnection,
+    validateConnection,
+    triggerHealthCheck,
     deleteConnection,
     refetch: fetchConnections
   };
