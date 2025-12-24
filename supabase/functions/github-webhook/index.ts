@@ -1,9 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-hub-signature-256',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-hub-signature-256, x-github-event, x-github-delivery',
 };
 
 interface GitHubPushPayload {
@@ -65,8 +66,44 @@ interface GitHubWorkflowPayload {
   };
   repository?: {
     full_name: string;
+    name: string;
+    owner: {
+      login: string;
+    };
     html_url: string;
   };
+}
+
+/**
+ * Verify GitHub webhook signature using HMAC SHA-256
+ * @see https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries
+ */
+function verifyGitHubSignature(payload: string, signature: string, secret: string): boolean {
+  if (!signature || !signature.startsWith('sha256=')) {
+    console.log('[Signature] Invalid signature format');
+    return false;
+  }
+
+  const expectedSignature = signature.slice(7); // Remove 'sha256=' prefix
+  const hmac = createHmac('sha256', secret);
+  hmac.update(payload, 'utf8');
+  const computedSignature = hmac.digest('hex');
+
+  try {
+    // Use timing-safe comparison to prevent timing attacks
+    const expectedBuffer = new Uint8Array(expectedSignature.match(/.{2}/g)!.map(byte => parseInt(byte, 16)));
+    const computedBuffer = new Uint8Array(computedSignature.match(/.{2}/g)!.map(byte => parseInt(byte, 16)));
+    
+    if (expectedBuffer.length !== computedBuffer.length) {
+      console.log('[Signature] Length mismatch');
+      return false;
+    }
+    
+    return timingSafeEqual(expectedBuffer, computedBuffer);
+  } catch (error) {
+    console.error('[Signature] Comparison error:', error);
+    return false;
+  }
 }
 
 serve(async (req) => {
@@ -74,20 +111,137 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const deliveryId = req.headers.get('x-github-delivery') || 'unknown';
+  console.log(`[GitHub Webhook] Delivery ID: ${deliveryId}`);
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const event = req.headers.get('x-github-event');
-    console.log(`[GitHub Webhook] Received event: ${event}`);
+    const signature = req.headers.get('x-hub-signature-256');
+    
+    console.log(`[GitHub Webhook] Event: ${event}`);
 
-    const payload = await req.json();
+    // Get raw payload for signature verification
+    const rawPayload = await req.text();
+    let payload: any;
+    
+    try {
+      payload = JSON.parse(rawPayload);
+    } catch (e) {
+      console.error('[GitHub Webhook] Invalid JSON payload');
+      return new Response(JSON.stringify({ error: 'Invalid JSON payload' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Extract repository info for signature verification
+    const repoOwner = payload.repository?.owner?.login || payload.repository?.owner?.name;
+    const repoName = payload.repository?.name;
+
+    if (!repoOwner || !repoName) {
+      console.log('[GitHub Webhook] Missing repository information');
+      return new Response(JSON.stringify({ error: 'Missing repository information' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Find matching GitHub integration to get webhook secret
+    const { data: integration, error: integrationError } = await supabase
+      .from('github_integrations')
+      .select('id, webhook_secret')
+      .eq('repository_owner', repoOwner)
+      .eq('repository_name', repoName)
+      .maybeSingle();
+
+    if (integrationError) {
+      console.error('[GitHub Webhook] Error fetching integration:', integrationError);
+      return new Response(JSON.stringify({ error: 'Failed to fetch integration' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!integration) {
+      console.log(`[GitHub Webhook] No integration found for ${repoOwner}/${repoName}`);
+      return new Response(JSON.stringify({ 
+        error: 'Repository not configured',
+        message: `No integration found for ${repoOwner}/${repoName}` 
+      }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verify webhook signature if secret is configured
+    if (integration.webhook_secret) {
+      if (!signature) {
+        console.log('[GitHub Webhook] Missing signature header');
+        
+        // Log security event
+        await supabase.from('audit_logs').insert({
+          action: 'webhook_signature_missing',
+          resource_type: 'github_webhook',
+          details: {
+            repository: `${repoOwner}/${repoName}`,
+            event,
+            delivery_id: deliveryId,
+          },
+        });
+
+        return new Response(JSON.stringify({ error: 'Missing signature' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const isValid = verifyGitHubSignature(rawPayload, signature, integration.webhook_secret);
+      
+      if (!isValid) {
+        console.log('[GitHub Webhook] Invalid signature');
+        
+        // Log security event
+        await supabase.from('audit_logs').insert({
+          action: 'webhook_signature_invalid',
+          resource_type: 'github_webhook',
+          details: {
+            repository: `${repoOwner}/${repoName}`,
+            event,
+            delivery_id: deliveryId,
+          },
+        });
+
+        return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log('[GitHub Webhook] Signature verified successfully');
+    } else {
+      console.log('[GitHub Webhook] No webhook secret configured - skipping signature verification');
+    }
+
+    // Log successful webhook receipt
+    await supabase.from('audit_logs').insert({
+      action: 'webhook_received',
+      resource_type: 'github_webhook',
+      details: {
+        repository: `${repoOwner}/${repoName}`,
+        event,
+        delivery_id: deliveryId,
+        signature_verified: !!integration.webhook_secret,
+      },
+    });
 
     // Handle PUSH events - create execution based on governance
     if (event === 'push') {
       const pushPayload = payload as GitHubPushPayload;
-      await handlePushEvent(supabase, pushPayload);
+      await handlePushEvent(supabase, pushPayload, integration.id);
     }
     // Handle workflow_run and workflow_job events
     else if (event === 'workflow_run') {
@@ -96,8 +250,15 @@ serve(async (req) => {
     else if (event === 'workflow_job') {
       await handleWorkflowJob(supabase, payload as GitHubWorkflowPayload);
     }
+    // Handle ping event (sent when webhook is first configured)
+    else if (event === 'ping') {
+      console.log('[GitHub Webhook] Ping received - webhook configured successfully');
+      return new Response(JSON.stringify({ success: true, message: 'Pong!' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    return new Response(JSON.stringify({ success: true, event }), {
+    return new Response(JSON.stringify({ success: true, event, delivery_id: deliveryId }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: any) {
@@ -109,7 +270,7 @@ serve(async (req) => {
   }
 });
 
-async function handlePushEvent(supabase: any, payload: GitHubPushPayload) {
+async function handlePushEvent(supabase: any, payload: GitHubPushPayload, integrationId: string) {
   const repoOwner = payload.repository.owner.login || payload.repository.owner.name;
   const repoName = payload.repository.name;
   const branch = payload.ref.replace('refs/heads/', '');
@@ -118,24 +279,11 @@ async function handlePushEvent(supabase: any, payload: GitHubPushPayload) {
 
   console.log(`[Push] ${repoOwner}/${repoName} - Branch: ${branch} - Commit: ${commitSha.substring(0, 7)}`);
 
-  // Find matching GitHub integration
-  const { data: integration, error: integrationError } = await supabase
-    .from('github_integrations')
-    .select('*')
-    .eq('repository_owner', repoOwner)
-    .eq('repository_name', repoName)
-    .maybeSingle();
-
-  if (integrationError || !integration) {
-    console.log(`[Push] No integration found for ${repoOwner}/${repoName}`);
-    return;
-  }
-
   // Find branch mappings
   const { data: mappings } = await supabase
     .from('branch_mappings')
     .select('*')
-    .eq('github_integration_id', integration.id);
+    .eq('github_integration_id', integrationId);
 
   // Match branch to environment(s)
   const matchedEnvironments = findMatchingEnvironments(branch, mappings || []);
@@ -203,7 +351,7 @@ async function handlePushEvent(supabase: any, payload: GitHubPushPayload) {
           metadata: {
             repository: `${repoOwner}/${repoName}`,
             pusher: payload.pusher.name,
-            github_integration_id: integration.id,
+            github_integration_id: integrationId,
           },
         })
         .select()
@@ -253,7 +401,7 @@ async function handlePushEvent(supabase: any, payload: GitHubPushPayload) {
           metadata: {
             repository: `${repoOwner}/${repoName}`,
             pusher: payload.pusher.name,
-            github_integration_id: integration.id,
+            github_integration_id: integrationId,
           },
         })
         .select()
