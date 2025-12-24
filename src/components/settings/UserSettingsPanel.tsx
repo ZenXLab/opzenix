@@ -33,6 +33,9 @@ import { toast } from 'sonner';
 import { ProfileTab } from './ProfileTab';
 import { OrganizationTab } from './OrganizationTab';
 import { DeploymentHistoryTab } from './DeploymentHistoryTab';
+import { ThemeSelector } from './ThemeSelector';
+import { TypographySelector } from './TypographySelector';
+import { IconStyleSelector } from './IconStyleSelector';
 
 interface UserSettingsPanelProps {
   open: boolean;
@@ -310,97 +313,24 @@ export function UserSettingsPanel({ open, onClose }: UserSettingsPanelProps) {
             </div>
           </TabsContent>
 
-          {/* Azure Settings */}
-          <TabsContent value="azure" className="space-y-6 mt-6">
-            <div className="space-y-4">
-              {/* ACR Configuration */}
-              <div className="p-4 rounded-lg border border-border bg-secondary/20">
-                <div className="flex items-center gap-2 mb-3">
-                  <Container className="w-4 h-4 text-ai-primary" />
-                  <Label className="text-sm font-medium">Azure Container Registry</Label>
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Registry URL</Label>
-                    <Input 
-                      placeholder="myregistry.azurecr.io" 
-                      className="mt-1 bg-background"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-muted-foreground">Not connected</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* AKS Configuration */}
-              <div className="p-4 rounded-lg border border-border bg-secondary/20">
-                <div className="flex items-center gap-2 mb-3">
-                  <Server className="w-4 h-4 text-sec-safe" />
-                  <Label className="text-sm font-medium">Azure Kubernetes Service</Label>
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Cluster Name</Label>
-                    <Input 
-                      placeholder="my-aks-cluster" 
-                      className="mt-1 bg-background"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Resource Group</Label>
-                    <Input 
-                      placeholder="my-resource-group" 
-                      className="mt-1 bg-background"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-muted-foreground">Not connected</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Key Vault Configuration */}
-              <div className="p-4 rounded-lg border border-border bg-secondary/20">
-                <div className="flex items-center gap-2 mb-3">
-                  <Key className="w-4 h-4 text-sec-warning" />
-                  <Label className="text-sm font-medium">Azure Key Vault</Label>
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Vault Name</Label>
-                    <Input 
-                      placeholder="my-key-vault" 
-                      className="mt-1 bg-background"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Tenant ID</Label>
-                    <Input 
-                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" 
-                      className="mt-1 bg-background"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span className="text-muted-foreground">Not connected</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-3 rounded-lg bg-ai-primary/10 border border-ai-primary/20">
-                <p className="text-xs text-muted-foreground">
-                  Configure Azure credentials in the Azure Integration Panel for full connectivity.
-                </p>
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* Appearance Settings */}
+          {/* Appearance Settings - Now with Theme, Typography, Icons */}
           <TabsContent value="appearance" className="space-y-6 mt-6">
-            <div className="space-y-4">
+            <div className="space-y-6">
+              {/* Theme Selector */}
+              <ThemeSelector />
+
+              <Separator />
+
+              {/* Typography Selector */}
+              <TypographySelector />
+
+              <Separator />
+
+              {/* Icon Style Selector */}
+              <IconStyleSelector />
+
+              <Separator />
+
               <div className="flex items-center justify-between">
                 <div>
                   <Label className="text-sm font-medium">Compact Mode</Label>
@@ -426,35 +356,18 @@ export function UserSettingsPanel({ open, onClose }: UserSettingsPanelProps) {
                   onCheckedChange={setAnimationsEnabled} 
                 />
               </div>
-
-              <Separator />
-
-              <div className="p-4 rounded-lg bg-secondary/30 border border-border">
-                <p className="text-xs text-muted-foreground">
-                  Theme settings are managed by your system preferences. 
-                  Toggle dark/light mode from your browser or OS settings.
-                </p>
-              </div>
             </div>
           </TabsContent>
         </Tabs>
 
         <SheetFooter className="mt-6 flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={handleReset}
-            className="gap-1.5"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
+          <Button variant="outline" onClick={handleReset} className="gap-2">
+            <RotateCcw className="w-4 h-4" />
             Reset
           </Button>
-          <Button 
-            onClick={handleSave} 
-            disabled={saving || loading}
-            className="gap-1.5 flex-1"
-          >
-            <Save className="w-3.5 h-3.5" />
-            {saving ? 'Saving...' : 'Save Settings'}
+          <Button onClick={handleSave} disabled={saving} className="gap-2">
+            <Save className="w-4 h-4" />
+            {saving ? 'Saving...' : 'Save Changes'}
           </Button>
         </SheetFooter>
       </SheetContent>
