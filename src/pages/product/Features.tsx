@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { 
-  GitBranch, Shield, Eye, Play, CheckCircle2, Zap, Lock, 
+  Shield, Play, Lock, 
   RotateCcw, Activity, Users, Workflow, ArrowRight, Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,8 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import EnterpriseNavigation from '@/components/landing/EnterpriseNavigation';
 import FooterSection from '@/components/landing/FooterSection';
-import InteractivePlatformDemo from '@/components/demo/InteractivePlatformDemo';
-
+import { EnhancedPlatformDemo } from '@/components/demo/EnhancedPlatformDemo';
 const Features = () => {
   const features = [
     {
@@ -75,7 +74,7 @@ const Features = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <InteractivePlatformDemo open={demoOpen} onClose={() => setDemoOpen(false)} />
+      <EnhancedPlatformDemo open={demoOpen} onClose={() => setDemoOpen(false)} />
       <EnterpriseNavigation />
       
       {/* Hero */}

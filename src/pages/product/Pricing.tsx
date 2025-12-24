@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import EnterpriseNavigation from '@/components/landing/EnterpriseNavigation';
 import FooterSection from '@/components/landing/FooterSection';
-
+import { PricingCalculator } from '@/components/pricing/PricingCalculator';
 const Pricing = () => {
   const plans = [
     {
@@ -152,6 +152,9 @@ const Pricing = () => {
           </div>
         </div>
       </section>
+
+      {/* Pricing Calculator */}
+      <PricingCalculator />
 
       {/* FAQ Teaser */}
       <section className="py-20 px-6 bg-muted/30">
