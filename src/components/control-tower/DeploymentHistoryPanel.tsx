@@ -382,6 +382,10 @@ const DeploymentHistoryPanel = () => {
           getStatusIcon={getStatusIcon}
           getEnvironmentColor={getEnvironmentColor}
           onRollback={setRollbackTarget}
+          onViewExecution={(executionId) => {
+            // Navigate to execution flow view
+            window.dispatchEvent(new CustomEvent('opzenix:view-execution', { detail: { executionId } }));
+          }}
         />
 
         {/* Rollback Confirmation Dialog */}
@@ -403,13 +407,15 @@ const DeploymentList = ({
   loading, 
   getStatusIcon,
   getEnvironmentColor,
-  onRollback
+  onRollback,
+  onViewExecution
 }: { 
   deployments: Deployment[];
   loading: boolean;
   getStatusIcon: (status: Deployment['status']) => React.ReactNode;
   getEnvironmentColor: (env: string) => string;
   onRollback: (deployment: Deployment) => void;
+  onViewExecution?: (executionId: string) => void;
 }) => {
   if (loading) {
     return (
@@ -489,8 +495,13 @@ const DeploymentList = ({
 
                 {/* Actions */}
                 <div className="flex items-center gap-2">
-                  {deployment.execution_id && (
-                    <Button variant="ghost" size="sm" className="gap-1.5">
+                  {deployment.execution_id && onViewExecution && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="gap-1.5"
+                      onClick={() => onViewExecution(deployment.execution_id!)}
+                    >
                       <Eye className="w-3.5 h-3.5" />
                       View Execution
                     </Button>

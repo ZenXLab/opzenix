@@ -71,6 +71,8 @@ const EnvironmentsPanel = () => {
   const [isWizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [isCreating, setIsCreating] = useState(false);
+  const [isConfiguring, setIsConfiguring] = useState(false);
+  const [configEnv, setConfigEnv] = useState<Environment | null>(null);
   const [newEnv, setNewEnv] = useState<{
     name: string;
     environment: string;
@@ -113,7 +115,7 @@ const EnvironmentsPanel = () => {
               .eq('environment', env.environment)
               .order('deployed_at', { ascending: false })
               .limit(1)
-              .single();
+              .maybeSingle();
 
             const vars = (env.variables as Record<string, unknown>) || {};
             
@@ -246,6 +248,17 @@ const EnvironmentsPanel = () => {
       console.error('[EnvironmentsPanel] Error duplicating environment:', err);
       toast.error(err.message || 'Failed to duplicate environment');
     }
+  };
+
+  const handleConfigureEnvironment = (env: Environment) => {
+    setConfigEnv(env);
+    toast.info(`Configure ${env.name} - Opening settings...`);
+    // For now, show a toast - full config dialog can be added later
+  };
+
+  const handleViewDeployments = (environment: string) => {
+    toast.info(`Viewing deployments for ${environment}`);
+    // Navigate to deployments section filtered by environment
   };
 
   const getStrategyBadge = (strategy: Environment['strategy']) => {
@@ -409,13 +422,13 @@ const EnvironmentsPanel = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="gap-2">
+                          <DropdownMenuItem className="gap-2" onClick={() => handleConfigureEnvironment(env)}>
                             <Settings className="w-4 h-4" /> Configure
                           </DropdownMenuItem>
                           <DropdownMenuItem className="gap-2" onClick={() => handleDuplicateEnvironment(env)}>
                             <Copy className="w-4 h-4" /> Duplicate
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2">
+                          <DropdownMenuItem className="gap-2" onClick={() => handleViewDeployments(env.environment)}>
                             <GitBranch className="w-4 h-4" /> View Deployments
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />

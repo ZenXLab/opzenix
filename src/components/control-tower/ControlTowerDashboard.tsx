@@ -108,7 +108,7 @@ const ControlTowerDashboard = ({
                 .eq('environment', env.environment)
                 .order('deployed_at', { ascending: false })
                 .limit(1)
-                .single();
+                .maybeSingle();
 
               const vars = env.variables as Record<string, unknown> || {};
               

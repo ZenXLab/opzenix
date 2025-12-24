@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AnimatePresence } from 'framer-motion';
 import ControlTowerLayout from '@/components/control-tower/ControlTowerLayout';
@@ -87,6 +87,19 @@ const Index = () => {
     completeOnboarding,
     loading: preferencesLoading 
   } = useUserPreferences();
+
+  // Listen for execution view events from other components (e.g., DeploymentHistoryPanel)
+  useEffect(() => {
+    const handleViewExecution = (event: CustomEvent<{ executionId: string }>) => {
+      setSelectedExecutionId(event.detail.executionId);
+      setActiveSection('executions');
+    };
+
+    window.addEventListener('opzenix:view-execution', handleViewExecution as EventListener);
+    return () => {
+      window.removeEventListener('opzenix:view-execution', handleViewExecution as EventListener);
+    };
+  }, []);
 
   const handleWizardComplete = useCallback((nodes: Node[], edges: Edge[], config: any) => {
     console.log('Pipeline created:', { nodes, edges, config });
