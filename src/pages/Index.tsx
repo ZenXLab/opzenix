@@ -26,6 +26,11 @@ import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { ValidationChecklist } from '@/components/validation/ValidationChecklist';
 import { GuidedDemoFlow } from '@/components/demo/GuidedDemoFlow';
 import { UserSettingsPanel } from '@/components/settings/UserSettingsPanel';
+import { EnterpriseReadinessChecklist } from '@/components/validation/EnterpriseReadinessChecklist';
+import { ImplementationReport } from '@/components/reports/ImplementationReport';
+import { ComplianceAuditPanel } from '@/components/compliance/ComplianceAuditPanel';
+import { VaultAdapterPanel } from '@/components/vault/VaultAdapterPanel';
+import { AzureIntegrationPanel } from '@/components/azure/AzureIntegrationPanel';
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
@@ -51,6 +56,11 @@ const Index = () => {
   const [isDemoOpen, setDemoOpen] = useState(false);
   const [isValidationOpen, setValidationOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
+  const [isReadinessOpen, setReadinessOpen] = useState(false);
+  const [isReportOpen, setReportOpen] = useState(false);
+  const [isComplianceOpen, setComplianceOpen] = useState(false);
+  const [isVaultOpen, setVaultOpen] = useState(false);
+  const [isAzureOpen, setAzureOpen] = useState(false);
   const { activeView, setActiveView, selectedExecution, activeFlowType } = useFlowStore();
   
   // Enable realtime updates
@@ -131,6 +141,10 @@ const Index = () => {
             onViewDashboard={() => setActiveView('dashboard')}
             onViewFlows={() => setActiveView('flows')}
             onOpenExecutionDetail={(id) => setSelectedExecutionId(id)}
+            onOpenReadinessChecklist={() => setReadinessOpen(true)}
+            onOpenImplementationReport={() => setReportOpen(true)}
+            onOpenComplianceAudit={() => setComplianceOpen(true)}
+            onOpenVaultManager={() => setVaultOpen(true)}
           />
           
           {/* Main Content - Single instance */}
@@ -239,6 +253,42 @@ const Index = () => {
             </div>
           </SheetContent>
         </Sheet>
+
+        {/* Enterprise Readiness Checklist */}
+        <EnterpriseReadinessChecklist 
+          isOpen={isReadinessOpen} 
+          onClose={() => setReadinessOpen(false)} 
+        />
+
+        {/* Implementation Report */}
+        <ImplementationReport 
+          isOpen={isReportOpen} 
+          onClose={() => setReportOpen(false)} 
+        />
+
+        {/* Compliance Audit Panel */}
+        <Sheet open={isComplianceOpen} onOpenChange={setComplianceOpen}>
+          <SheetContent side="right" className="w-[600px] sm:max-w-2xl overflow-y-auto">
+            <div className="mt-6">
+              <ComplianceAuditPanel />
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Vault Manager Panel */}
+        <Sheet open={isVaultOpen} onOpenChange={setVaultOpen}>
+          <SheetContent side="right" className="w-[600px] sm:max-w-2xl overflow-y-auto">
+            <div className="mt-6">
+              <VaultAdapterPanel />
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {/* Azure Integration Panel */}
+        <AzureIntegrationPanel 
+          isOpen={isAzureOpen} 
+          onClose={() => setAzureOpen(false)} 
+        />
       </div>
     </ReactFlowProvider>
   );

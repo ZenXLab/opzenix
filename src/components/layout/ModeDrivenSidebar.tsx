@@ -26,7 +26,10 @@ import {
   Users,
   Settings,
   XCircle,
-  CheckCircle2
+  CheckCircle2,
+  ClipboardCheck,
+  BarChart3,
+  Key
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -49,6 +52,10 @@ interface ModeDrivenSidebarProps {
   onViewDashboard?: () => void;
   onViewFlows?: () => void;
   onOpenExecutionDetail?: (executionId: string) => void;
+  onOpenReadinessChecklist?: () => void;
+  onOpenImplementationReport?: () => void;
+  onOpenComplianceAudit?: () => void;
+  onOpenVaultManager?: () => void;
 }
 
 const modeIcons = {
@@ -76,6 +83,10 @@ export function ModeDrivenSidebar({
   onViewDashboard,
   onViewFlows,
   onOpenExecutionDetail,
+  onOpenReadinessChecklist,
+  onOpenImplementationReport,
+  onOpenComplianceAudit,
+  onOpenVaultManager,
 }: ModeDrivenSidebarProps) {
   const { mode, setMode, collapsed, toggleCollapsed, getAllowedModes } = useSidebarStore();
   const { executions, metrics, loading } = useDashboardRealtime();
@@ -125,8 +136,10 @@ export function ModeDrivenSidebar({
         ];
       case 'govern':
         return [
-          { id: 'security', label: 'Security Gates', icon: Shield, onClick: () => toast.info('Security Gates coming soon') },
-          { id: 'policies', label: 'Policies', icon: Lock, onClick: () => toast.info('Policies coming soon') },
+          { id: 'readiness', label: 'Readiness Checklist', icon: ClipboardCheck, onClick: onOpenReadinessChecklist },
+          { id: 'report', label: 'Implementation Report', icon: BarChart3, onClick: onOpenImplementationReport },
+          { id: 'compliance', label: 'Compliance Audit', icon: Shield, onClick: onOpenComplianceAudit },
+          { id: 'vault', label: 'Vault Manager', icon: Key, onClick: onOpenVaultManager },
           { id: 'audit', label: 'Audit Log', icon: FileText, onClick: onOpenAuditLog },
           { id: 'access', label: 'Access Control', icon: Users, onClick: () => toast.info('Access Control coming soon') },
         ];
