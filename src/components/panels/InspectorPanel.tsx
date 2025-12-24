@@ -117,7 +117,7 @@ const InspectorPanel = () => {
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: '100%', opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          className="w-[380px] h-full border-l border-border bg-card/95 backdrop-blur-sm flex flex-col overflow-hidden"
+          className="fixed right-0 top-12 bottom-0 w-[380px] border-l border-border bg-card/95 backdrop-blur-sm flex flex-col overflow-hidden z-40 shadow-xl"
         >
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-border">
