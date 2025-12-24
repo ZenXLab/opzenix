@@ -10,20 +10,36 @@ import NotFound from "./pages/NotFound";
 import Changelog from "./pages/Changelog";
 import Status from "./pages/Status";
 
-// Docs
+// Docs - Getting Started
 import DocsHome from "./pages/docs/DocsHome";
-import GitHubAppSetupDocs from "./pages/docs/setup-guides/GitHubAppSetupDocs";
-import BranchEnvironmentRulesDocs from "./pages/docs/governance/BranchEnvironmentRulesDocs";
-import RBACModelDocs from "./pages/docs/governance/RBACModelDocs";
-import SecurityPermissionModelDocs from "./pages/docs/security/SecurityPermissionModelDocs";
-import QuickstartDocs from "./pages/docs/getting-started/QuickstartDocs";
-import CoreConceptsDocs from "./pages/docs/getting-started/CoreConceptsDocs";
 import IntroductionDocs from "./pages/docs/getting-started/IntroductionDocs";
-import ExecutionsFlowsDocs from "./pages/docs/operations/ExecutionsFlowsDocs";
-import CheckpointsRewindDocs from "./pages/docs/operations/CheckpointsRewindDocs";
+import CoreConceptsDocs from "./pages/docs/getting-started/CoreConceptsDocs";
+import ControlPlaneModelDocs from "./pages/docs/getting-started/ControlPlaneModelDocs";
+import QuickstartDocs from "./pages/docs/getting-started/QuickstartDocs";
+
+// Docs - Setup Guides
+import GitHubAppSetupDocs from "./pages/docs/setup-guides/GitHubAppSetupDocs";
 import KubernetesDocs from "./pages/docs/setup-guides/KubernetesDocs";
+import ContainerRegistryDocs from "./pages/docs/setup-guides/ContainerRegistryDocs";
 import VaultDocs from "./pages/docs/setup-guides/VaultDocs";
 import OpenTelemetryDocs from "./pages/docs/setup-guides/OpenTelemetryDocs";
+
+// Docs - Governance
+import BranchEnvironmentRulesDocs from "./pages/docs/governance/BranchEnvironmentRulesDocs";
+import ApprovalWorkflowsDocs from "./pages/docs/governance/ApprovalWorkflowsDocs";
+import EnvironmentLocksDocs from "./pages/docs/governance/EnvironmentLocksDocs";
+import RBACModelDocs from "./pages/docs/governance/RBACModelDocs";
+
+// Docs - Operations
+import ExecutionsFlowsDocs from "./pages/docs/operations/ExecutionsFlowsDocs";
+import CheckpointsRewindDocs from "./pages/docs/operations/CheckpointsRewindDocs";
+import RollbacksDocs from "./pages/docs/operations/RollbacksDocs";
+import AuditLogsDocs from "./pages/docs/operations/AuditLogsDocs";
+
+// Docs - Security
+import SecurityPermissionModelDocs from "./pages/docs/security/SecurityPermissionModelDocs";
+import SecretsHandlingDocs from "./pages/docs/security/SecretsHandlingDocs";
+import ComplianceMappingDocs from "./pages/docs/security/ComplianceMappingDocs";
 
 // Product
 import Features from "./pages/product/Features";
@@ -84,18 +100,36 @@ const App = () => (
           
           {/* Documentation Routes */}
           <Route path="/docs" element={<DocsHome />} />
+          
+          {/* Getting Started */}
           <Route path="/docs/getting-started/introduction" element={<IntroductionDocs />} />
-          <Route path="/docs/getting-started/quickstart" element={<QuickstartDocs />} />
           <Route path="/docs/getting-started/core-concepts" element={<CoreConceptsDocs />} />
+          <Route path="/docs/getting-started/control-plane-model" element={<ControlPlaneModelDocs />} />
+          <Route path="/docs/getting-started/quickstart" element={<QuickstartDocs />} />
+          
+          {/* Setup Guides */}
           <Route path="/docs/setup-guides/github-app" element={<GitHubAppSetupDocs />} />
           <Route path="/docs/setup-guides/kubernetes" element={<KubernetesDocs />} />
+          <Route path="/docs/setup-guides/container-registry" element={<ContainerRegistryDocs />} />
           <Route path="/docs/setup-guides/vault" element={<VaultDocs />} />
           <Route path="/docs/setup-guides/opentelemetry" element={<OpenTelemetryDocs />} />
+          
+          {/* Governance */}
           <Route path="/docs/governance/branch-environment-rules" element={<BranchEnvironmentRulesDocs />} />
+          <Route path="/docs/governance/approval-workflows" element={<ApprovalWorkflowsDocs />} />
+          <Route path="/docs/governance/environment-locks" element={<EnvironmentLocksDocs />} />
           <Route path="/docs/governance/rbac-model" element={<RBACModelDocs />} />
+          
+          {/* Operations */}
           <Route path="/docs/operations/executions-flows" element={<ExecutionsFlowsDocs />} />
           <Route path="/docs/operations/checkpoints-rewind" element={<CheckpointsRewindDocs />} />
+          <Route path="/docs/operations/rollbacks" element={<RollbacksDocs />} />
+          <Route path="/docs/operations/audit-logs" element={<AuditLogsDocs />} />
+          
+          {/* Security */}
           <Route path="/docs/security/permission-model" element={<SecurityPermissionModelDocs />} />
+          <Route path="/docs/security/secrets-handling" element={<SecretsHandlingDocs />} />
+          <Route path="/docs/security/compliance-mapping" element={<ComplianceMappingDocs />} />
           
           <Route path="*" element={<NotFound />} />
         </Routes>

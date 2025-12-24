@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { 
@@ -9,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import EnterpriseNavigation from '@/components/landing/EnterpriseNavigation';
 import FooterSection from '@/components/landing/FooterSection';
+import InteractivePlatformDemo from '@/components/demo/InteractivePlatformDemo';
 
 const Features = () => {
   const features = [
@@ -69,8 +71,11 @@ const Features = () => {
     visible: { opacity: 1, y: 0 }
   };
 
+  const [demoOpen, setDemoOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-background">
+      <InteractivePlatformDemo open={demoOpen} onClose={() => setDemoOpen(false)} />
       <EnterpriseNavigation />
       
       {/* Hero */}
@@ -151,10 +156,8 @@ const Features = () => {
                     Watch how Opzenix orchestrates deployments with real-time visibility, 
                     governance enforcement, and instant rollback capabilities.
                   </p>
-                  <Button asChild>
-                    <Link to="/app">
-                      Launch Demo <ArrowRight className="ml-2 w-4 h-4" />
-                    </Link>
+                  <Button onClick={() => setDemoOpen(true)}>
+                    Launch Demo <ArrowRight className="ml-2 w-4 h-4" />
                   </Button>
                 </div>
                 <div className="relative aspect-video rounded-xl bg-background/50 border overflow-hidden">
