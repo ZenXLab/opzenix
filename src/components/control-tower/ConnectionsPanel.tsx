@@ -234,21 +234,29 @@ const ConnectionItem = ({ connection, onValidate, isValidating }: ConnectionItem
           <h4 className="text-sm font-medium">{connection.name}</h4>
           <div className="flex items-center gap-2 mt-1">
             {getStatusBadge(connection.status)}
-            {connection.lastValidated && (
+            {connection.last_validated_at && (
               <span className="text-xs text-muted-foreground flex items-center gap-1">
                 <Clock className="w-3 h-3" />
-                {formatTime(connection.lastValidated)}
+                {formatTime(connection.last_validated_at)}
               </span>
             )}
           </div>
-          {connection.errorReason && (
-            <p className="text-xs text-sec-critical mt-1">{connection.errorReason}</p>
+          {connection.validation_message && connection.status !== 'connected' && (
+            <p className="text-xs text-sec-critical mt-1">{connection.validation_message}</p>
           )}
-          {connection.permissions && connection.permissions.length > 0 && (
+          {connection.resource_status && Object.keys(connection.resource_status).length > 0 && (
             <div className="flex items-center gap-1 mt-2 flex-wrap">
-              {connection.permissions.map((perm, i) => (
-                <Badge key={i} variant="outline" className="text-[10px] h-5">
-                  {perm}
+              {Object.entries(connection.resource_status).map(([key, value]) => (
+                <Badge 
+                  key={key} 
+                  variant="outline" 
+                  className={cn(
+                    "text-[10px] h-5",
+                    value?.status === 'ok' && 'border-sec-safe/50 text-sec-safe',
+                    value?.status === 'error' && 'border-sec-critical/50 text-sec-critical'
+                  )}
+                >
+                  {key.toUpperCase()}: {value?.status || 'unknown'}
                 </Badge>
               ))}
             </div>
