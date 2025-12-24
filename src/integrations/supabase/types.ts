@@ -264,12 +264,54 @@ export type Database = {
           },
         ]
       }
+      connection_health_events: {
+        Row: {
+          checked_at: string
+          connection_id: string
+          details: Json | null
+          id: string
+          message: string | null
+          response_time_ms: number | null
+          status: string
+        }
+        Insert: {
+          checked_at?: string
+          connection_id: string
+          details?: Json | null
+          id?: string
+          message?: string | null
+          response_time_ms?: number | null
+          status: string
+        }
+        Update: {
+          checked_at?: string
+          connection_id?: string
+          details?: Json | null
+          id?: string
+          message?: string | null
+          response_time_ms?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "connection_health_events_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       connections: {
         Row: {
+          blocked: boolean | null
           config: Json | null
+          connection_type: string | null
           created_at: string
+          health_check_interval_minutes: number | null
           id: string
           last_validated_at: string | null
+          last_validation_error: string | null
           name: string
           resource_status: Json | null
           status: string
@@ -280,10 +322,14 @@ export type Database = {
           validation_message: string | null
         }
         Insert: {
+          blocked?: boolean | null
           config?: Json | null
+          connection_type?: string | null
           created_at?: string
+          health_check_interval_minutes?: number | null
           id?: string
           last_validated_at?: string | null
+          last_validation_error?: string | null
           name: string
           resource_status?: Json | null
           status?: string
@@ -294,10 +340,14 @@ export type Database = {
           validation_message?: string | null
         }
         Update: {
+          blocked?: boolean | null
           config?: Json | null
+          connection_type?: string | null
           created_at?: string
+          health_check_interval_minutes?: number | null
           id?: string
           last_validated_at?: string | null
+          last_validation_error?: string | null
           name?: string
           resource_status?: Json | null
           status?: string

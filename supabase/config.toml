@@ -39,3 +39,9 @@ verify_jwt = false
 verify_jwt = false
 [functions.azure-validate]
 verify_jwt = false
+[functions.rollback-deployment]
+verify_jwt = false
+[functions.create-test-execution]
+verify_jwt = false
+[functions.connection-health-check]
+verify_jwt = false

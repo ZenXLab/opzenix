@@ -11,6 +11,9 @@ import {
   ChevronLeft,
   ChevronRight,
   History,
+  GitBranch,
+  Lock,
+  Shield,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -50,6 +53,18 @@ const navItems = [
     label: 'Environments', 
     icon: Globe, 
     description: 'Policy-based environment config'
+  },
+  { 
+    id: 'branch-management', 
+    label: 'Branch Mapping', 
+    icon: GitBranch, 
+    description: 'Branch → environment rules'
+  },
+  { 
+    id: 'environment-locks', 
+    label: 'Environment Locks', 
+    icon: Lock, 
+    description: 'RBAC-based deployment gates'
   },
   { 
     id: 'connections', 
