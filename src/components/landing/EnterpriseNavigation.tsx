@@ -109,6 +109,12 @@ const NAV_ITEMS: NavItem[] = [
         icon: <Building2 className="w-5 h-5" />
       },
       {
+        label: 'Case Studies',
+        description: 'Enterprise success stories',
+        href: '/company/case-studies',
+        icon: <Briefcase className="w-5 h-5" />
+      },
+      {
         label: 'Careers',
         description: 'Join the Opzenix team',
         href: '/company/careers',

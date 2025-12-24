@@ -53,16 +53,16 @@ interface PipelineNode {
 
 const DEMO_PHASES: { id: DemoPhase; title: string; description: string; duration: number }[] = [
   { id: 'intro', title: 'Welcome to Opzenix', description: 'Enterprise CI/CD Control Plane', duration: 3000 },
-  { id: 'dashboard', title: 'Control Tower Dashboard', description: 'Real-time system overview & metrics', duration: 6000 },
-  { id: 'github', title: 'Connect GitHub', description: 'One-click repository integration', duration: 5000 },
-  { id: 'pipeline', title: 'Visual Pipeline Builder', description: 'Drag-and-drop flow creation', duration: 5000 },
-  { id: 'execution', title: 'Live Execution', description: 'Watch your pipeline run in real-time', duration: 7000 },
-  { id: 'analytics', title: 'Analytics & Insights', description: 'Deep observability with OpenTelemetry', duration: 5000 },
-  { id: 'failure', title: 'Failure Detection', description: 'Intelligent failure handling', duration: 4000 },
-  { id: 'rollback', title: 'Checkpoint Recovery', description: 'Resume from any checkpoint', duration: 5000 },
-  { id: 'ai', title: 'AI-Powered Insights', description: 'Opzenix AI explains and suggests fixes', duration: 5000 },
-  { id: 'governance', title: 'Enterprise Governance', description: 'RBAC, Approvals & Audit Logs', duration: 5000 },
-  { id: 'complete', title: 'Production Ready', description: 'Enterprise-grade governance', duration: 3000 },
+  { id: 'github', title: 'Step 1: Connect GitHub', description: 'One-click repository integration', duration: 5000 },
+  { id: 'pipeline', title: 'Step 2: Build Pipeline', description: 'Visual drag-and-drop flow creation', duration: 5000 },
+  { id: 'execution', title: 'Step 3: Execute Pipeline', description: 'Watch your pipeline run in real-time', duration: 7000 },
+  { id: 'analytics', title: 'Step 4: Monitor & Observe', description: 'Deep observability with OpenTelemetry', duration: 5000 },
+  { id: 'failure', title: 'Step 5: Failure Detected', description: 'Intelligent failure handling', duration: 4000 },
+  { id: 'rollback', title: 'Step 6: Recovery', description: 'Resume from checkpoint instantly', duration: 5000 },
+  { id: 'ai', title: 'Step 7: AI Analysis', description: 'Opzenix AI explains root cause', duration: 5000 },
+  { id: 'governance', title: 'Step 8: Governance', description: 'RBAC, Approvals & Audit Logs', duration: 5000 },
+  { id: 'dashboard', title: 'Step 9: Control Tower', description: 'Real-time system overview & metrics', duration: 6000 },
+  { id: 'complete', title: 'Production Ready', description: 'Enterprise-grade CI/CD governance', duration: 3000 },
 ];
 
 // Generate fake chart data

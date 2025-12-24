@@ -56,6 +56,7 @@ import Security from "./pages/solutions/Security";
 import About from "./pages/company/About";
 import Contact from "./pages/company/Contact";
 import Careers from "./pages/company/Careers";
+import CaseStudies from "./pages/company/CaseStudies";
 
 // Legal
 import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
@@ -93,6 +94,7 @@ const App = () => (
           <Route path="/company/about" element={<About />} />
           <Route path="/company/contact" element={<Contact />} />
           <Route path="/company/careers" element={<Careers />} />
+          <Route path="/company/case-studies" element={<CaseStudies />} />
           
           {/* Legal Routes */}
           <Route path="/privacy" element={<PrivacyPolicy />} />
