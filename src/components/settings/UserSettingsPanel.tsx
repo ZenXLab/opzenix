@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import { 
   Settings, X, Monitor, Wrench, Eye, Palette, 
   Layout, Moon, Sun, Save, RotateCcw, Cloud, 
-  Container, Server, Key, CheckCircle2, AlertCircle
+  Container, Server, Key, CheckCircle2, AlertCircle,
+  Building2, User, History
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +30,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
 import { toast } from 'sonner';
+import { ProfileTab } from './ProfileTab';
+import { OrganizationTab } from './OrganizationTab';
+import { DeploymentHistoryTab } from './DeploymentHistoryTab';
 
 interface UserSettingsPanelProps {
   open: boolean;
@@ -115,25 +119,48 @@ export function UserSettingsPanel({ open, onClose }: UserSettingsPanelProps) {
           </SheetDescription>
         </SheetHeader>
 
-        <Tabs defaultValue="general" className="mt-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="general" className="gap-1.5">
-              <Monitor className="w-3.5 h-3.5" />
+        <Tabs defaultValue="profile" className="mt-6">
+          <TabsList className="grid w-full grid-cols-6 h-auto">
+            <TabsTrigger value="profile" className="gap-1 text-xs px-2">
+              <User className="w-3 h-3" />
+              Profile
+            </TabsTrigger>
+            <TabsTrigger value="organization" className="gap-1 text-xs px-2">
+              <Building2 className="w-3 h-3" />
+              Org
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-1 text-xs px-2">
+              <History className="w-3 h-3" />
+              History
+            </TabsTrigger>
+            <TabsTrigger value="general" className="gap-1 text-xs px-2">
+              <Monitor className="w-3 h-3" />
               General
             </TabsTrigger>
-            <TabsTrigger value="dashboard" className="gap-1.5">
-              <Layout className="w-3.5 h-3.5" />
+            <TabsTrigger value="dashboard" className="gap-1 text-xs px-2">
+              <Layout className="w-3 h-3" />
               Dashboard
             </TabsTrigger>
-            <TabsTrigger value="azure" className="gap-1.5">
-              <Cloud className="w-3.5 h-3.5" />
-              Azure
-            </TabsTrigger>
-            <TabsTrigger value="appearance" className="gap-1.5">
-              <Palette className="w-3.5 h-3.5" />
-              Appearance
+            <TabsTrigger value="appearance" className="gap-1 text-xs px-2">
+              <Palette className="w-3 h-3" />
+              Theme
             </TabsTrigger>
           </TabsList>
+
+          {/* Profile Tab */}
+          <TabsContent value="profile" className="mt-6">
+            <ProfileTab />
+          </TabsContent>
+
+          {/* Organization Tab */}
+          <TabsContent value="organization" className="mt-6">
+            <OrganizationTab />
+          </TabsContent>
+
+          {/* Deployment History Tab */}
+          <TabsContent value="history" className="mt-6">
+            <DeploymentHistoryTab />
+          </TabsContent>
 
           {/* General Settings */}
           <TabsContent value="general" className="space-y-6 mt-6">
