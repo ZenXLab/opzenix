@@ -309,6 +309,9 @@ export const useConnectionsRealtime = () => {
     }
   }, []);
 
+  // Track previous connection statuses for failure/recovery notifications
+  const prevStatusesRef = useRef<Map<string, string>>(new Map());
+
   // Set up realtime subscription and periodic health checks
   useEffect(() => {
     fetchConnections();
@@ -338,11 +341,41 @@ export const useConnectionsRealtime = () => {
           if (payload.eventType === 'INSERT') {
             setConnections(prev => [payload.new as Connection, ...prev]);
           } else if (payload.eventType === 'UPDATE') {
+            const newConn = payload.new as Connection;
+            const oldStatus = prevStatusesRef.current.get(newConn.id);
+            const newStatus = newConn.status;
+            
+            // Notify on status changes (failure or recovery)
+            if (oldStatus && oldStatus !== newStatus) {
+              const failedStatuses = ['error', 'failed', 'invalid', 'rate-limited'];
+              const healthyStatuses = ['connected'];
+              
+              // Went from healthy to failed
+              if (healthyStatuses.includes(oldStatus) && failedStatuses.includes(newStatus)) {
+                toast.error(`Connection "${newConn.name}" failed`, {
+                  description: newConn.validation_message || 'Health check detected an issue',
+                  duration: 8000,
+                });
+              }
+              // Recovered from failure
+              else if (failedStatuses.includes(oldStatus) && healthyStatuses.includes(newStatus)) {
+                toast.success(`Connection "${newConn.name}" recovered`, {
+                  description: 'Connection is now healthy',
+                  duration: 5000,
+                });
+              }
+            }
+            
+            // Update tracked status
+            prevStatusesRef.current.set(newConn.id, newStatus);
+            
             setConnections(prev => 
-              prev.map(c => c.id === (payload.new as any).id ? payload.new as Connection : c)
+              prev.map(c => c.id === newConn.id ? newConn : c)
             );
           } else if (payload.eventType === 'DELETE') {
-            setConnections(prev => prev.filter(c => c.id !== (payload.old as any).id));
+            const deletedId = (payload.old as any).id;
+            prevStatusesRef.current.delete(deletedId);
+            setConnections(prev => prev.filter(c => c.id !== deletedId));
           }
         }
       )
@@ -359,6 +392,15 @@ export const useConnectionsRealtime = () => {
       supabase.removeChannel(channel);
     };
   }, [fetchConnections, triggerHealthCheck]);
+
+  // Initialize status tracking when connections are first loaded
+  useEffect(() => {
+    connections.forEach(conn => {
+      if (!prevStatusesRef.current.has(conn.id)) {
+        prevStatusesRef.current.set(conn.id, conn.status);
+      }
+    });
+  }, [connections]);
 
   return {
     connections,
