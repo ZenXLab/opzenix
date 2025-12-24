@@ -53,3 +53,5 @@ verify_jwt = false
 verify_jwt = false
 [functions.validate-otel]
 verify_jwt = false
+[functions.github-api]
+verify_jwt = false
