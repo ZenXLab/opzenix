@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Link2, 
@@ -13,9 +13,10 @@ import {
   EyeOff,
   AlertTriangle,
   ExternalLink,
-  Database,
   Activity,
-  Container
+  Container,
+  XCircle,
+  RefreshCw
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,17 @@ interface ConnectionCreationWizardProps {
 }
 
 type ConnectionType = 'github' | 'azure' | 'vault' | 'registry' | 'otel';
+
+interface ValidationError {
+  field: string;
+  message: string;
+}
+
+interface ValidationResult {
+  success: boolean;
+  message: string;
+  details?: { service: string; status: string; message: string; latencyMs?: number }[];
+}
 
 interface ConnectionForm {
   type: ConnectionType;
@@ -133,7 +145,8 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [showSecrets, setShowSecrets] = useState(false);
-  const [validationResult, setValidationResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<ValidationError[]>([]);
   
   const [form, setForm] = useState<ConnectionForm>({
     type: 'github',
@@ -142,14 +155,125 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
 
   const selectedType = connectionTypes.find(t => t.id === form.type)!;
 
+  // Get required fields based on connection type
+  const getRequiredFields = useCallback((): { field: keyof ConnectionForm; label: string }[] => {
+    const baseFields: { field: keyof ConnectionForm; label: string }[] = [
+      { field: 'name', label: 'Connection Name' }
+    ];
+
+    switch (form.type) {
+      case 'github':
+        return [...baseFields, 
+          { field: 'repositoryOwner', label: 'Repository Owner' },
+          { field: 'repositoryName', label: 'Repository Name' },
+          { field: 'accessToken', label: 'Access Token' }
+        ];
+      case 'azure':
+        return [...baseFields,
+          { field: 'tenantId', label: 'Tenant ID' },
+          { field: 'clientId', label: 'Client ID' },
+          { field: 'clientSecret', label: 'Client Secret' },
+          { field: 'subscriptionId', label: 'Subscription ID' }
+        ];
+      case 'vault':
+        return [...baseFields,
+          { field: 'vaultUrl', label: 'Vault URL' },
+          { field: 'vaultToken', label: 'Vault Token' }
+        ];
+      case 'registry':
+        const registryFields = [...baseFields];
+        if (form.registryType === 'dockerhub' || form.registryType === 'ghcr') {
+          registryFields.push(
+            { field: 'registryUsername', label: 'Username' },
+            { field: 'registryPassword', label: 'Access Token' }
+          );
+        } else if (form.registryType === 'ecr') {
+          registryFields.push(
+            { field: 'awsRegion', label: 'AWS Region' },
+            { field: 'awsAccessKeyId', label: 'Access Key ID' },
+            { field: 'awsSecretAccessKey', label: 'Secret Key' }
+          );
+        } else if (form.registryType === 'acr') {
+          registryFields.push(
+            { field: 'tenantId', label: 'Tenant ID' },
+            { field: 'clientId', label: 'Client ID' },
+            { field: 'clientSecret', label: 'Client Secret' }
+          );
+        }
+        return registryFields;
+      case 'otel':
+        return [...baseFields,
+          { field: 'otelEndpoint', label: 'Endpoint URL' }
+        ];
+      default:
+        return baseFields;
+    }
+  }, [form.type, form.registryType]);
+
+  // Validate required fields
+  const validateFields = useCallback((): ValidationError[] => {
+    const errors: ValidationError[] = [];
+    const requiredFields = getRequiredFields();
+
+    for (const { field, label } of requiredFields) {
+      const value = form[field];
+      if (!value || (typeof value === 'string' && value.trim() === '')) {
+        errors.push({ field, message: `${label} is required` });
+      }
+    }
+
+    return errors;
+  }, [form, getRequiredFields]);
+
+  // Check if form is valid for proceeding
+  const isFormValid = useCallback((): boolean => {
+    return validateFields().length === 0;
+  }, [validateFields]);
+
+  // Real-time field validation on blur
+  const handleFieldBlur = useCallback((field: keyof ConnectionForm) => {
+    const requiredFields = getRequiredFields();
+    const fieldDef = requiredFields.find(f => f.field === field);
+    
+    if (fieldDef) {
+      const value = form[field];
+      if (!value || (typeof value === 'string' && value.trim() === '')) {
+        setFieldErrors(prev => {
+          const existing = prev.find(e => e.field === field);
+          if (!existing) {
+            return [...prev, { field, message: `${fieldDef.label} is required` }];
+          }
+          return prev;
+        });
+      } else {
+        setFieldErrors(prev => prev.filter(e => e.field !== field));
+      }
+    }
+  }, [form, getRequiredFields]);
+
   const updateForm = (updates: Partial<ConnectionForm>) => {
     setForm(prev => ({ ...prev, ...updates }));
     setValidationResult(null);
+    // Clear field errors for updated fields
+    Object.keys(updates).forEach(field => {
+      setFieldErrors(prev => prev.filter(e => e.field !== field));
+    });
   };
 
   const handleNext = () => {
-    if (step < 3) {
-      setStep(step + 1);
+    // Validate before moving to step 2
+    if (step === 1) {
+      setStep(2);
+    } else if (step === 2) {
+      // Validate all fields before moving to step 3
+      const errors = validateFields();
+      if (errors.length > 0) {
+        setFieldErrors(errors);
+        toast.error('Please fill in all required fields');
+        return;
+      }
+      // Validate the connection before proceeding
+      handleValidate();
     }
   };
 
@@ -157,16 +281,24 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
     if (step > 1) {
       setStep(step - 1);
       setValidationResult(null);
+      setFieldErrors([]);
     }
   };
 
   const handleValidate = async () => {
+    // First validate required fields
+    const errors = validateFields();
+    if (errors.length > 0) {
+      setFieldErrors(errors);
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
     setIsValidating(true);
     setValidationResult(null);
 
     try {
       if (form.type === 'azure') {
-        // Call Azure validation edge function
         const { data, error } = await supabase.functions.invoke('azure-validate', {
           body: {
             tenantId: form.tenantId,
@@ -182,59 +314,92 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
 
         if (error) throw error;
 
-        const failedServices = data.results?.filter((r: any) => r.status === 'failed') || [];
+        const results = data.results || [];
+        const failedServices = results.filter((r: any) => r.status === 'failed');
         
         if (failedServices.length > 0) {
           setValidationResult({
             success: false,
-            message: `Validation failed for: ${failedServices.map((f: any) => f.service).join(', ')}`
+            message: `Validation failed for ${failedServices.length} service(s)`,
+            details: results
           });
         } else {
           setValidationResult({
             success: true,
-            message: `Successfully validated ${data.summary?.successful || 0} service(s)`
+            message: `Successfully validated ${data.summary?.successful || 0} service(s)`,
+            details: results
           });
+          setStep(3);
         }
       } else if (form.type === 'github') {
-        // For GitHub, we just verify the token works
-        if (!form.accessToken) {
-          setValidationResult({ success: false, message: 'Access token required' });
-          return;
-        }
-        
-        // Test the token by fetching user info
         const response = await fetch('https://api.github.com/user', {
           headers: { 'Authorization': `Bearer ${form.accessToken}` }
         });
 
         if (!response.ok) {
-          setValidationResult({ success: false, message: 'Invalid GitHub token' });
+          const errorData = await response.json().catch(() => ({}));
+          setValidationResult({ 
+            success: false, 
+            message: errorData.message || 'Invalid GitHub token',
+            details: [{ service: 'GitHub API', status: 'failed', message: errorData.message || 'Authentication failed' }]
+          });
         } else {
           const user = await response.json();
-          setValidationResult({ 
-            success: true, 
-            message: `Authenticated as ${user.login}` 
+          
+          // Also verify repo access
+          const repoResponse = await fetch(`https://api.github.com/repos/${form.repositoryOwner}/${form.repositoryName}`, {
+            headers: { 'Authorization': `Bearer ${form.accessToken}` }
           });
+          
+          if (!repoResponse.ok) {
+            setValidationResult({
+              success: false,
+              message: 'Cannot access repository',
+              details: [
+                { service: 'GitHub Auth', status: 'success', message: `Authenticated as ${user.login}` },
+                { service: 'Repository Access', status: 'failed', message: `Cannot access ${form.repositoryOwner}/${form.repositoryName}` }
+              ]
+            });
+          } else {
+            setValidationResult({ 
+              success: true, 
+              message: `Authenticated as ${user.login}`,
+              details: [
+                { service: 'GitHub Auth', status: 'success', message: `User: ${user.login}` },
+                { service: 'Repository Access', status: 'success', message: `${form.repositoryOwner}/${form.repositoryName}` }
+              ]
+            });
+            setStep(3);
+          }
         }
       } else if (form.type === 'vault') {
-        // For Vault, test the connection
-        if (!form.vaultUrl || !form.vaultToken) {
-          setValidationResult({ success: false, message: 'Vault URL and token required' });
-          return;
-        }
+        try {
+          const response = await fetch(`${form.vaultUrl}/v1/sys/health`, {
+            headers: { 'X-Vault-Token': form.vaultToken! }
+          });
 
-        // Simple health check
-        const response = await fetch(`${form.vaultUrl}/v1/sys/health`, {
-          headers: { 'X-Vault-Token': form.vaultToken }
-        });
-
-        if (response.ok) {
-          setValidationResult({ success: true, message: 'Vault connection successful' });
-        } else {
-          setValidationResult({ success: false, message: 'Vault connection failed' });
+          if (response.ok) {
+            setValidationResult({ 
+              success: true, 
+              message: 'Vault connection successful',
+              details: [{ service: 'HashiCorp Vault', status: 'success', message: 'Health check passed' }]
+            });
+            setStep(3);
+          } else {
+            setValidationResult({ 
+              success: false, 
+              message: 'Vault connection failed',
+              details: [{ service: 'HashiCorp Vault', status: 'failed', message: `HTTP ${response.status}` }]
+            });
+          }
+        } catch (err: any) {
+          setValidationResult({ 
+            success: false, 
+            message: 'Cannot reach Vault server',
+            details: [{ service: 'HashiCorp Vault', status: 'failed', message: err.message || 'Network error' }]
+          });
         }
       } else if (form.type === 'registry') {
-        // Validate container registry
         const { data, error } = await supabase.functions.invoke('validate-registry', {
           body: {
             registryType: form.registryType,
@@ -258,16 +423,18 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
         if (data.success) {
           setValidationResult({
             success: true,
-            message: data.message || `Registry validated: ${data.registryUrl}`
+            message: data.message || `Registry validated: ${data.registryUrl}`,
+            details: [{ service: 'Container Registry', status: 'success', message: data.message }]
           });
+          setStep(3);
         } else {
           setValidationResult({
             success: false,
-            message: data.message || 'Registry validation failed'
+            message: data.message || 'Registry validation failed',
+            details: [{ service: 'Container Registry', status: 'failed', message: data.message }]
           });
         }
       } else if (form.type === 'otel') {
-        // Validate OpenTelemetry collector
         const { data, error } = await supabase.functions.invoke('validate-otel', {
           body: {
             collectorType: form.otelCollectorType,
@@ -285,18 +452,25 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
         if (data.success) {
           setValidationResult({
             success: true,
-            message: data.message || `Collector validated: ${data.endpoint}`
+            message: data.message || `Collector validated: ${data.endpoint}`,
+            details: [{ service: 'OpenTelemetry Collector', status: 'success', message: data.message }]
           });
+          setStep(3);
         } else {
           setValidationResult({
             success: false,
-            message: data.message || 'Collector validation failed'
+            message: data.message || 'Collector validation failed',
+            details: [{ service: 'OpenTelemetry Collector', status: 'failed', message: data.message }]
           });
         }
       }
     } catch (error: any) {
       console.error('[ConnectionWizard] Validation error:', error);
-      setValidationResult({ success: false, message: error.message || 'Validation failed' });
+      setValidationResult({ 
+        success: false, 
+        message: error.message || 'Validation failed',
+        details: [{ service: 'Validation', status: 'failed', message: error.message || 'Unknown error' }]
+      });
     } finally {
       setIsValidating(false);
     }
@@ -308,17 +482,20 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
       return;
     }
 
+    if (!validationResult?.success) {
+      toast.error('Connection must be validated before creating');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      // Build config based on type
       let config: Record<string, any> = {};
       
       if (form.type === 'github') {
         config = {
           repositoryOwner: form.repositoryOwner,
           repositoryName: form.repositoryName,
-          // Note: In production, store token securely in Vault/Secrets Manager
         };
       } else if (form.type === 'azure') {
         config = {
@@ -352,23 +529,22 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
       const { error } = await supabase.from('connections').insert({
         type: form.type,
         name: form.name,
-        status: validationResult?.success ? 'connected' : 'pending',
+        status: 'connected',
         config,
-        validated: validationResult?.success || false,
-        validation_message: validationResult?.message,
-        last_validated_at: validationResult?.success ? new Date().toISOString() : null,
+        validated: true,
+        validation_message: validationResult.message,
+        last_validated_at: new Date().toISOString(),
       });
 
       if (error) throw error;
 
-      // Log to audit
       await supabase.from('audit_logs').insert({
         action: 'create_connection',
         resource_type: 'connection',
         details: { type: form.type, name: form.name }
       });
 
-      toast.success(`${form.name} connection created`);
+      toast.success(`${form.name} connection created successfully`);
       onOpenChange(false);
       onComplete?.();
 
@@ -376,6 +552,7 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
       setStep(1);
       setForm({ type: 'github', name: '' });
       setValidationResult(null);
+      setFieldErrors([]);
     } catch (error: any) {
       console.error('[ConnectionWizard] Error:', error);
       toast.error(error.message || 'Failed to create connection');
@@ -384,9 +561,24 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
     }
   };
 
+  // Reset when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setStep(1);
+      setForm({ type: 'github', name: '' });
+      setValidationResult(null);
+      setFieldErrors([]);
+      setShowSecrets(false);
+    }
+  }, [open]);
+
+  const getFieldError = (field: keyof ConnectionForm) => {
+    return fieldErrors.find(e => e.field === field)?.message;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[650px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Link2 className="w-5 h-5 text-primary" />
@@ -416,7 +608,7 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
-            className="py-4 min-h-[350px]"
+            className="py-4 min-h-[380px]"
           >
             {step === 1 && (
               <div className="space-y-4">
@@ -458,7 +650,7 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
             )}
 
             {step === 2 && (
-              <div className="space-y-6">
+              <div className="space-y-5">
                 <div className="flex items-center gap-3">
                   <div className={cn('p-2 rounded-lg', selectedType.bgColor)}>
                     <selectedType.icon className={cn('w-4 h-4', selectedType.color)} />
@@ -469,44 +661,61 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-4 max-h-[320px] overflow-y-auto pr-2">
                   <div className="space-y-2">
-                    <Label>Connection Name</Label>
+                    <Label>Connection Name <span className="text-sec-critical">*</span></Label>
                     <Input 
                       value={form.name}
                       onChange={(e) => updateForm({ name: e.target.value })}
+                      onBlur={() => handleFieldBlur('name')}
                       placeholder="e.g., Production GitHub"
+                      className={cn(getFieldError('name') && 'border-sec-critical')}
                     />
+                    {getFieldError('name') && (
+                      <p className="text-xs text-sec-critical">{getFieldError('name')}</p>
+                    )}
                   </div>
 
                   {form.type === 'github' && (
                     <>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label>Repository Owner</Label>
+                          <Label>Repository Owner <span className="text-sec-critical">*</span></Label>
                           <Input 
                             value={form.repositoryOwner || ''}
                             onChange={(e) => updateForm({ repositoryOwner: e.target.value })}
+                            onBlur={() => handleFieldBlur('repositoryOwner')}
                             placeholder="organization or username"
+                            className={cn(getFieldError('repositoryOwner') && 'border-sec-critical')}
                           />
+                          {getFieldError('repositoryOwner') && (
+                            <p className="text-xs text-sec-critical">{getFieldError('repositoryOwner')}</p>
+                          )}
                         </div>
                         <div className="space-y-2">
-                          <Label>Repository Name</Label>
+                          <Label>Repository Name <span className="text-sec-critical">*</span></Label>
                           <Input 
                             value={form.repositoryName || ''}
                             onChange={(e) => updateForm({ repositoryName: e.target.value })}
+                            onBlur={() => handleFieldBlur('repositoryName')}
                             placeholder="my-app"
+                            className={cn(getFieldError('repositoryName') && 'border-sec-critical')}
                           />
+                          {getFieldError('repositoryName') && (
+                            <p className="text-xs text-sec-critical">{getFieldError('repositoryName')}</p>
+                          )}
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <Label>Personal Access Token</Label>
+                        <Label>Personal Access Token <span className="text-sec-critical">*</span></Label>
                         <div className="relative">
                           <Input 
                             type={showSecrets ? 'text' : 'password'}
                             value={form.accessToken || ''}
                             onChange={(e) => updateForm({ accessToken: e.target.value })}
+                            onBlur={() => handleFieldBlur('accessToken')}
                             placeholder="ghp_..."
+                            className={cn(getFieldError('accessToken') && 'border-sec-critical')}
                           />
                           <Button
                             type="button"
@@ -518,6 +727,9 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
                             {showSecrets ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </Button>
                         </div>
+                        {getFieldError('accessToken') && (
+                          <p className="text-xs text-sec-critical">{getFieldError('accessToken')}</p>
+                        )}
                         <p className="text-xs text-muted-foreground flex items-center gap-1">
                           Needs repo, workflow, and admin:repo_hook scopes
                           <a 
@@ -537,44 +749,64 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
                     <>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label>Tenant ID</Label>
+                          <Label>Tenant ID <span className="text-sec-critical">*</span></Label>
                           <Input 
                             value={form.tenantId || ''}
                             onChange={(e) => updateForm({ tenantId: e.target.value })}
+                            onBlur={() => handleFieldBlur('tenantId')}
                             placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                            className={cn(getFieldError('tenantId') && 'border-sec-critical')}
                           />
+                          {getFieldError('tenantId') && (
+                            <p className="text-xs text-sec-critical">{getFieldError('tenantId')}</p>
+                          )}
                         </div>
                         <div className="space-y-2">
-                          <Label>Subscription ID</Label>
+                          <Label>Subscription ID <span className="text-sec-critical">*</span></Label>
                           <Input 
                             value={form.subscriptionId || ''}
                             onChange={(e) => updateForm({ subscriptionId: e.target.value })}
+                            onBlur={() => handleFieldBlur('subscriptionId')}
                             placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                            className={cn(getFieldError('subscriptionId') && 'border-sec-critical')}
                           />
+                          {getFieldError('subscriptionId') && (
+                            <p className="text-xs text-sec-critical">{getFieldError('subscriptionId')}</p>
+                          )}
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label>Client ID</Label>
+                          <Label>Client ID <span className="text-sec-critical">*</span></Label>
                           <Input 
                             value={form.clientId || ''}
                             onChange={(e) => updateForm({ clientId: e.target.value })}
+                            onBlur={() => handleFieldBlur('clientId')}
                             placeholder="App registration client ID"
+                            className={cn(getFieldError('clientId') && 'border-sec-critical')}
                           />
+                          {getFieldError('clientId') && (
+                            <p className="text-xs text-sec-critical">{getFieldError('clientId')}</p>
+                          )}
                         </div>
                         <div className="space-y-2">
-                          <Label>Client Secret</Label>
+                          <Label>Client Secret <span className="text-sec-critical">*</span></Label>
                           <Input 
                             type={showSecrets ? 'text' : 'password'}
                             value={form.clientSecret || ''}
                             onChange={(e) => updateForm({ clientSecret: e.target.value })}
+                            onBlur={() => handleFieldBlur('clientSecret')}
                             placeholder="••••••••"
+                            className={cn(getFieldError('clientSecret') && 'border-sec-critical')}
                           />
+                          {getFieldError('clientSecret') && (
+                            <p className="text-xs text-sec-critical">{getFieldError('clientSecret')}</p>
+                          )}
                         </div>
                       </div>
                       <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-2">
-                          <Label>ACR Name (optional)</Label>
+                          <Label>ACR Name</Label>
                           <Input 
                             value={form.acrName || ''}
                             onChange={(e) => updateForm({ acrName: e.target.value })}
@@ -582,7 +814,7 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>AKS Cluster (optional)</Label>
+                          <Label>AKS Cluster</Label>
                           <Input 
                             value={form.aksClusterName || ''}
                             onChange={(e) => updateForm({ aksClusterName: e.target.value })}
@@ -590,7 +822,7 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Key Vault (optional)</Label>
+                          <Label>Key Vault</Label>
                           <Input 
                             value={form.keyVaultName || ''}
                             onChange={(e) => updateForm({ keyVaultName: e.target.value })}
@@ -614,24 +846,34 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
                   {form.type === 'vault' && (
                     <>
                       <div className="space-y-2">
-                        <Label>Vault URL</Label>
+                        <Label>Vault URL <span className="text-sec-critical">*</span></Label>
                         <Input 
                           value={form.vaultUrl || ''}
                           onChange={(e) => updateForm({ vaultUrl: e.target.value })}
+                          onBlur={() => handleFieldBlur('vaultUrl')}
                           placeholder="https://vault.example.com:8200"
+                          className={cn(getFieldError('vaultUrl') && 'border-sec-critical')}
                         />
+                        {getFieldError('vaultUrl') && (
+                          <p className="text-xs text-sec-critical">{getFieldError('vaultUrl')}</p>
+                        )}
                       </div>
                       <div className="space-y-2">
-                        <Label>Vault Token</Label>
+                        <Label>Vault Token <span className="text-sec-critical">*</span></Label>
                         <Input 
                           type={showSecrets ? 'text' : 'password'}
                           value={form.vaultToken || ''}
                           onChange={(e) => updateForm({ vaultToken: e.target.value })}
+                          onBlur={() => handleFieldBlur('vaultToken')}
                           placeholder="hvs...."
+                          className={cn(getFieldError('vaultToken') && 'border-sec-critical')}
                         />
+                        {getFieldError('vaultToken') && (
+                          <p className="text-xs text-sec-critical">{getFieldError('vaultToken')}</p>
+                        )}
                       </div>
                       <div className="space-y-2">
-                        <Label>Namespace (optional)</Label>
+                        <Label>Namespace</Label>
                         <Input 
                           value={form.vaultNamespace || ''}
                           onChange={(e) => updateForm({ vaultNamespace: e.target.value })}
@@ -644,7 +886,7 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
                   {form.type === 'registry' && (
                     <>
                       <div className="space-y-2">
-                        <Label>Registry Type</Label>
+                        <Label>Registry Type <span className="text-sec-critical">*</span></Label>
                         <Select value={form.registryType || 'acr'} onValueChange={(v) => updateForm({ registryType: v as any })}>
                           <SelectTrigger><SelectValue placeholder="Select registry" /></SelectTrigger>
                           <SelectContent>
@@ -659,28 +901,121 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
                       {(form.registryType === 'dockerhub' || form.registryType === 'ghcr') && (
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <Label>Username</Label>
-                            <Input value={form.registryUsername || ''} onChange={(e) => updateForm({ registryUsername: e.target.value })} />
+                            <Label>Username <span className="text-sec-critical">*</span></Label>
+                            <Input 
+                              value={form.registryUsername || ''} 
+                              onChange={(e) => updateForm({ registryUsername: e.target.value })}
+                              onBlur={() => handleFieldBlur('registryUsername')}
+                              className={cn(getFieldError('registryUsername') && 'border-sec-critical')}
+                            />
+                            {getFieldError('registryUsername') && (
+                              <p className="text-xs text-sec-critical">{getFieldError('registryUsername')}</p>
+                            )}
                           </div>
                           <div className="space-y-2">
-                            <Label>Access Token</Label>
-                            <Input type={showSecrets ? 'text' : 'password'} value={form.registryPassword || ''} onChange={(e) => updateForm({ registryPassword: e.target.value })} />
+                            <Label>Access Token <span className="text-sec-critical">*</span></Label>
+                            <Input 
+                              type={showSecrets ? 'text' : 'password'} 
+                              value={form.registryPassword || ''} 
+                              onChange={(e) => updateForm({ registryPassword: e.target.value })}
+                              onBlur={() => handleFieldBlur('registryPassword')}
+                              className={cn(getFieldError('registryPassword') && 'border-sec-critical')}
+                            />
+                            {getFieldError('registryPassword') && (
+                              <p className="text-xs text-sec-critical">{getFieldError('registryPassword')}</p>
+                            )}
                           </div>
                         </div>
                       )}
                       {form.registryType === 'ecr' && (
                         <div className="grid grid-cols-3 gap-4">
                           <div className="space-y-2">
-                            <Label>AWS Region</Label>
-                            <Input value={form.awsRegion || ''} onChange={(e) => updateForm({ awsRegion: e.target.value })} placeholder="us-east-1" />
+                            <Label>AWS Region <span className="text-sec-critical">*</span></Label>
+                            <Input 
+                              value={form.awsRegion || ''} 
+                              onChange={(e) => updateForm({ awsRegion: e.target.value })} 
+                              placeholder="us-east-1"
+                              onBlur={() => handleFieldBlur('awsRegion')}
+                              className={cn(getFieldError('awsRegion') && 'border-sec-critical')}
+                            />
+                            {getFieldError('awsRegion') && (
+                              <p className="text-xs text-sec-critical">{getFieldError('awsRegion')}</p>
+                            )}
                           </div>
                           <div className="space-y-2">
-                            <Label>Access Key ID</Label>
-                            <Input value={form.awsAccessKeyId || ''} onChange={(e) => updateForm({ awsAccessKeyId: e.target.value })} />
+                            <Label>Access Key ID <span className="text-sec-critical">*</span></Label>
+                            <Input 
+                              value={form.awsAccessKeyId || ''} 
+                              onChange={(e) => updateForm({ awsAccessKeyId: e.target.value })}
+                              onBlur={() => handleFieldBlur('awsAccessKeyId')}
+                              className={cn(getFieldError('awsAccessKeyId') && 'border-sec-critical')}
+                            />
+                            {getFieldError('awsAccessKeyId') && (
+                              <p className="text-xs text-sec-critical">{getFieldError('awsAccessKeyId')}</p>
+                            )}
                           </div>
                           <div className="space-y-2">
-                            <Label>Secret Key</Label>
-                            <Input type={showSecrets ? 'text' : 'password'} value={form.awsSecretAccessKey || ''} onChange={(e) => updateForm({ awsSecretAccessKey: e.target.value })} />
+                            <Label>Secret Key <span className="text-sec-critical">*</span></Label>
+                            <Input 
+                              type={showSecrets ? 'text' : 'password'} 
+                              value={form.awsSecretAccessKey || ''} 
+                              onChange={(e) => updateForm({ awsSecretAccessKey: e.target.value })}
+                              onBlur={() => handleFieldBlur('awsSecretAccessKey')}
+                              className={cn(getFieldError('awsSecretAccessKey') && 'border-sec-critical')}
+                            />
+                            {getFieldError('awsSecretAccessKey') && (
+                              <p className="text-xs text-sec-critical">{getFieldError('awsSecretAccessKey')}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {form.registryType === 'acr' && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Tenant ID <span className="text-sec-critical">*</span></Label>
+                            <Input 
+                              value={form.tenantId || ''} 
+                              onChange={(e) => updateForm({ tenantId: e.target.value })}
+                              onBlur={() => handleFieldBlur('tenantId')}
+                              placeholder="Azure AD tenant ID"
+                              className={cn(getFieldError('tenantId') && 'border-sec-critical')}
+                            />
+                            {getFieldError('tenantId') && (
+                              <p className="text-xs text-sec-critical">{getFieldError('tenantId')}</p>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Client ID <span className="text-sec-critical">*</span></Label>
+                            <Input 
+                              value={form.clientId || ''} 
+                              onChange={(e) => updateForm({ clientId: e.target.value })}
+                              onBlur={() => handleFieldBlur('clientId')}
+                              className={cn(getFieldError('clientId') && 'border-sec-critical')}
+                            />
+                            {getFieldError('clientId') && (
+                              <p className="text-xs text-sec-critical">{getFieldError('clientId')}</p>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Client Secret <span className="text-sec-critical">*</span></Label>
+                            <Input 
+                              type={showSecrets ? 'text' : 'password'} 
+                              value={form.clientSecret || ''} 
+                              onChange={(e) => updateForm({ clientSecret: e.target.value })}
+                              onBlur={() => handleFieldBlur('clientSecret')}
+                              className={cn(getFieldError('clientSecret') && 'border-sec-critical')}
+                            />
+                            {getFieldError('clientSecret') && (
+                              <p className="text-xs text-sec-critical">{getFieldError('clientSecret')}</p>
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>ACR Name</Label>
+                            <Input 
+                              value={form.acrName || ''} 
+                              onChange={(e) => updateForm({ acrName: e.target.value })}
+                              placeholder="myregistry.azurecr.io"
+                            />
                           </div>
                         </div>
                       )}
@@ -704,11 +1039,20 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
                       </div>
                       <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-2 col-span-2">
-                          <Label>Endpoint URL</Label>
-                          <Input value={form.otelEndpoint || ''} onChange={(e) => updateForm({ otelEndpoint: e.target.value })} placeholder="https://otel-collector.example.com" />
+                          <Label>Endpoint URL <span className="text-sec-critical">*</span></Label>
+                          <Input 
+                            value={form.otelEndpoint || ''} 
+                            onChange={(e) => updateForm({ otelEndpoint: e.target.value })} 
+                            placeholder="https://otel-collector.example.com"
+                            onBlur={() => handleFieldBlur('otelEndpoint')}
+                            className={cn(getFieldError('otelEndpoint') && 'border-sec-critical')}
+                          />
+                          {getFieldError('otelEndpoint') && (
+                            <p className="text-xs text-sec-critical">{getFieldError('otelEndpoint')}</p>
+                          )}
                         </div>
                         <div className="space-y-2">
-                          <Label>Port (optional)</Label>
+                          <Label>Port</Label>
                           <Input value={form.otelPort || ''} onChange={(e) => updateForm({ otelPort: e.target.value })} placeholder="4318" />
                         </div>
                       </div>
@@ -755,19 +1099,76 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
                     {showSecrets ? 'Hide Secrets' : 'Show Secrets'}
                   </Button>
                 </div>
+
+                {/* Validation result shown in step 2 if failed */}
+                {validationResult && !validationResult.success && (
+                  <Card className="border-sec-critical/50 bg-sec-critical/5">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center gap-2 text-sec-critical">
+                        <XCircle className="w-5 h-5" />
+                        <span className="font-medium">Validation Failed</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{validationResult.message}</p>
+                      
+                      {validationResult.details && validationResult.details.length > 0 && (
+                        <div className="space-y-2">
+                          {validationResult.details.map((detail, idx) => (
+                            <div 
+                              key={idx}
+                              className={cn(
+                                'p-2 rounded text-sm flex items-center gap-2',
+                                detail.status === 'failed' ? 'bg-sec-critical/10 text-sec-critical' : 
+                                detail.status === 'success' ? 'bg-sec-safe/10 text-sec-safe' :
+                                'bg-muted text-muted-foreground'
+                              )}
+                            >
+                              {detail.status === 'failed' ? <XCircle className="w-4 h-4 shrink-0" /> :
+                               detail.status === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> :
+                               <AlertTriangle className="w-4 h-4 shrink-0" />}
+                              <span className="font-medium">{detail.service}:</span>
+                              <span className="flex-1">{detail.message}</span>
+                              {detail.latencyMs && <span className="text-xs">({detail.latencyMs}ms)</span>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleValidate}
+                        disabled={isValidating}
+                        className="w-full"
+                      >
+                        {isValidating ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Retrying...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Retry Validation
+                          </>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             )}
 
             {step === 3 && (
               <div className="space-y-6">
                 <div className="text-center py-2">
-                  <h3 className="text-lg font-semibold">Validate & Create</h3>
+                  <CheckCircle2 className="w-12 h-12 text-sec-safe mx-auto mb-3" />
+                  <h3 className="text-lg font-semibold">Connection Validated</h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Test the connection before saving
+                    Ready to create your connection
                   </p>
                 </div>
 
-                <Card className="border-dashed">
+                <Card className="border-sec-safe/50 bg-sec-safe/5">
                   <CardContent className="p-6">
                     <div className="flex items-center gap-4">
                       <div className={cn('p-3 rounded-lg', selectedType.bgColor)}>
@@ -777,84 +1178,75 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
                         <h4 className="font-medium">{form.name}</h4>
                         <p className="text-sm text-muted-foreground">{selectedType.name} Connection</p>
                       </div>
-                      <Badge variant={
-                        validationResult?.success ? 'default' : 
-                        validationResult ? 'destructive' : 
-                        'secondary'
-                      }>
-                        {validationResult?.success ? 'Validated' : 
-                         validationResult ? 'Failed' : 
-                         'Not validated'}
+                      <Badge variant="default" className="bg-sec-safe text-sec-safe-foreground">
+                        Validated
                       </Badge>
                     </div>
 
-                    {validationResult && (
-                      <div className={cn(
-                        'mt-4 p-3 rounded-lg text-sm flex items-start gap-2',
-                        validationResult.success 
-                          ? 'bg-sec-safe/10 text-sec-safe' 
-                          : 'bg-sec-critical/10 text-sec-critical'
-                      )}>
-                        {validationResult.success ? (
-                          <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-                        ) : (
-                          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                        )}
-                        {validationResult.message}
+                    {validationResult?.details && validationResult.details.length > 0 && (
+                      <div className="mt-4 space-y-2">
+                        {validationResult.details.map((detail, idx) => (
+                          <div 
+                            key={idx}
+                            className="p-2 rounded bg-background/50 text-sm flex items-center gap-2"
+                          >
+                            <CheckCircle2 className="w-4 h-4 text-sec-safe shrink-0" />
+                            <span className="font-medium">{detail.service}</span>
+                            <span className="text-muted-foreground flex-1">{detail.message}</span>
+                            {detail.latencyMs && <span className="text-xs text-muted-foreground">({detail.latencyMs}ms)</span>}
+                          </div>
+                        ))}
                       </div>
                     )}
-
-                    <Button 
-                      variant="outline" 
-                      className="w-full mt-4"
-                      onClick={handleValidate}
-                      disabled={isValidating}
-                    >
-                      {isValidating ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Validating...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="w-4 h-4 mr-2" />
-                          Validate Connection
-                        </>
-                      )}
-                    </Button>
                   </CardContent>
                 </Card>
-
-                {!validationResult?.success && (
-                  <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/50 border">
-                    <AlertTriangle className="w-4 h-4 text-sec-warning shrink-0 mt-0.5" />
-                    <p className="text-xs text-muted-foreground">
-                      You can create the connection without validation, but deployments will be blocked until validated.
-                    </p>
-                  </div>
-                )}
               </div>
             )}
           </motion.div>
         </AnimatePresence>
 
-        <DialogFooter className="flex justify-between">
+        <DialogFooter className="flex justify-between gap-2">
           <Button 
             variant="outline" 
             onClick={handleBack}
-            disabled={step === 1 || isSubmitting}
+            disabled={step === 1 || isSubmitting || isValidating}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
 
-          {step < 3 ? (
+          {step === 1 && (
             <Button onClick={handleNext}>
               Next
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-          ) : (
-            <Button onClick={handleCreate} disabled={isSubmitting}>
+          )}
+
+          {step === 2 && (
+            <Button 
+              onClick={handleNext}
+              disabled={isValidating || !isFormValid()}
+            >
+              {isValidating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Validating...
+                </>
+              ) : (
+                <>
+                  Validate & Continue
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </>
+              )}
+            </Button>
+          )}
+
+          {step === 3 && (
+            <Button 
+              onClick={handleCreate} 
+              disabled={isSubmitting}
+              className="bg-sec-safe hover:bg-sec-safe/90"
+            >
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
