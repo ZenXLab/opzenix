@@ -223,6 +223,51 @@ export type Database = {
           },
         ]
       }
+      connections: {
+        Row: {
+          config: Json | null
+          created_at: string
+          id: string
+          last_validated_at: string | null
+          name: string
+          resource_status: Json | null
+          status: string
+          type: string
+          updated_at: string
+          user_id: string | null
+          validated: boolean | null
+          validation_message: string | null
+        }
+        Insert: {
+          config?: Json | null
+          created_at?: string
+          id?: string
+          last_validated_at?: string | null
+          name: string
+          resource_status?: Json | null
+          status?: string
+          type: string
+          updated_at?: string
+          user_id?: string | null
+          validated?: boolean | null
+          validation_message?: string | null
+        }
+        Update: {
+          config?: Json | null
+          created_at?: string
+          id?: string
+          last_validated_at?: string | null
+          name?: string
+          resource_status?: Json | null
+          status?: string
+          type?: string
+          updated_at?: string
+          user_id?: string | null
+          validated?: boolean | null
+          validation_message?: string | null
+        }
+        Relationships: []
+      }
       dashboard_layouts: {
         Row: {
           created_at: string
