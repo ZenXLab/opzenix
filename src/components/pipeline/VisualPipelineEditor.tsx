@@ -17,15 +17,19 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Save, Play, Undo, Redo, Sparkles, Users, FolderOpen, GripVertical, Crosshair } from 'lucide-react';
+import { X, Save, Play, Undo, Redo, Sparkles, Users, FolderOpen, GripVertical, Crosshair, CheckCircle2, AlertTriangle, Square, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { nodeTypes } from './PipelineNodeTypes';
 import PipelineToolbox from './PipelineToolbox';
 import StageConfigPanel from './StageConfigPanel';
 import PipelineTemplatesLibrary from './PipelineTemplatesLibrary';
 import NodeInspector from './NodeInspector';
+import ValidationPanel from './ValidationPanel';
 import { usePipelineCollaboration } from '@/hooks/usePipelineCollaboration';
+import { usePipelineExecution } from '@/hooks/usePipelineExecution';
+import { validatePipeline, wouldCreateCycle, isValidConnection, ValidationResult } from '@/utils/pipelineValidation';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -73,8 +77,36 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave, pipelineId = 'default' 
   const [showGuides, setShowGuides] = useState(true);
   const [dragPreview, setDragPreview] = useState<{ x: number; y: number } | null>(null);
   const [alignmentGuides, setAlignmentGuides] = useState<{ horizontal: number[]; vertical: number[] }>({ horizontal: [], vertical: [] });
+  const [validation, setValidation] = useState<ValidationResult | null>(null);
+  const [showValidation, setShowValidation] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+
+  // Pipeline execution hook
+  const {
+    isExecuting,
+    executionState,
+    nodeStates,
+    startExecution,
+    stopExecution,
+    getNodeStatus,
+  } = usePipelineExecution({
+    onNodeStatusChange: (nodeId, status) => {
+      // Update node visuals based on execution status
+      setNodes(nds => nds.map(node => 
+        node.id === nodeId 
+          ? { ...node, data: { ...node.data, status } }
+          : node
+      ));
+    },
+    onExecutionComplete: (success) => {
+      if (success) {
+        // Reset all nodes to success
+        setNodes(nds => nds.map(node => ({ ...node, data: { ...node.data, status: 'success' } })));
+      }
+    },
+  });
 
   // Real-time collaboration
   const {
@@ -161,7 +193,47 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave, pipelineId = 'default' 
     toast.success('Template loaded');
   };
 
+  // Validate pipeline
+  const handleValidate = useCallback(() => {
+    setIsValidating(true);
+    const result = validatePipeline(nodes, edges);
+    setValidation(result);
+    setShowValidation(true);
+    setIsValidating(false);
+  }, [nodes, edges]);
+
+  // Run pipeline execution
+  const handleRun = useCallback(async () => {
+    // Validate first
+    const result = validatePipeline(nodes, edges);
+    if (!result.isValid) {
+      setValidation(result);
+      setShowValidation(true);
+      toast.error('Pipeline has errors - fix before running');
+      return;
+    }
+    
+    // Reset node statuses to idle
+    setNodes(nds => nds.map(node => ({ ...node, data: { ...node.data, status: 'idle' } })));
+    
+    // Start execution
+    await startExecution(nodes, edges, { environment: 'development' });
+  }, [nodes, edges, startExecution, setNodes]);
+
   const onConnect = useCallback((connection: Connection) => {
+    // Validate connection before adding
+    const connectionValid = isValidConnection(nodes, connection.source!, connection.target!);
+    if (!connectionValid.valid) {
+      toast.error(connectionValid.reason || 'Invalid connection');
+      return;
+    }
+    
+    // Check for cycles
+    if (wouldCreateCycle(nodes, edges, { source: connection.source!, target: connection.target! })) {
+      toast.error('Cannot create connection - would create a cycle');
+      return;
+    }
+    
     setEdges((eds) => {
       const newEdges = addEdge({
         ...connection,
@@ -171,7 +243,7 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave, pipelineId = 'default' 
       broadcastEdgeChange(newEdges);
       return newEdges;
     });
-  }, [setEdges, broadcastEdgeChange]);
+  }, [nodes, edges, setEdges, broadcastEdgeChange]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -398,9 +470,29 @@ const VisualPipelineEditor = ({ isOpen, onClose, onSave, pipelineId = 'default' 
                 <Redo className="w-4 h-4" />
               </Button>
               <div className="w-px h-6 bg-border mx-1" />
-              <Button variant="ghost" size="sm" className="gap-1">
-                <Play className="w-4 h-4" />
-                Run
+              {isExecuting ? (
+                <Button variant="destructive" size="sm" className="gap-1" onClick={stopExecution}>
+                  <Square className="w-3 h-3" />
+                  Stop
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" className="gap-1" onClick={handleRun}>
+                  <Play className="w-4 h-4" />
+                  Run
+                </Button>
+              )}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-1" 
+                onClick={handleValidate}
+              >
+                {validation?.isValid ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-sec-safe" />
+                ) : validation ? (
+                  <AlertTriangle className="w-3.5 h-3.5 text-sec-warning" />
+                ) : null}
+                Validate
               </Button>
               <Button size="sm" className="gap-1" onClick={handleSave}>
                 <Save className="w-4 h-4" />
