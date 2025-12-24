@@ -34,6 +34,7 @@ import {
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { EnvironmentConfigDialog } from './EnvironmentConfigDialog';
 
 interface Environment {
   id: string;
@@ -252,13 +253,14 @@ const EnvironmentsPanel = () => {
 
   const handleConfigureEnvironment = (env: Environment) => {
     setConfigEnv(env);
-    toast.info(`Configure ${env.name} - Opening settings...`);
-    // For now, show a toast - full config dialog can be added later
+    setIsConfiguring(true);
   };
 
   const handleViewDeployments = (environment: string) => {
+    window.dispatchEvent(new CustomEvent('opzenix:navigate', { 
+      detail: { section: 'deployments', filter: environment } 
+    }));
     toast.info(`Viewing deployments for ${environment}`);
-    // Navigate to deployments section filtered by environment
   };
 
   const getStrategyBadge = (strategy: Environment['strategy']) => {
