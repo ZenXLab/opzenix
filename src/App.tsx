@@ -40,6 +40,7 @@ import AuditLogsDocs from "./pages/docs/operations/AuditLogsDocs";
 import SecurityPermissionModelDocs from "./pages/docs/security/SecurityPermissionModelDocs";
 import SecretsHandlingDocs from "./pages/docs/security/SecretsHandlingDocs";
 import ComplianceMappingDocs from "./pages/docs/security/ComplianceMappingDocs";
+import APIReferenceDocs from "./pages/docs/APIReferenceDocs";
 
 // Product
 import Features from "./pages/product/Features";
@@ -130,6 +131,9 @@ const App = () => (
           <Route path="/docs/security/permission-model" element={<SecurityPermissionModelDocs />} />
           <Route path="/docs/security/secrets-handling" element={<SecretsHandlingDocs />} />
           <Route path="/docs/security/compliance-mapping" element={<ComplianceMappingDocs />} />
+          
+          {/* API Reference */}
+          <Route path="/docs/api-reference" element={<APIReferenceDocs />} />
           
           <Route path="*" element={<NotFound />} />
         </Routes>
