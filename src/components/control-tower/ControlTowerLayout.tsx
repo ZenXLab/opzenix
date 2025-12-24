@@ -14,6 +14,7 @@ interface ControlTowerLayoutProps {
   onOpenSettings?: () => void;
   onOpenApprovals?: () => void;
   onOpenAuditLog?: () => void;
+  onOpenProfile?: () => void;
 }
 
 const ControlTowerLayout = ({
@@ -23,6 +24,7 @@ const ControlTowerLayout = ({
   onOpenSettings,
   onOpenApprovals,
   onOpenAuditLog,
+  onOpenProfile,
 }: ControlTowerLayoutProps) => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -37,6 +39,7 @@ const ControlTowerLayout = ({
       <ControlTowerTopBar 
         onOpenSettings={onOpenSettings}
         onOpenApprovals={onOpenApprovals}
+        onOpenProfile={onOpenProfile}
       />
       
       {/* Main Content Area */}
