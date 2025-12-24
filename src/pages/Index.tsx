@@ -8,7 +8,7 @@ import ConnectionsPanel from '@/components/control-tower/ConnectionsPanel';
 import EnvironmentsPanel from '@/components/control-tower/EnvironmentsPanel';
 import ApprovalsPanel from '@/components/control-tower/ApprovalsPanel';
 import SystemHealthPanel from '@/components/control-tower/SystemHealthPanel';
-import AuditLogViewer from '@/components/governance/AuditLogViewer';
+import AuditLogPanel from '@/components/control-tower/AuditLogPanel';
 import GitConnectionWizard from '@/components/connect/GitConnectionWizard';
 import GitHubConnectionPanel from '@/components/connect/GitHubConnectionPanel';
 import SpeechPanel from '@/components/speech/SpeechPanel';
@@ -45,7 +45,6 @@ const Index = () => {
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   
   // Panel states
-  const [isAuditLogOpen, setAuditLogOpen] = useState(false);
   const [isGitWizardOpen, setGitWizardOpen] = useState(false);
   const [isGitHubPanelOpen, setGitHubPanelOpen] = useState(false);
   const [isSpeechOpen, setSpeechOpen] = useState(false);
@@ -142,6 +141,8 @@ const Index = () => {
         return <EnvironmentsPanel />;
       case 'approvals':
         return <ApprovalsPanel />;
+      case 'audit-log':
+        return <AuditLogPanel />;
       case 'health':
         return <SystemHealthPanel />;
       default:
@@ -166,13 +167,12 @@ const Index = () => {
         onSectionChange={setActiveSection}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenApprovals={() => setActiveSection('approvals')}
-        onOpenAuditLog={() => setAuditLogOpen(true)}
+        onOpenAuditLog={() => setActiveSection('audit-log')}
       >
         {renderSectionContent()}
       </ControlTowerLayout>
 
       {/* Modals & Overlays */}
-      <AuditLogViewer isOpen={isAuditLogOpen} onClose={() => setAuditLogOpen(false)} />
       <GitConnectionWizard isOpen={isGitWizardOpen} onClose={() => setGitWizardOpen(false)} />
       <GitHubConnectionPanel 
         isOpen={isGitHubPanelOpen} 

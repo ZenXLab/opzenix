@@ -64,7 +64,7 @@ const navItems = [
     description: 'Immutable action history'
   },
   { 
-    id: 'system-health', 
+    id: 'health', 
     label: 'System Health', 
     icon: Activity, 
     description: 'Infrastructure status'
@@ -79,11 +79,7 @@ const ControlTowerNav = ({
   const [collapsed, setCollapsed] = useState(false);
 
   const handleNavClick = (id: string) => {
-    if (id === 'audit-log' && onOpenAuditLog) {
-      onOpenAuditLog();
-    } else {
-      onSectionChange(id);
-    }
+    onSectionChange(id);
   };
 
   return (
