@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Settings, X, Monitor, Wrench, Eye, Palette, 
-  Layout, Moon, Sun, Save, RotateCcw
+  Layout, Moon, Sun, Save, RotateCcw, Cloud, 
+  Container, Server, Key, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -114,7 +116,7 @@ export function UserSettingsPanel({ open, onClose }: UserSettingsPanelProps) {
         </SheetHeader>
 
         <Tabs defaultValue="general" className="mt-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="general" className="gap-1.5">
               <Monitor className="w-3.5 h-3.5" />
               General
@@ -122,6 +124,10 @@ export function UserSettingsPanel({ open, onClose }: UserSettingsPanelProps) {
             <TabsTrigger value="dashboard" className="gap-1.5">
               <Layout className="w-3.5 h-3.5" />
               Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="azure" className="gap-1.5">
+              <Cloud className="w-3.5 h-3.5" />
+              Azure
             </TabsTrigger>
             <TabsTrigger value="appearance" className="gap-1.5">
               <Palette className="w-3.5 h-3.5" />
@@ -273,6 +279,94 @@ export function UserSettingsPanel({ open, onClose }: UserSettingsPanelProps) {
                   checked={showWidgetTitles} 
                   onCheckedChange={setShowWidgetTitles} 
                 />
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Azure Settings */}
+          <TabsContent value="azure" className="space-y-6 mt-6">
+            <div className="space-y-4">
+              {/* ACR Configuration */}
+              <div className="p-4 rounded-lg border border-border bg-secondary/20">
+                <div className="flex items-center gap-2 mb-3">
+                  <Container className="w-4 h-4 text-ai-primary" />
+                  <Label className="text-sm font-medium">Azure Container Registry</Label>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Registry URL</Label>
+                    <Input 
+                      placeholder="myregistry.azurecr.io" 
+                      className="mt-1 bg-background"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-muted-foreground">Not connected</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* AKS Configuration */}
+              <div className="p-4 rounded-lg border border-border bg-secondary/20">
+                <div className="flex items-center gap-2 mb-3">
+                  <Server className="w-4 h-4 text-sec-safe" />
+                  <Label className="text-sm font-medium">Azure Kubernetes Service</Label>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Cluster Name</Label>
+                    <Input 
+                      placeholder="my-aks-cluster" 
+                      className="mt-1 bg-background"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Resource Group</Label>
+                    <Input 
+                      placeholder="my-resource-group" 
+                      className="mt-1 bg-background"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-muted-foreground">Not connected</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Key Vault Configuration */}
+              <div className="p-4 rounded-lg border border-border bg-secondary/20">
+                <div className="flex items-center gap-2 mb-3">
+                  <Key className="w-4 h-4 text-sec-warning" />
+                  <Label className="text-sm font-medium">Azure Key Vault</Label>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Vault Name</Label>
+                    <Input 
+                      placeholder="my-key-vault" 
+                      className="mt-1 bg-background"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Tenant ID</Label>
+                    <Input 
+                      placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" 
+                      className="mt-1 bg-background"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-muted-foreground">Not connected</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-ai-primary/10 border border-ai-primary/20">
+                <p className="text-xs text-muted-foreground">
+                  Configure Azure credentials in the Azure Integration Panel for full connectivity.
+                </p>
               </div>
             </div>
           </TabsContent>
