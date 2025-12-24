@@ -16,7 +16,8 @@ import {
   Database,
   Sparkles,
   Workflow,
-  Play
+  Play,
+  History
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -33,6 +34,7 @@ interface AppSidebarProps {
   onOpenTelemetry?: () => void;
   onOpenOpzenixWizard?: () => void;
   onOpenPipelineEditor?: () => void;
+  onOpenExecutionHistory?: () => void;
 }
 
 interface NavItem {
@@ -57,7 +59,8 @@ const AppSidebar = ({
   onOpenRollback,
   onOpenTelemetry,
   onOpenOpzenixWizard,
-  onOpenPipelineEditor
+  onOpenPipelineEditor,
+  onOpenExecutionHistory
 }: AppSidebarProps) => {
   const [collapsed, setCollapsed] = useState(false);
   const { 
@@ -79,9 +82,14 @@ const AppSidebar = ({
   const handleFlowTypeChange = (flowType: FlowType) => {
     setActiveFlowType(flowType);
     const category = flowCategories.find(c => c.id === flowType);
+    const typeExecutions = executions.filter(e => e.flowType === flowType);
     toast.success(`Switched to ${category?.label} pipelines`, {
-      description: `Showing ${flowTypeExecutions.length} active pipelines`,
+      description: typeExecutions.length > 0 
+        ? `Showing ${typeExecutions.length} active pipelines` 
+        : 'No pipelines yet - create your first one!',
     });
+    // Open execution history to show pipelines for this flow type
+    onOpenExecutionHistory?.();
   };
 
   const mainNavItems: NavItem[] = [
@@ -101,6 +109,16 @@ const AppSidebar = ({
   ];
 
   const toolItems: NavItem[] = [
+    { 
+      id: 'history', 
+      label: 'Executions', 
+      icon: History, 
+      badge: runningExecutions,
+      onClick: () => {
+        onOpenExecutionHistory?.();
+        toast.info('Opening Execution History');
+      }
+    },
     { 
       id: 'alerts', 
       label: 'Alerts', 

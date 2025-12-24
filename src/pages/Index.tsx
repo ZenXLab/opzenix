@@ -17,6 +17,7 @@ import OpzenixWizard from '@/components/opzenix/OpzenixWizard';
 import CheckpointRollbackPanel from '@/components/checkpoint/CheckpointRollbackPanel';
 import AlertsPanel from '@/components/alerts/AlertsPanel';
 import TelemetryPanel from '@/components/telemetry/TelemetryPanel';
+import ExecutionHistoryPanel from '@/components/execution/ExecutionHistoryPanel';
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
 import { useFlowStore } from '@/stores/flowStore';
 import { toast } from 'sonner';
@@ -32,7 +33,8 @@ const Index = () => {
   const [isRollbackOpen, setRollbackOpen] = useState(false);
   const [isAlertsOpen, setAlertsOpen] = useState(false);
   const [isTelemetryOpen, setTelemetryOpen] = useState(false);
-  const { activeView, setActiveView, selectedExecution } = useFlowStore();
+  const [isExecutionHistoryOpen, setExecutionHistoryOpen] = useState(false);
+  const { activeView, setActiveView, selectedExecution, activeFlowType } = useFlowStore();
   
   useRealtimeUpdates();
 
@@ -53,6 +55,7 @@ const Index = () => {
           onOpenTelemetry={() => setTelemetryOpen(true)}
           onOpenOpzenixWizard={() => setOpzenixWizardOpen(true)}
           onOpenPipelineEditor={() => setPipelineEditorOpen(true)}
+          onOpenExecutionHistory={() => setExecutionHistoryOpen(true)}
         />
         
         {/* Main Content */}
@@ -99,6 +102,11 @@ const Index = () => {
         <TelemetryPanel
           isOpen={isTelemetryOpen}
           onClose={() => setTelemetryOpen(false)}
+        />
+        <ExecutionHistoryPanel
+          isOpen={isExecutionHistoryOpen}
+          onClose={() => setExecutionHistoryOpen(false)}
+          flowType={activeFlowType}
         />
       </div>
     </ReactFlowProvider>
