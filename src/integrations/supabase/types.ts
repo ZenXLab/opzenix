@@ -167,6 +167,36 @@ export type Database = {
           },
         ]
       }
+      dashboard_layouts: {
+        Row: {
+          created_at: string
+          id: string
+          is_default: boolean | null
+          layout: Json
+          name: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          layout?: Json
+          name?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_default?: boolean | null
+          layout?: Json
+          name?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       deployments: {
         Row: {
           deployed_at: string
@@ -220,6 +250,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      environment_configs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          environment: string
+          id: string
+          is_active: boolean | null
+          name: string
+          secrets_ref: string | null
+          updated_at: string
+          variables: Json | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          environment: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          secrets_ref?: string | null
+          updated_at?: string
+          variables?: Json | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          environment?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          secrets_ref?: string | null
+          updated_at?: string
+          variables?: Json | null
+        }
+        Relationships: []
       }
       execution_logs: {
         Row: {
@@ -293,6 +359,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "execution_nodes_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      execution_state_events: {
+        Row: {
+          created_at: string
+          execution_id: string | null
+          id: string
+          new_state: string
+          node_id: string | null
+          old_state: string | null
+          reason: string | null
+          triggered_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          execution_id?: string | null
+          id?: string
+          new_state: string
+          node_id?: string | null
+          old_state?: string | null
+          reason?: string | null
+          triggered_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          execution_id?: string | null
+          id?: string
+          new_state?: string
+          node_id?: string | null
+          old_state?: string | null
+          reason?: string | null
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "execution_state_events_execution_id_fkey"
             columns: ["execution_id"]
             isOneToOne: false
             referencedRelation: "executions"
@@ -425,6 +532,36 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_events: {
+        Row: {
+          created_at: string
+          id: string
+          payload: Json | null
+          read_at: string | null
+          status: string | null
+          target: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          payload?: Json | null
+          read_at?: string | null
+          status?: string | null
+          target: string
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          payload?: Json | null
+          read_at?: string | null
+          status?: string | null
+          target?: string
+          type?: string
+        }
+        Relationships: []
+      }
       pipeline_templates: {
         Row: {
           category: string
@@ -497,6 +634,33 @@ export type Database = {
           full_name?: string | null
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      secret_references: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          provider: string
+          ref_key: string
+          scope: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          provider?: string
+          ref_key: string
+          scope: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          provider?: string
+          ref_key?: string
+          scope?: string
         }
         Relationships: []
       }
@@ -587,6 +751,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_preferences: {
+        Row: {
+          created_at: string
+          default_mode: string | null
+          onboarding_state: Json | null
+          ui_preferences: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          default_mode?: string | null
+          onboarding_state?: Json | null
+          ui_preferences?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          default_mode?: string | null
+          onboarding_state?: Json | null
+          ui_preferences?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
