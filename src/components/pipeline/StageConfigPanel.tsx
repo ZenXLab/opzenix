@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { X, Settings, Trash2, Play, Code, Terminal, Clock } from 'lucide-react';
+import { X, Settings, Trash2, Play, Code, Terminal, Clock, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Node } from '@xyflow/react';
+import { DeploymentStrategySelector } from './DeploymentStrategySelector';
 
 interface StageConfigPanelProps {
   node: Node | null;
@@ -19,6 +21,7 @@ const StageConfigPanel = ({ node, onClose, onUpdate, onDelete }: StageConfigPane
   const [command, setCommand] = useState('');
   const [timeout, setTimeout] = useState('300');
   const [retries, setRetries] = useState('0');
+  const [deploymentStrategy, setDeploymentStrategy] = useState('rolling');
 
   useEffect(() => {
     if (node) {
@@ -27,6 +30,7 @@ const StageConfigPanel = ({ node, onClose, onUpdate, onDelete }: StageConfigPane
       setCommand((node.data as any).command || '');
       setTimeout((node.data as any).timeout || '300');
       setRetries((node.data as any).retries || '0');
+      setDeploymentStrategy((node.data as any).deploymentStrategy || 'rolling');
     }
   }, [node]);
 
@@ -40,7 +44,12 @@ const StageConfigPanel = ({ node, onClose, onUpdate, onDelete }: StageConfigPane
       command,
       timeout,
       retries,
+      deploymentStrategy,
     });
+  };
+
+  const handleStrategyChange = (strategy: string, config: any) => {
+    setDeploymentStrategy(strategy);
   };
 
   const stageType = (node.data as any).stageType;
@@ -132,6 +141,18 @@ const StageConfigPanel = ({ node, onClose, onUpdate, onDelete }: StageConfigPane
             className="bg-background"
           />
         </div>
+
+        {/* Deployment Strategy Selector - Only for deploy stages */}
+        {stageType === 'deploy' && (
+          <>
+            <Separator className="my-4" />
+            <DeploymentStrategySelector
+              value={deploymentStrategy}
+              onChange={handleStrategyChange}
+              environment={description || 'production'}
+            />
+          </>
+        )}
 
         {/* Environment Variables Preview */}
         <div className="p-3 bg-secondary/30 rounded-lg">
