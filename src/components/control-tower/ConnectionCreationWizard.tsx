@@ -12,7 +12,10 @@ import {
   Eye,
   EyeOff,
   AlertTriangle,
-  ExternalLink
+  ExternalLink,
+  Database,
+  Activity,
+  Container
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -20,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -30,7 +34,7 @@ interface ConnectionCreationWizardProps {
   onComplete?: () => void;
 }
 
-type ConnectionType = 'github' | 'azure' | 'vault';
+type ConnectionType = 'github' | 'azure' | 'vault' | 'registry' | 'otel';
 
 interface ConnectionForm {
   type: ConnectionType;
@@ -52,6 +56,23 @@ interface ConnectionForm {
   vaultUrl?: string;
   vaultToken?: string;
   vaultNamespace?: string;
+  // Registry
+  registryType?: 'acr' | 'ecr' | 'dockerhub' | 'ghcr' | 'gcr';
+  registryUrl?: string;
+  registryUsername?: string;
+  registryPassword?: string;
+  awsAccessKeyId?: string;
+  awsSecretAccessKey?: string;
+  awsRegion?: string;
+  gcpServiceAccountKey?: string;
+  // OTel
+  otelCollectorType?: 'otlp-http' | 'otlp-grpc' | 'jaeger' | 'zipkin' | 'prometheus';
+  otelEndpoint?: string;
+  otelPort?: string;
+  otelAuthType?: 'none' | 'bearer' | 'basic' | 'api-key';
+  otelAuthToken?: string;
+  otelApiKey?: string;
+  otelApiKeyHeader?: string;
 }
 
 const connectionTypes = [
@@ -62,22 +83,48 @@ const connectionTypes = [
     icon: Github,
     color: 'text-foreground',
     bgColor: 'bg-foreground/10',
+    required: true,
+    blocks: 'All executions',
   },
   {
     id: 'azure' as ConnectionType,
-    name: 'Azure',
-    description: 'Connect Azure ACR, AKS, and Key Vault',
+    name: 'Azure (AKS)',
+    description: 'Connect Azure AKS for Kubernetes deployments',
     icon: Cloud,
     color: 'text-primary',
     bgColor: 'bg-primary/10',
+    required: true,
+    blocks: 'CD deployments',
+  },
+  {
+    id: 'registry' as ConnectionType,
+    name: 'Container Registry',
+    description: 'ACR, ECR, Docker Hub, GHCR, or GCR',
+    icon: Container,
+    color: 'text-sec-info',
+    bgColor: 'bg-sec-info/10',
+    required: true,
+    blocks: 'CD deployments',
   },
   {
     id: 'vault' as ConnectionType,
-    name: 'HashiCorp Vault',
-    description: 'Connect to Vault for secrets management',
+    name: 'Secrets Vault',
+    description: 'Azure Key Vault or HashiCorp Vault',
     icon: Shield,
     color: 'text-sec-warning',
     bgColor: 'bg-sec-warning/10',
+    required: true,
+    blocks: 'Deployments',
+  },
+  {
+    id: 'otel' as ConnectionType,
+    name: 'OpenTelemetry',
+    description: 'Traces, metrics, and logs collection',
+    icon: Activity,
+    color: 'text-sec-safe',
+    bgColor: 'bg-sec-safe/10',
+    required: false,
+    blocks: 'Warning only',
   },
 ];
 
@@ -186,6 +233,66 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
         } else {
           setValidationResult({ success: false, message: 'Vault connection failed' });
         }
+      } else if (form.type === 'registry') {
+        // Validate container registry
+        const { data, error } = await supabase.functions.invoke('validate-registry', {
+          body: {
+            registryType: form.registryType,
+            registryUrl: form.registryUrl,
+            acrName: form.acrName,
+            tenantId: form.tenantId,
+            clientId: form.clientId,
+            clientSecret: form.clientSecret,
+            subscriptionId: form.subscriptionId,
+            username: form.registryUsername,
+            password: form.registryPassword,
+            awsAccessKeyId: form.awsAccessKeyId,
+            awsSecretAccessKey: form.awsSecretAccessKey,
+            awsRegion: form.awsRegion,
+            gcpServiceAccountKey: form.gcpServiceAccountKey,
+          }
+        });
+
+        if (error) throw error;
+
+        if (data.success) {
+          setValidationResult({
+            success: true,
+            message: data.message || `Registry validated: ${data.registryUrl}`
+          });
+        } else {
+          setValidationResult({
+            success: false,
+            message: data.message || 'Registry validation failed'
+          });
+        }
+      } else if (form.type === 'otel') {
+        // Validate OpenTelemetry collector
+        const { data, error } = await supabase.functions.invoke('validate-otel', {
+          body: {
+            collectorType: form.otelCollectorType,
+            endpoint: form.otelEndpoint,
+            port: form.otelPort ? parseInt(form.otelPort) : undefined,
+            authType: form.otelAuthType,
+            authToken: form.otelAuthToken,
+            apiKey: form.otelApiKey,
+            apiKeyHeader: form.otelApiKeyHeader,
+          }
+        });
+
+        if (error) throw error;
+
+        if (data.success) {
+          setValidationResult({
+            success: true,
+            message: data.message || `Collector validated: ${data.endpoint}`
+          });
+        } else {
+          setValidationResult({
+            success: false,
+            message: data.message || 'Collector validation failed'
+          });
+        }
       }
     } catch (error: any) {
       console.error('[ConnectionWizard] Validation error:', error);
@@ -226,6 +333,19 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
         config = {
           vaultUrl: form.vaultUrl,
           vaultNamespace: form.vaultNamespace,
+        };
+      } else if (form.type === 'registry') {
+        config = {
+          registryType: form.registryType,
+          registryUrl: form.registryUrl,
+          awsRegion: form.awsRegion,
+        };
+      } else if (form.type === 'otel') {
+        config = {
+          collectorType: form.otelCollectorType,
+          endpoint: form.otelEndpoint,
+          port: form.otelPort,
+          authType: form.otelAuthType,
         };
       }
 
@@ -521,11 +641,108 @@ const ConnectionCreationWizard = ({ open, onOpenChange, onComplete }: Connection
                     </>
                   )}
 
-                  <Button 
-                    variant="outline" 
-                    className="w-full" 
-                    onClick={() => setShowSecrets(!showSecrets)}
-                  >
+                  {form.type === 'registry' && (
+                    <>
+                      <div className="space-y-2">
+                        <Label>Registry Type</Label>
+                        <Select value={form.registryType || 'acr'} onValueChange={(v) => updateForm({ registryType: v as any })}>
+                          <SelectTrigger><SelectValue placeholder="Select registry" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="acr">Azure Container Registry (ACR)</SelectItem>
+                            <SelectItem value="ecr">AWS ECR</SelectItem>
+                            <SelectItem value="dockerhub">Docker Hub</SelectItem>
+                            <SelectItem value="ghcr">GitHub Container Registry</SelectItem>
+                            <SelectItem value="gcr">Google Container Registry</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {(form.registryType === 'dockerhub' || form.registryType === 'ghcr') && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Username</Label>
+                            <Input value={form.registryUsername || ''} onChange={(e) => updateForm({ registryUsername: e.target.value })} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Access Token</Label>
+                            <Input type={showSecrets ? 'text' : 'password'} value={form.registryPassword || ''} onChange={(e) => updateForm({ registryPassword: e.target.value })} />
+                          </div>
+                        </div>
+                      )}
+                      {form.registryType === 'ecr' && (
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <Label>AWS Region</Label>
+                            <Input value={form.awsRegion || ''} onChange={(e) => updateForm({ awsRegion: e.target.value })} placeholder="us-east-1" />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Access Key ID</Label>
+                            <Input value={form.awsAccessKeyId || ''} onChange={(e) => updateForm({ awsAccessKeyId: e.target.value })} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Secret Key</Label>
+                            <Input type={showSecrets ? 'text' : 'password'} value={form.awsSecretAccessKey || ''} onChange={(e) => updateForm({ awsSecretAccessKey: e.target.value })} />
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {form.type === 'otel' && (
+                    <>
+                      <div className="space-y-2">
+                        <Label>Collector Type</Label>
+                        <Select value={form.otelCollectorType || 'otlp-http'} onValueChange={(v) => updateForm({ otelCollectorType: v as any })}>
+                          <SelectTrigger><SelectValue placeholder="Select collector" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="otlp-http">OTLP/HTTP</SelectItem>
+                            <SelectItem value="otlp-grpc">OTLP/gRPC</SelectItem>
+                            <SelectItem value="jaeger">Jaeger</SelectItem>
+                            <SelectItem value="zipkin">Zipkin</SelectItem>
+                            <SelectItem value="prometheus">Prometheus</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2 col-span-2">
+                          <Label>Endpoint URL</Label>
+                          <Input value={form.otelEndpoint || ''} onChange={(e) => updateForm({ otelEndpoint: e.target.value })} placeholder="https://otel-collector.example.com" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Port (optional)</Label>
+                          <Input value={form.otelPort || ''} onChange={(e) => updateForm({ otelPort: e.target.value })} placeholder="4318" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Authentication</Label>
+                        <Select value={form.otelAuthType || 'none'} onValueChange={(v) => updateForm({ otelAuthType: v as any })}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">No Authentication</SelectItem>
+                            <SelectItem value="bearer">Bearer Token</SelectItem>
+                            <SelectItem value="api-key">API Key</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {form.otelAuthType === 'bearer' && (
+                        <div className="space-y-2">
+                          <Label>Bearer Token</Label>
+                          <Input type={showSecrets ? 'text' : 'password'} value={form.otelAuthToken || ''} onChange={(e) => updateForm({ otelAuthToken: e.target.value })} />
+                        </div>
+                      )}
+                      {form.otelAuthType === 'api-key' && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>API Key</Label>
+                            <Input type={showSecrets ? 'text' : 'password'} value={form.otelApiKey || ''} onChange={(e) => updateForm({ otelApiKey: e.target.value })} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Header Name</Label>
+                            <Input value={form.otelApiKeyHeader || 'X-API-Key'} onChange={(e) => updateForm({ otelApiKeyHeader: e.target.value })} />
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
                     {showSecrets ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
                     {showSecrets ? 'Hide Secrets' : 'Show Secrets'}
                   </Button>
