@@ -31,6 +31,7 @@ interface TopBarProps {
   onOpenOpzenixWizard?: () => void;
   onOpenDemo?: () => void;
   onOpenValidation?: () => void;
+  onOpenSettings?: () => void;
 }
 
 const TopBar = ({ 
@@ -40,7 +41,8 @@ const TopBar = ({
   onOpenEnvironmentManager,
   onOpenOpzenixWizard,
   onOpenDemo,
-  onOpenValidation
+  onOpenValidation,
+  onOpenSettings
 }: TopBarProps) => {
   const { 
     systemHealth, 
@@ -190,7 +192,12 @@ const TopBar = ({
             <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-node-warning" />
           )}
         </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8 hidden sm:flex">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-8 w-8 hidden sm:flex"
+          onClick={onOpenSettings}
+        >
           <Settings className="w-4 h-4 text-muted-foreground" />
         </Button>
         <div className="w-px h-6 bg-border mx-1 hidden sm:block" />

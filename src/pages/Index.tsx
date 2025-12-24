@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AnimatePresence } from 'framer-motion';
 import ModeDrivenSidebar from '@/components/layout/ModeDrivenSidebar';
@@ -25,6 +25,7 @@ import PipelineTemplatesGallery from '@/components/templates/PipelineTemplatesGa
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { ValidationChecklist } from '@/components/validation/ValidationChecklist';
 import { GuidedDemoFlow } from '@/components/demo/GuidedDemoFlow';
+import { UserSettingsPanel } from '@/components/settings/UserSettingsPanel';
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
@@ -49,6 +50,7 @@ const Index = () => {
   const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [isDemoOpen, setDemoOpen] = useState(false);
   const [isValidationOpen, setValidationOpen] = useState(false);
+  const [isSettingsOpen, setSettingsOpen] = useState(false);
   const { activeView, setActiveView, selectedExecution, activeFlowType } = useFlowStore();
   
   // Enable realtime updates
@@ -113,6 +115,7 @@ const Index = () => {
           onOpenOpzenixWizard={() => setOpzenixWizardOpen(true)}
           onOpenDemo={() => setDemoOpen(true)}
           onOpenValidation={() => setValidationOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
         
         <div className="flex-1 flex overflow-hidden">
@@ -130,7 +133,7 @@ const Index = () => {
             onOpenExecutionDetail={(id) => setSelectedExecutionId(id)}
           />
           
-          {/* Main Content */}
+          {/* Main Content - Single instance */}
           <main className="flex-1 relative overflow-hidden">
             <AnimatePresence mode="wait">
               {activeView === 'dashboard' ? (
@@ -161,35 +164,6 @@ const Index = () => {
             </AnimatePresence>
           </main>
         </div>
-        <main className="flex-1 relative overflow-hidden">
-          <AnimatePresence mode="wait">
-            {activeView === 'dashboard' ? (
-              <ModularDashboardView 
-                key="dashboard"
-                onViewFlows={() => setActiveView('flows')}
-                onOpenPipelineEditor={() => setPipelineEditorOpen(true)}
-                onOpenEnvironmentManager={() => setEnvironmentManagerOpen(true)}
-                onOpenOpzenixWizard={() => setOpzenixWizardOpen(true)}
-                onOpenTemplatesGallery={() => setTemplatesGalleryOpen(true)}
-                onOpenGitHubConnection={() => setGitHubPanelOpen(true)}
-                onOpenExecutionHistory={() => setExecutionHistoryOpen(true)}
-                onMetricClick={handleMetricClick}
-              />
-            ) : (
-              <FlowCanvas key="flows" />
-            )}
-          </AnimatePresence>
-          
-          {/* Execution Detail Panel - Slide-out */}
-          <AnimatePresence>
-            {selectedExecutionId && (
-              <ExecutionDetailPanel 
-                executionId={selectedExecutionId}
-                onClose={() => setSelectedExecutionId(null)}
-              />
-            )}
-          </AnimatePresence>
-        </main>
 
         {/* Modals & Overlays */}
         {activeView === 'flows' && <InspectorPanel />}
@@ -233,6 +207,12 @@ const Index = () => {
           isOpen={isTemplatesGalleryOpen}
           onClose={() => setTemplatesGalleryOpen(false)}
           onSelectTemplate={handleTemplateSelect}
+        />
+        
+        {/* User Settings Panel */}
+        <UserSettingsPanel 
+          open={isSettingsOpen}
+          onClose={() => setSettingsOpen(false)}
         />
         
         {/* Onboarding Wizard - Auto-shows for first-time users */}
