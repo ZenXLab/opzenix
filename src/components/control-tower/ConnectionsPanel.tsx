@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import ConnectionCreationWizard from './ConnectionCreationWizard';
 import { 
   Github, 
   Cloud, 
@@ -23,12 +24,14 @@ import { useConnectionsRealtime, Connection } from '@/hooks/useConnectionsRealti
 import { toast } from 'sonner';
 
 const ConnectionsPanel = () => {
+  const [showWizard, setShowWizard] = useState(false);
   const { 
     connections, 
     loading, 
     validatingId, 
     isConnected,
-    validateAzureConnection 
+    validateAzureConnection,
+    refetch
   } = useConnectionsRealtime();
 
   const handleValidate = async (connectionId: string) => {
@@ -92,7 +95,7 @@ const ConnectionsPanel = () => {
               Manage GitHub, Kubernetes, and Vault integrations — Real-time validated
             </p>
           </div>
-          <Button className="gap-2">
+          <Button className="gap-2" onClick={() => setShowWizard(true)}>
             <Plus className="w-4 h-4" />
             Add Connection
           </Button>
@@ -117,7 +120,7 @@ const ConnectionsPanel = () => {
               />
             ))}
             {connectionsByType.github.length === 0 && (
-              <EmptyState type="GitHub repository" />
+              <EmptyState type="GitHub repository" onAdd={() => setShowWizard(true)} />
             )}
           </CardContent>
         </Card>
@@ -141,7 +144,7 @@ const ConnectionsPanel = () => {
               />
             ))}
             {connectionsByType.kubernetes.length === 0 && (
-              <EmptyState type="Kubernetes cluster" />
+              <EmptyState type="Kubernetes cluster" onAdd={() => setShowWizard(true)} />
             )}
           </CardContent>
         </Card>
@@ -165,11 +168,20 @@ const ConnectionsPanel = () => {
               />
             ))}
             {connectionsByType.vault.length === 0 && (
-              <EmptyState type="Vault" />
+              <EmptyState type="Vault" onAdd={() => setShowWizard(true)} />
             )}
           </CardContent>
         </Card>
       </div>
+
+      <ConnectionCreationWizard 
+        open={showWizard}
+        onOpenChange={setShowWizard}
+        onComplete={() => {
+          setShowWizard(false);
+          refetch();
+        }}
+      />
     </ScrollArea>
   );
 };
@@ -286,11 +298,11 @@ const ConnectionItem = ({ connection, onValidate, isValidating }: ConnectionItem
   );
 };
 
-const EmptyState = ({ type }: { type: string }) => (
+const EmptyState = ({ type, onAdd }: { type: string; onAdd?: () => void }) => (
   <div className="text-center py-8 text-muted-foreground">
     <Plus className="w-8 h-8 mx-auto mb-2 opacity-50" />
     <p className="text-sm">No {type} connected</p>
-    <Button variant="link" size="sm" className="mt-2">
+    <Button variant="link" size="sm" className="mt-2" onClick={onAdd}>
       Add your first {type.toLowerCase()}
     </Button>
   </div>
