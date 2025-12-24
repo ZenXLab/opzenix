@@ -49,3 +49,7 @@ verify_jwt = false
 verify_jwt = false
 [functions.aks-validate]
 verify_jwt = false
+[functions.validate-registry]
+verify_jwt = false
+[functions.validate-otel]
+verify_jwt = false
