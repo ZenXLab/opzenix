@@ -47,3 +47,5 @@ verify_jwt = false
 verify_jwt = false
 [functions.github-validate-connection]
 verify_jwt = false
+[functions.aks-validate]
+verify_jwt = false
