@@ -9,6 +9,7 @@ import EnterpriseCapabilitiesSection from '@/components/landing/EnterpriseCapabi
 import LiveFlowPreviewSection from '@/components/landing/LiveFlowPreviewSection';
 import ComparisonSection from '@/components/landing/ComparisonSection';
 import SecuritySection from '@/components/landing/SecuritySection';
+import TestimonialsSection from '@/components/landing/TestimonialsSection';
 import AudienceSection from '@/components/landing/AudienceSection';
 import UseCasesSection from '@/components/landing/UseCasesSection';
 import FinalCTASection from '@/components/landing/FinalCTASection';
@@ -28,6 +29,7 @@ const Landing = () => {
         <HowItWorksSection />
         <ComparisonSection />
         <SecuritySection />
+        <TestimonialsSection />
         <AudienceSection />
         <UseCasesSection />
         <FinalCTASection />
