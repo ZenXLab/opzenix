@@ -19,3 +19,11 @@ verify_jwt = false
 verify_jwt = false
 [functions.pipeline-execute]
 verify_jwt = false
+[functions.github-webhook]
+verify_jwt = false
+[functions.trigger-github-workflow]
+verify_jwt = false
+[functions.rerun-from-checkpoint]
+verify_jwt = false
+[functions.fetch-node-logs]
+verify_jwt = false

@@ -221,6 +221,41 @@ export type Database = {
           },
         ]
       }
+      execution_logs: {
+        Row: {
+          created_at: string
+          execution_id: string
+          id: string
+          level: string
+          message: string
+          node_id: string
+        }
+        Insert: {
+          created_at?: string
+          execution_id: string
+          id?: string
+          level?: string
+          message: string
+          node_id: string
+        }
+        Update: {
+          created_at?: string
+          execution_id?: string
+          id?: string
+          level?: string
+          message?: string
+          node_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "execution_logs_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       execution_nodes: {
         Row: {
           completed_at: string | null
@@ -350,6 +385,90 @@ export type Database = {
           name?: string
           nodes?: Json
           type?: Database["public"]["Enums"]["flow_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      github_integrations: {
+        Row: {
+          created_at: string
+          default_branch: string
+          id: string
+          repository_name: string
+          repository_owner: string
+          updated_at: string
+          user_id: string
+          webhook_secret: string | null
+          workflow_file: string
+        }
+        Insert: {
+          created_at?: string
+          default_branch?: string
+          id?: string
+          repository_name: string
+          repository_owner: string
+          updated_at?: string
+          user_id: string
+          webhook_secret?: string | null
+          workflow_file?: string
+        }
+        Update: {
+          created_at?: string
+          default_branch?: string
+          id?: string
+          repository_name?: string
+          repository_owner?: string
+          updated_at?: string
+          user_id?: string
+          webhook_secret?: string | null
+          workflow_file?: string
+        }
+        Relationships: []
+      }
+      pipeline_templates: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          edges: Json
+          id: string
+          is_public: boolean
+          name: string
+          nodes: Json
+          popularity: number
+          stages: number
+          tags: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          edges?: Json
+          id?: string
+          is_public?: boolean
+          name: string
+          nodes?: Json
+          popularity?: number
+          stages?: number
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          edges?: Json
+          id?: string
+          is_public?: boolean
+          name?: string
+          nodes?: Json
+          popularity?: number
+          stages?: number
+          tags?: string[] | null
           updated_at?: string
         }
         Relationships: []
@@ -487,6 +606,33 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      widget_metrics: {
+        Row: {
+          id: string
+          metadata: Json | null
+          metric_name: string
+          metric_value: number | null
+          recorded_at: string
+          widget_type: string
+        }
+        Insert: {
+          id?: string
+          metadata?: Json | null
+          metric_name: string
+          metric_value?: number | null
+          recorded_at?: string
+          widget_type: string
+        }
+        Update: {
+          id?: string
+          metadata?: Json | null
+          metric_name?: string
+          metric_value?: number | null
+          recorded_at?: string
+          widget_type?: string
         }
         Relationships: []
       }
