@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react';
-import { motion, AnimatePresence, Reorder } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, TrendingUp, Activity, FileText, Terminal,
-  GitBranch, Gauge, Play, Sparkles, GripVertical, Radio,
+  GitBranch, Gauge, Sparkles, GripVertical, Radio,
   Database, Shield, Network, BarChart3, PieChart, Layers,
-  AlertTriangle, Zap, Eye, Lock, Cloud, Settings, LineChart, Github
+  AlertTriangle, Zap, Eye, Lock, Cloud, Settings, LineChart, Github,
+  RotateCcw, Save
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +22,7 @@ import EnhancedWidgetPicker from './EnhancedWidgetPicker';
 import DraggableWidget from './DraggableWidget';
 import { useFlowStore } from '@/stores/flowStore';
 import { useWidgetMetrics } from '@/hooks/useWidgetMetrics';
+import { useDashboardLayout } from '@/hooks/useDashboardLayout';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -43,14 +45,6 @@ type WidgetType = 'deployments' | 'audit' | 'metrics' | 'api' | 'pipelines' | 'l
   | 'vulnerability-scan' | 'compliance' | 'secrets-audit'
   | 'traces' | 'build-metrics' | 'test-coverage';
 
-interface Widget {
-  id: string;
-  type: WidgetType;
-  size: 'small' | 'medium' | 'large';
-  name?: string;
-  executionId?: string;
-}
-
 const ModularDashboardView = ({ 
   onViewFlows, 
   onOpenPipelineEditor,
@@ -64,16 +58,21 @@ const ModularDashboardView = ({
   const { executions, deployments, approvalRequests } = useFlowStore();
   const { aggregated, loading: metricsLoading } = useWidgetMetrics();
   const [showWidgetPicker, setShowWidgetPicker] = useState(false);
+  const [draggedWidget, setDraggedWidget] = useState<string | null>(null);
+  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   
-  const [widgets, setWidgets] = useState<Widget[]>([
-    { id: 'w1', type: 'actions', size: 'small', name: 'Quick Actions' },
-    { id: 'w2', type: 'system-health', size: 'medium', name: 'System Health' },
-    { id: 'w3', type: 'deployments', size: 'medium', name: 'Deployments' },
-    { id: 'w4', type: 'pipelines', size: 'small', name: 'Pipeline Status' },
-    { id: 'w5', type: 'audit', size: 'medium', name: 'Audit Activity' },
-    { id: 'w6', type: 'api', size: 'small', name: 'API Performance' },
-    { id: 'w7', type: 'logs', size: 'large', name: 'Log Stream' },
-  ]);
+  // Use persistent dashboard layout
+  const {
+    widgets,
+    loading: layoutLoading,
+    saving,
+    addWidget,
+    removeWidget,
+    renameWidget,
+    duplicateWidget,
+    moveWidget,
+    resetLayout
+  } = useDashboardLayout();
 
   // Use real-time aggregated metrics or fallback to store data
   const activeExecutions = aggregated.activeFlows || executions.filter(e => e.status === 'running').length;
@@ -84,33 +83,26 @@ const ModularDashboardView = ({
   const pendingApprovals = aggregated.pendingApprovals || approvalRequests.filter(a => a.status === 'pending').length;
 
   const handleRemoveWidget = useCallback((id: string) => {
-    setWidgets(prev => prev.filter(w => w.id !== id));
+    removeWidget(id);
     toast.success('Widget removed');
-  }, []);
+  }, [removeWidget]);
 
   const handleRenameWidget = useCallback((id: string, newName: string) => {
-    setWidgets(prev => prev.map(w => 
-      w.id === id ? { ...w, name: newName } : w
-    ));
-  }, []);
+    renameWidget(id, newName);
+  }, [renameWidget]);
 
   const handleDuplicateWidget = useCallback((id: string) => {
-    const widget = widgets.find(w => w.id === id);
-    if (widget) {
-      setWidgets(prev => [...prev, { 
-        ...widget, 
-        id: `w-${Date.now()}`,
-        name: `${widget.name || widget.type} (copy)`
-      }]);
-    }
-  }, [widgets]);
+    duplicateWidget(id);
+    toast.success('Widget duplicated');
+  }, [duplicateWidget]);
 
   const handleAddWidget = (type: string) => {
-    const sizeMap: Record<string, Widget['size']> = {
+    const sizeMap: Record<string, 'small' | 'medium' | 'large'> = {
       'logs': 'large',
       'deployments': 'medium',
       'audit': 'medium',
       'traces': 'large',
+      'system-health': 'medium',
     };
     const nameMap: Record<string, string> = {
       'deployments': 'Deployments',
@@ -120,30 +112,50 @@ const ModularDashboardView = ({
       'pipelines': 'Pipeline Status',
       'logs': 'Log Stream',
       'actions': 'Quick Actions',
+      'system-health': 'System Health',
       'model-registry': 'Model Registry',
       'k8s-clusters': 'K8s Clusters',
       'vulnerability-scan': 'Vulnerability Scan',
     };
     
-    // Generate unique execution ID for tracking
-    const executionId = `exec-${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    setWidgets(prev => [...prev, { 
-      id: `w-${Date.now()}`, 
-      type: type as WidgetType, 
-      size: sizeMap[type] || 'small',
-      name: nameMap[type] || type.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      executionId,
-    }]);
+    addWidget(type, nameMap[type] || type.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), sizeMap[type] || 'small');
     setShowWidgetPicker(false);
     toast.success('Widget added');
   };
 
-  const handleReorder = (newOrder: Widget[]) => {
-    setWidgets(newOrder);
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, widgetId: string) => {
+    setDraggedWidget(widgetId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', widgetId);
   };
 
-  const renderWidgetContent = (widget: Widget) => {
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDropTargetIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDropTargetIndex(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, toIndex: number) => {
+    e.preventDefault();
+    const fromIndex = widgets.findIndex(w => w.id === draggedWidget);
+    if (fromIndex !== -1 && fromIndex !== toIndex) {
+      moveWidget(fromIndex, toIndex);
+    }
+    setDraggedWidget(null);
+    setDropTargetIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedWidget(null);
+    setDropTargetIndex(null);
+  };
+
+  const renderWidgetContent = (widget: { id: string; type: string }) => {
     const commonProps = { 
       id: widget.id, 
       onRemove: handleRemoveWidget,
@@ -180,8 +192,8 @@ const ModularDashboardView = ({
     }
   };
 
-  const getWidgetIcon = (type: WidgetType) => {
-    const iconMap: Record<WidgetType, React.ReactNode> = {
+  const getWidgetIcon = (type: string) => {
+    const iconMap: Record<string, React.ReactNode> = {
       'deployments': <TrendingUp className="w-4 h-4 text-ai-primary" />,
       'audit': <FileText className="w-4 h-4 text-muted-foreground" />,
       'metrics': <Gauge className="w-4 h-4 text-sec-safe" />,
@@ -214,6 +226,17 @@ const ModularDashboardView = ({
     };
     return iconMap[type] || <Layers className="w-4 h-4" />;
   };
+
+  if (layoutLoading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm text-muted-foreground">Loading dashboard...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -261,14 +284,25 @@ const ModularDashboardView = ({
                 <Plus className="w-3.5 h-3.5" />
                 Add Widget
               </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="gap-1.5"
+                onClick={resetLayout}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </Button>
               <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-sec-safe/10 text-sec-safe text-xs font-medium">
-                <span className="w-1.5 h-1.5 rounded-full bg-sec-safe animate-pulse" />
-                {metricsLoading ? 'Loading...' : 'Live'}
+                <span className={cn(
+                  "w-1.5 h-1.5 rounded-full",
+                  saving ? "bg-sec-warning animate-pulse" : "bg-sec-safe animate-pulse"
+                )} />
+                {saving ? 'Saving...' : metricsLoading ? 'Loading...' : 'Live'}
               </span>
             </div>
           </div>
 
-          {/* Key Metrics - Now Clickable */}
+          {/* Key Metrics */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <ClickableMetricCard 
               label="Active Flows" 
@@ -309,47 +343,68 @@ const ModularDashboardView = ({
             />
           </div>
 
-          {/* Reorderable Widgets Grid with proper drag-drop */}
-          <Reorder.Group 
-            axis="y" 
-            values={widgets} 
-            onReorder={handleReorder}
-            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-min"
-            style={{ touchAction: 'pan-y' }}
-          >
-            {widgets.map((widget) => (
-              <Reorder.Item
-                key={widget.id}
-                value={widget}
-                className={cn(
-                  "cursor-grab active:cursor-grabbing",
-                  widget.size === 'large' && "md:col-span-2",
-                  widget.type === 'audit' && "md:row-span-2"
-                )}
-                whileDrag={{ 
-                  scale: 1.02, 
-                  zIndex: 50,
-                  boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-                }}
-                dragConstraints={{ top: 0, bottom: 0, left: 0, right: 0 }}
-                dragElastic={0.1}
-              >
-                <DraggableWidget
-                  id={widget.id}
-                  title={widget.name || widget.type}
-                  icon={getWidgetIcon(widget.type)}
-                  onRemove={handleRemoveWidget}
-                  onRename={handleRenameWidget}
-                  onDuplicate={handleDuplicateWidget}
-                  size={widget.size}
-                  widgetType={widget.type}
-                  executionId={widget.executionId}
+          {/* Widgets Grid with HTML5 Drag and Drop */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-min">
+            <AnimatePresence mode="popLayout">
+              {widgets.map((widget, index) => (
+                <motion.div
+                  key={widget.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ 
+                    opacity: draggedWidget === widget.id ? 0.5 : 1, 
+                    scale: 1,
+                    y: dropTargetIndex === index && draggedWidget !== widget.id ? 8 : 0
+                  }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.2 }}
+                  className={cn(
+                    "relative",
+                    widget.size === 'large' && "md:col-span-2",
+                    widget.size === 'medium' && widget.type === 'audit' && "md:row-span-2",
+                    dropTargetIndex === index && draggedWidget !== widget.id && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg"
+                  )}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e as any, widget.id)}
+                  onDragOver={(e) => handleDragOver(e as any, index)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e as any, index)}
+                  onDragEnd={handleDragEnd}
                 >
-                  {renderWidgetContent(widget)}
-                </DraggableWidget>
-              </Reorder.Item>
-            ))}
-          </Reorder.Group>
+                  <DraggableWidget
+                    id={widget.id}
+                    title={widget.name || widget.type}
+                    icon={getWidgetIcon(widget.type)}
+                    onRemove={handleRemoveWidget}
+                    onRename={handleRenameWidget}
+                    onDuplicate={handleDuplicateWidget}
+                    size={widget.size}
+                    widgetType={widget.type}
+                    executionId={widget.executionId}
+                  >
+                    {renderWidgetContent(widget)}
+                  </DraggableWidget>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+
+          {/* Empty state */}
+          {widgets.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="w-16 h-16 rounded-full bg-secondary/50 flex items-center justify-center mb-4">
+                <Layers className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-medium text-foreground mb-2">No widgets yet</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Add widgets to customize your dashboard
+              </p>
+              <Button onClick={() => setShowWidgetPicker(true)} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Add Your First Widget
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
