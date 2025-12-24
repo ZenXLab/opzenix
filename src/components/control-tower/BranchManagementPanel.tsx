@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   GitBranch, Plus, Trash2, Check, X, RefreshCw, Settings,
-  ArrowRight, Lock, Unlock, AlertTriangle, CheckCircle2
+  ArrowRight, Lock, Unlock, AlertTriangle, CheckCircle2, Info, Clock, XCircle
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,9 +26,17 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { GitHubConnectionPanel } from '@/components/connect/GitHubConnectionPanel';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface BranchMapping {
   id: string;
@@ -45,6 +53,15 @@ interface GitHubIntegration {
   repository_name: string;
 }
 
+interface BlockedExecution {
+  id: string;
+  name: string;
+  branch: string;
+  blocked_reason: string;
+  started_at: string;
+  environment: string;
+}
+
 const ENVIRONMENTS = ['DEV', 'UAT', 'Staging', 'PreProd', 'Prod'];
 
 const DEFAULT_MAPPINGS = [
@@ -57,12 +74,23 @@ const DEFAULT_MAPPINGS = [
   { pattern: 'main', environment: 'Prod', description: 'Main branch deploys to Prod' },
 ];
 
+const EXAMPLE_MAPPINGS = [
+  { pattern: 'main', target: 'Production', description: 'Protected releases only' },
+  { pattern: 'release/*', target: 'UAT', description: 'Pre-release testing' },
+  { pattern: 'develop', target: 'Development', description: 'Integration testing' },
+];
+
 export const BranchManagementPanel = () => {
+  const { role: userRole, isAdmin, isOperator } = useUserRole();
+  const isViewer = !isAdmin && !isOperator;
+  
   const [integrations, setIntegrations] = useState<GitHubIntegration[]>([]);
   const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null);
   const [mappings, setMappings] = useState<BranchMapping[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showGitHubPanel, setShowGitHubPanel] = useState(false);
+  const [blockedExecutions, setBlockedExecutions] = useState<BlockedExecution[]>([]);
   const [newMapping, setNewMapping] = useState({
     branch_pattern: '',
     environment: 'DEV',
@@ -71,17 +99,46 @@ export const BranchManagementPanel = () => {
 
   useEffect(() => {
     fetchIntegrations();
-  }, []);
+    fetchBlockedExecutions();
+    
+    // Subscribe to realtime updates
+    const channel = supabase
+      .channel('branch-mappings-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'branch_mappings',
+      }, () => {
+        if (selectedIntegration) fetchMappings(selectedIntegration);
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'github_integrations',
+      }, () => {
+        fetchIntegrations();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'executions',
+        filter: 'governance_status=eq.blocked',
+      }, () => {
+        fetchBlockedExecutions();
+      })
+      .subscribe();
 
-  useEffect(() => {
-    if (selectedIntegration) {
-      fetchMappings(selectedIntegration);
-    }
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [selectedIntegration]);
 
   const fetchIntegrations = async () => {
     const { data: user } = await supabase.auth.getUser();
-    if (!user.user) return;
+    if (!user.user) {
+      setLoading(false);
+      return;
+    }
 
     const { data, error } = await supabase
       .from('github_integrations')
@@ -106,6 +163,19 @@ export const BranchManagementPanel = () => {
 
     if (!error && data) {
       setMappings(data);
+    }
+  };
+
+  const fetchBlockedExecutions = async () => {
+    const { data, error } = await supabase
+      .from('executions')
+      .select('id, name, branch, blocked_reason, started_at, environment')
+      .eq('governance_status', 'blocked')
+      .order('started_at', { ascending: false })
+      .limit(5);
+
+    if (!error && data) {
+      setBlockedExecutions(data as BlockedExecution[]);
     }
   };
 
@@ -135,6 +205,11 @@ export const BranchManagementPanel = () => {
   };
 
   const handleDeleteMapping = async (id: string) => {
+    if (isViewer) {
+      toast.error('Viewers cannot delete mappings');
+      return;
+    }
+
     const { error } = await supabase
       .from('branch_mappings')
       .delete()
@@ -149,6 +224,11 @@ export const BranchManagementPanel = () => {
   };
 
   const handleToggleDeployable = async (mapping: BranchMapping) => {
+    if (isViewer) {
+      toast.error('Viewers cannot modify mappings');
+      return;
+    }
+
     const { error } = await supabase
       .from('branch_mappings')
       .update({ is_deployable: !mapping.is_deployable })
@@ -179,6 +259,12 @@ export const BranchManagementPanel = () => {
 
     toast.success('Default mappings applied');
     fetchMappings(selectedIntegration);
+  };
+
+  const handleGitHubConnected = () => {
+    setShowGitHubPanel(false);
+    fetchIntegrations();
+    toast.success('GitHub repository connected successfully!');
   };
 
   const getEnvironmentColor = (env: string) => {
@@ -212,7 +298,12 @@ export const BranchManagementPanel = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {selectedIntegration && (
+            {isViewer && (
+              <Badge variant="outline" className="text-muted-foreground">
+                View Only
+              </Badge>
+            )}
+            {selectedIntegration && !isViewer && (
               <>
                 <Button variant="outline" onClick={applyDefaultMappings}>
                   <RefreshCw className="w-4 h-4 mr-2" />
@@ -248,6 +339,14 @@ export const BranchManagementPanel = () => {
                     ))}
                   </SelectContent>
                 </Select>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setShowGitHubPanel(true)}
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Repository
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -259,9 +358,25 @@ export const BranchManagementPanel = () => {
               <p className="text-sm text-muted-foreground mb-4">
                 Connect a GitHub repository first to manage branch mappings.
               </p>
-              <Button variant="outline">
+              <Button onClick={() => setShowGitHubPanel(true)}>
                 Connect GitHub Repository
               </Button>
+              
+              {/* Inline Examples */}
+              <div className="mt-6 p-4 bg-muted/50 rounded-lg text-left max-w-md mx-auto">
+                <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                  <Info className="w-3 h-3" />
+                  Example Mappings
+                </p>
+                <div className="space-y-1 font-mono text-xs">
+                  {EXAMPLE_MAPPINGS.map((ex, i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <code className="text-foreground">{ex.pattern}</code>
+                      <span className="text-muted-foreground">→ {ex.target}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -282,6 +397,39 @@ export const BranchManagementPanel = () => {
           </CardContent>
         </Card>
 
+        {/* Blocked Branch Attempts Preview */}
+        {blockedExecutions.length > 0 && (
+          <Card className="border-sec-critical/30 bg-sec-critical/5">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <XCircle className="w-4 h-4 text-sec-critical" />
+                Recent Blocked Attempts
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="space-y-2">
+                {blockedExecutions.slice(0, 3).map((exec) => (
+                  <div 
+                    key={exec.id} 
+                    className="flex items-center justify-between p-2 rounded bg-background/50 text-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      <GitBranch className="w-3 h-3 text-muted-foreground" />
+                      <code className="font-mono text-xs">{exec.branch || 'unknown'}</code>
+                      <ArrowRight className="w-3 h-3 text-muted-foreground" />
+                      <Badge variant="outline" className="text-xs">{exec.environment}</Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock className="w-3 h-3" />
+                      {new Date(exec.started_at).toLocaleTimeString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Mappings by Environment */}
         {selectedIntegration && (
           <div className="space-y-4">
@@ -298,13 +446,31 @@ export const BranchManagementPanel = () => {
                       </span>
                     </div>
                     {environment === 'DEV' ? (
-                      <Badge variant="outline" className="gap-1">
-                        <Unlock className="w-3 h-3" /> Unlocked
-                      </Badge>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="outline" className="gap-1 cursor-help">
+                              <Unlock className="w-3 h-3" /> Unlocked
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>DEV environment is open for all deployments</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     ) : (
-                      <Badge variant="outline" className="gap-1 text-sec-warning">
-                        <Lock className="w-3 h-3" /> Locked
-                      </Badge>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="outline" className="gap-1 text-sec-warning cursor-help">
+                              <Lock className="w-3 h-3" /> Locked
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Locked by policy. Requires {environment === 'Prod' || environment === 'PreProd' ? 'Admin' : 'Operator'} role.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                   </div>
                 </CardHeader>
@@ -333,23 +499,31 @@ export const BranchManagementPanel = () => {
                             </Badge>
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-2">
-                              <Switch
-                                checked={mapping.is_deployable}
-                                onCheckedChange={() => handleToggleDeployable(mapping)}
-                              />
-                              <span className="text-xs text-muted-foreground">
-                                {mapping.is_deployable ? 'Deployable' : 'Blocked'}
-                              </span>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-sec-critical"
-                              onClick={() => handleDeleteMapping(mapping.id)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                            {!isViewer ? (
+                              <>
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={mapping.is_deployable}
+                                    onCheckedChange={() => handleToggleDeployable(mapping)}
+                                  />
+                                  <span className="text-xs text-muted-foreground">
+                                    {mapping.is_deployable ? 'Deployable' : 'Blocked'}
+                                  </span>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-sec-critical"
+                                  onClick={() => handleDeleteMapping(mapping.id)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
+                            ) : (
+                              <Badge variant="outline" className={mapping.is_deployable ? 'text-sec-safe' : 'text-sec-critical'}>
+                                {mapping.is_deployable ? 'Allowed' : 'Blocked'}
+                              </Badge>
+                            )}
                           </div>
                         </motion.div>
                       ))}
@@ -423,6 +597,13 @@ export const BranchManagementPanel = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* GitHub Connection Panel */}
+        <GitHubConnectionPanel
+          isOpen={showGitHubPanel}
+          onClose={() => setShowGitHubPanel(false)}
+          onConnected={handleGitHubConnected}
+        />
       </div>
     </ScrollArea>
   );
