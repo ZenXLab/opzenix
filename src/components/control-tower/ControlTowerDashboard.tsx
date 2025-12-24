@@ -28,6 +28,7 @@ import { useConnectionsRealtime, Connection } from '@/hooks/useConnectionsRealti
 import { useControlTowerRealtime } from '@/hooks/useControlTowerRealtime';
 import SystemRiskBanner from './SystemRiskBanner';
 import LastApprovalIndicator from './LastApprovalIndicator';
+import EmptyStateGuidance from './EmptyStateGuidance';
 
 interface ControlTowerDashboardProps {
   onViewExecution?: (executionId: string) => void;
@@ -210,10 +211,7 @@ const ControlTowerDashboard = ({
                   <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                 </div>
               ) : connections.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Link2 className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No connections configured</p>
-                </div>
+                <EmptyStateGuidance type="connections" onAction={onOpenConnections} />
               ) : (
                 connections.map((conn) => {
                   const Icon = getConnectionIcon(conn.type);
@@ -268,10 +266,7 @@ const ControlTowerDashboard = ({
                   <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                 </div>
               ) : environments.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Globe className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No environments configured</p>
-                </div>
+                <EmptyStateGuidance type="environments" onAction={onOpenEnvironments} />
               ) : (
                 environments.map((env) => (
                   <div 
@@ -344,10 +339,7 @@ const ControlTowerDashboard = ({
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>
             ) : executions.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No active executions</p>
-              </div>
+              <EmptyStateGuidance type="executions" onAction={onOpenConnections} />
             ) : (
               <div className="space-y-3">
                 {executions.map((exec) => (
