@@ -29,6 +29,7 @@ import { useControlTowerRealtime } from '@/hooks/useControlTowerRealtime';
 import SystemRiskBanner from './SystemRiskBanner';
 import LastApprovalIndicator from './LastApprovalIndicator';
 import EmptyStateGuidance from './EmptyStateGuidance';
+import { ConnectionGatingBanner } from './ConnectionGatingBanner';
 
 interface ControlTowerDashboardProps {
   onViewExecution?: (executionId: string) => void;
@@ -170,6 +171,9 @@ const ControlTowerDashboard = ({
             <span className="text-sm text-sec-warning">Live connection lost — data may be stale</span>
           </div>
         )}
+
+        {/* Connection Gating Banner */}
+        <ConnectionGatingBanner onOpenConnections={onOpenConnections} />
 
         {/* System Risk Banner */}
         <SystemRiskBanner onViewApprovals={onOpenApprovals} onViewExecution={onViewExecution} />

@@ -302,16 +302,16 @@ const DeploymentHistoryPanel = () => {
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-6 max-w-5xl mx-auto space-y-6">
+      <div className="p-6 max-w-6xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-2xl font-semibold text-foreground">Deployment History</h1>
             <p className="text-sm text-muted-foreground mt-1">
               Real deployment records from your environments
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Button 
               variant="outline" 
               size="sm" 
@@ -323,7 +323,7 @@ const DeploymentHistoryPanel = () => {
               Test Execution
             </Button>
             <Select value={selectedEnv} onValueChange={setSelectedEnv}>
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-44">
                 <Filter className="w-4 h-4 mr-2" />
                 <SelectValue placeholder="All environments" />
               </SelectTrigger>
@@ -343,43 +343,46 @@ const DeploymentHistoryPanel = () => {
           </div>
         </div>
 
-        {/* Environment Tabs */}
-        {selectedEnv === 'all' && environments.length > 0 && (
-          <Tabs defaultValue={environments[0]?.environment || 'development'} className="w-full">
-            <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${environments.length}, 1fr)` }}>
-              {environments.map(env => (
-                <TabsTrigger key={env.id} value={env.environment} className="capitalize">
-                  {env.name}
-                  <Badge variant="secondary" className="ml-2 text-[10px] h-4 px-1">
-                    {groupedByEnv[env.environment]?.length || 0}
-                  </Badge>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            {environments.map(env => (
-              <TabsContent key={env.id} value={env.environment} className="mt-4">
-                <DeploymentList 
-                  deployments={groupedByEnv[env.environment] || []}
-                  loading={loading}
-                  getStatusIcon={getStatusIcon}
-                  getEnvironmentColor={getEnvironmentColor}
-                  onRollback={setRollbackTarget}
-                />
-              </TabsContent>
-            ))}
-          </Tabs>
+        {/* Environment Filter Chips */}
+        {environments.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge
+              variant={selectedEnv === 'all' ? 'default' : 'outline'}
+              className="cursor-pointer px-3 py-1.5 text-xs"
+              onClick={() => setSelectedEnv('all')}
+            >
+              All ({deployments.length})
+            </Badge>
+            {environments.map(env => {
+              const count = deployments.filter(d => d.environment === env.environment).length;
+              const isSelected = selectedEnv === env.environment;
+              return (
+                <Badge
+                  key={env.id}
+                  variant={isSelected ? 'default' : 'outline'}
+                  className={cn(
+                    'cursor-pointer px-3 py-1.5 text-xs transition-colors',
+                    env.environment.toLowerCase().includes('prod') && isSelected && 'bg-sec-critical text-white',
+                    env.environment.toLowerCase().includes('uat') && isSelected && 'bg-sec-warning text-white',
+                    env.environment.toLowerCase().includes('dev') && isSelected && 'bg-sec-safe text-white',
+                  )}
+                  onClick={() => setSelectedEnv(env.environment)}
+                >
+                  {env.name} ({count})
+                </Badge>
+              );
+            })}
+          </div>
         )}
 
-        {/* Single List when filtered */}
-        {(selectedEnv !== 'all' || environments.length === 0) && (
-          <DeploymentList 
-            deployments={deployments}
-            loading={loading}
-            getStatusIcon={getStatusIcon}
-            getEnvironmentColor={getEnvironmentColor}
-            onRollback={setRollbackTarget}
-          />
-        )}
+        {/* Deployments List */}
+        <DeploymentList 
+          deployments={selectedEnv === 'all' ? deployments : deployments.filter(d => d.environment === selectedEnv)}
+          loading={loading}
+          getStatusIcon={getStatusIcon}
+          getEnvironmentColor={getEnvironmentColor}
+          onRollback={setRollbackTarget}
+        />
 
         {/* Rollback Confirmation Dialog */}
         <RollbackDialog
@@ -418,9 +421,11 @@ const DeploymentList = ({
 
   if (deployments.length === 0) {
     return (
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <History className="w-12 h-12 text-muted-foreground mb-4" />
+      <Card className="border-dashed border-2 border-muted">
+        <CardContent className="flex flex-col items-center justify-center py-16">
+          <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+            <History className="w-8 h-8 text-muted-foreground" />
+          </div>
           <h3 className="text-lg font-semibold text-foreground mb-2">No Deployments Yet</h3>
           <p className="text-sm text-muted-foreground text-center max-w-md">
             Deployments will appear here once executions complete and deploy to environments.

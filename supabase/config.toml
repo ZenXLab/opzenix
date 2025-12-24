@@ -45,3 +45,5 @@ verify_jwt = false
 verify_jwt = false
 [functions.connection-health-check]
 verify_jwt = false
+[functions.github-validate-connection]
+verify_jwt = false
