@@ -108,7 +108,17 @@ export const useWidgetMetrics = () => {
         .order('recorded_at', { ascending: false })
         .limit(100);
 
-      setMetrics(widgetMetrics || []);
+      // Map the data to ensure proper types
+      const mappedMetrics: WidgetMetric[] = (widgetMetrics || []).map((m: any) => ({
+        id: m.id,
+        widget_type: m.widget_type,
+        metric_name: m.metric_name,
+        metric_value: m.metric_value,
+        metadata: (typeof m.metadata === 'object' && m.metadata !== null ? m.metadata : {}) as Record<string, any>,
+        recorded_at: m.recorded_at,
+      }));
+
+      setMetrics(mappedMetrics);
     } catch (err) {
       console.error('Failed to fetch metrics:', err);
     } finally {

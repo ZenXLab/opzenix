@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { AnimatePresence } from 'framer-motion';
 import AppSidebar from '@/components/layout/AppSidebar';
@@ -10,6 +10,7 @@ import ApprovalPanel from '@/components/governance/ApprovalPanel';
 import AuditLogViewer from '@/components/governance/AuditLogViewer';
 import ModularDashboardView from '@/components/dashboard/ModularDashboardView';
 import GitConnectionWizard from '@/components/connect/GitConnectionWizard';
+import GitHubConnectionPanel from '@/components/connect/GitHubConnectionPanel';
 import SpeechPanel from '@/components/speech/SpeechPanel';
 import VisualPipelineEditor from '@/components/pipeline/VisualPipelineEditor';
 import EnvironmentManager from '@/components/environments/EnvironmentManager';
@@ -18,6 +19,7 @@ import CheckpointRollbackPanel from '@/components/checkpoint/CheckpointRollbackP
 import AlertsPanel from '@/components/alerts/AlertsPanel';
 import TelemetryPanel from '@/components/telemetry/TelemetryPanel';
 import ExecutionHistoryPanel from '@/components/execution/ExecutionHistoryPanel';
+import PipelineTemplatesGallery from '@/components/templates/PipelineTemplatesGallery';
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
 import { useFlowStore } from '@/stores/flowStore';
 import { toast } from 'sonner';
@@ -26,6 +28,7 @@ import { Node, Edge } from '@xyflow/react';
 const Index = () => {
   const [isAuditLogOpen, setAuditLogOpen] = useState(false);
   const [isGitWizardOpen, setGitWizardOpen] = useState(false);
+  const [isGitHubPanelOpen, setGitHubPanelOpen] = useState(false);
   const [isSpeechOpen, setSpeechOpen] = useState(false);
   const [isPipelineEditorOpen, setPipelineEditorOpen] = useState(false);
   const [isEnvironmentManagerOpen, setEnvironmentManagerOpen] = useState(false);
@@ -34,15 +37,47 @@ const Index = () => {
   const [isAlertsOpen, setAlertsOpen] = useState(false);
   const [isTelemetryOpen, setTelemetryOpen] = useState(false);
   const [isExecutionHistoryOpen, setExecutionHistoryOpen] = useState(false);
+  const [isTemplatesGalleryOpen, setTemplatesGalleryOpen] = useState(false);
   const { activeView, setActiveView, selectedExecution, activeFlowType } = useFlowStore();
   
+  // Enable realtime updates
   useRealtimeUpdates();
 
-  const handleWizardComplete = (nodes: Node[], edges: Edge[], config: any) => {
+  const handleWizardComplete = useCallback((nodes: Node[], edges: Edge[], config: any) => {
     console.log('Pipeline created:', { nodes, edges, config });
     toast.success(`Created ${config.repository.language || 'custom'} pipeline with ${nodes.length} stages`);
     setPipelineEditorOpen(true);
-  };
+  }, []);
+
+  const handleTemplateSelect = useCallback((nodes: Node[], edges: Edge[]) => {
+    console.log('Template selected:', { nodes, edges });
+    toast.success(`Loaded template with ${nodes.length} stages`);
+    setTemplatesGalleryOpen(false);
+    setPipelineEditorOpen(true);
+  }, []);
+
+  const handleGitHubConnected = useCallback((config: any) => {
+    console.log('GitHub connected:', config);
+    toast.success(`Connected to ${config.owner}/${config.repo}`);
+  }, []);
+
+  // Handle metric card clicks - navigate to relevant section
+  const handleMetricClick = useCallback((metricType: string) => {
+    switch (metricType) {
+      case 'active-flows':
+        setActiveView('flows');
+        break;
+      case 'deployments':
+        setActiveView('flows');
+        setExecutionHistoryOpen(true);
+        break;
+      case 'pending':
+        // Open approval panel
+        break;
+      default:
+        break;
+    }
+  }, [setActiveView]);
 
   return (
     <ReactFlowProvider>
@@ -68,6 +103,10 @@ const Index = () => {
                 onOpenPipelineEditor={() => setPipelineEditorOpen(true)}
                 onOpenEnvironmentManager={() => setEnvironmentManagerOpen(true)}
                 onOpenOpzenixWizard={() => setOpzenixWizardOpen(true)}
+                onOpenTemplatesGallery={() => setTemplatesGalleryOpen(true)}
+                onOpenGitHubConnection={() => setGitHubPanelOpen(true)}
+                onOpenExecutionHistory={() => setExecutionHistoryOpen(true)}
+                onMetricClick={handleMetricClick}
               />
             ) : (
               <FlowCanvas key="flows" />
@@ -82,6 +121,11 @@ const Index = () => {
         <ApprovalPanel />
         <AuditLogViewer isOpen={isAuditLogOpen} onClose={() => setAuditLogOpen(false)} />
         <GitConnectionWizard isOpen={isGitWizardOpen} onClose={() => setGitWizardOpen(false)} />
+        <GitHubConnectionPanel 
+          isOpen={isGitHubPanelOpen} 
+          onClose={() => setGitHubPanelOpen(false)}
+          onConnected={handleGitHubConnected}
+        />
         <SpeechPanel isOpen={isSpeechOpen} onClose={() => setSpeechOpen(false)} />
         <VisualPipelineEditor isOpen={isPipelineEditorOpen} onClose={() => setPipelineEditorOpen(false)} />
         <EnvironmentManager isOpen={isEnvironmentManagerOpen} onClose={() => setEnvironmentManagerOpen(false)} />
@@ -107,6 +151,11 @@ const Index = () => {
           isOpen={isExecutionHistoryOpen}
           onClose={() => setExecutionHistoryOpen(false)}
           flowType={activeFlowType}
+        />
+        <PipelineTemplatesGallery
+          isOpen={isTemplatesGalleryOpen}
+          onClose={() => setTemplatesGalleryOpen(false)}
+          onSelectTemplate={handleTemplateSelect}
         />
       </div>
     </ReactFlowProvider>
