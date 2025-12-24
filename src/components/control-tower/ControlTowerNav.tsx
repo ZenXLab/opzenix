@@ -43,6 +43,12 @@ const navItems = [
     badge: 'live'
   },
   { 
+    id: 'execution-builder', 
+    label: 'Execution Builder', 
+    icon: Play, 
+    description: 'Build and configure pipelines'
+  },
+  { 
     id: 'deployments', 
     label: 'Deployments', 
     icon: History, 

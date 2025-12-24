@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import ConnectionCreationWizard from './ConnectionCreationWizard';
+import ConnectionDetailsPanel from './ConnectionDetailsPanel';
 import { 
   Github, 
   Cloud, 
@@ -25,6 +26,7 @@ import { toast } from 'sonner';
 
 const ConnectionsPanel = () => {
   const [showWizard, setShowWizard] = useState(false);
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const { 
     connections, 
     loading, 
@@ -33,6 +35,8 @@ const ConnectionsPanel = () => {
     validateAzureConnection,
     refetch
   } = useConnectionsRealtime();
+  
+  const selectedConnection = connections.find(c => c.id === selectedConnectionId);
 
   const handleValidate = async (connectionId: string) => {
     const conn = connections.find(c => c.id === connectionId);
@@ -117,6 +121,7 @@ const ConnectionsPanel = () => {
                 connection={conn} 
                 onValidate={handleValidate}
                 isValidating={validatingId === conn.id}
+                onClick={() => setSelectedConnectionId(conn.id)}
               />
             ))}
             {connectionsByType.github.length === 0 && (
@@ -141,6 +146,7 @@ const ConnectionsPanel = () => {
                 connection={conn} 
                 onValidate={handleValidate}
                 isValidating={validatingId === conn.id}
+                onClick={() => setSelectedConnectionId(conn.id)}
               />
             ))}
             {connectionsByType.kubernetes.length === 0 && (
@@ -165,6 +171,7 @@ const ConnectionsPanel = () => {
                 connection={conn} 
                 onValidate={handleValidate}
                 isValidating={validatingId === conn.id}
+                onClick={() => setSelectedConnectionId(conn.id)}
               />
             ))}
             {connectionsByType.vault.length === 0 && (
@@ -182,6 +189,14 @@ const ConnectionsPanel = () => {
           refetch();
         }}
       />
+
+      {selectedConnection && (
+        <ConnectionDetailsPanel
+          connection={selectedConnection}
+          onClose={() => setSelectedConnectionId(null)}
+          onConnectionUpdated={refetch}
+        />
+      )}
     </ScrollArea>
   );
 };
@@ -190,9 +205,10 @@ interface ConnectionItemProps {
   connection: Connection;
   onValidate: (id: string) => void;
   isValidating: boolean;
+  onClick?: () => void;
 }
 
-const ConnectionItem = ({ connection, onValidate, isValidating }: ConnectionItemProps) => {
+const ConnectionItem = ({ connection, onValidate, isValidating, onClick }: ConnectionItemProps) => {
   const Icon = {
     github: Github,
     kubernetes: Cloud,
@@ -229,13 +245,14 @@ const ConnectionItem = ({ connection, onValidate, isValidating }: ConnectionItem
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
+      onClick={onClick}
       className={cn(
-        'flex items-center justify-between p-4 rounded-lg border transition-colors',
-        connection.status === 'connected' && 'bg-sec-safe/5 border-sec-safe/20',
-        connection.status === 'error' && 'bg-sec-critical/5 border-sec-critical/20',
-        connection.status === 'invalid' && 'bg-sec-critical/5 border-sec-critical/20',
-        connection.status === 'rate-limited' && 'bg-sec-warning/5 border-sec-warning/20',
-        connection.status === 'validating' && 'bg-muted/30 border-border',
+        'flex items-center justify-between p-4 rounded-lg border transition-colors cursor-pointer hover:shadow-md',
+        connection.status === 'connected' && 'bg-sec-safe/5 border-sec-safe/20 hover:bg-sec-safe/10',
+        connection.status === 'error' && 'bg-sec-critical/5 border-sec-critical/20 hover:bg-sec-critical/10',
+        connection.status === 'invalid' && 'bg-sec-critical/5 border-sec-critical/20 hover:bg-sec-critical/10',
+        connection.status === 'rate-limited' && 'bg-sec-warning/5 border-sec-warning/20 hover:bg-sec-warning/10',
+        connection.status === 'validating' && 'bg-muted/30 border-border hover:bg-muted/50',
       )}
     >
       <div className="flex items-center gap-4">

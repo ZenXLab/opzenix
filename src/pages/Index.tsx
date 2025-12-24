@@ -34,6 +34,7 @@ import { ImplementationReport } from '@/components/reports/ImplementationReport'
 import { ComplianceAuditPanel } from '@/components/compliance/ComplianceAuditPanel';
 import { VaultAdapterPanel } from '@/components/vault/VaultAdapterPanel';
 import { AzureIntegrationPanel } from '@/components/azure/AzureIntegrationPanel';
+import ExecutionBuilderPanel from '@/components/control-tower/ExecutionBuilderPanel';
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
@@ -142,6 +143,8 @@ const Index = () => {
         );
       case 'deployments':
         return <DeploymentHistoryPanel />;
+      case 'execution-builder':
+        return <ExecutionBuilderPanel />;
       case 'branch-management':
         return <BranchManagementPanel />;
       case 'environment-locks':
