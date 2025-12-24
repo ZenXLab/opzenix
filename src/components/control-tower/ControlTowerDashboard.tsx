@@ -32,6 +32,7 @@ import SystemRiskBanner from './SystemRiskBanner';
 import LastApprovalIndicator from './LastApprovalIndicator';
 import EmptyStateGuidance from './EmptyStateGuidance';
 import { ConnectionGatingBanner } from './ConnectionGatingBanner';
+import { VersionHistoryWidget } from './VersionHistoryWidget';
 
 interface ControlTowerDashboardProps {
   onViewExecution?: (executionId: string) => void;

@@ -25,7 +25,7 @@ import TelemetryPanel from '@/components/telemetry/TelemetryPanel';
 import ExecutionHistoryPanel from '@/components/execution/ExecutionHistoryPanel';
 import { ExecutionDetailPanel } from '@/components/execution/ExecutionDetailPanel';
 import PipelineTemplatesGallery from '@/components/templates/PipelineTemplatesGallery';
-import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
+import { EnhancedOnboardingWizard } from '@/components/onboarding/EnhancedOnboardingWizard';
 import { ValidationChecklist } from '@/components/validation/ValidationChecklist';
 import { GuidedDemoFlow } from '@/components/demo/GuidedDemoFlow';
 import { UserSettingsPanel } from '@/components/settings/UserSettingsPanel';
@@ -231,8 +231,8 @@ const Index = () => {
         onClose={() => setSettingsOpen(false)}
       />
       
-      {/* Onboarding Wizard - Auto-shows for first-time users */}
-      <OnboardingWizard 
+      {/* Enhanced Onboarding Wizard - Auto-shows for first-time users with real GitHub integration */}
+      <EnhancedOnboardingWizard 
         open={showOnboarding}
         onClose={() => setShowOnboarding(false)}
         onComplete={completeOnboarding}
