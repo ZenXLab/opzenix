@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Globe, 
@@ -7,15 +7,15 @@ import {
   Shield, 
   CheckCircle2, 
   XCircle,
-  ArrowRight,
   Trash2,
   Copy,
   MoreVertical,
   RefreshCcw,
   Zap,
-  GitBranch
+  GitBranch,
+  Loader2
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -38,6 +38,7 @@ import { toast } from 'sonner';
 interface Environment {
   id: string;
   name: string;
+  environment: string;
   strategy: 'rolling' | 'canary' | 'blue-green';
   approvalRequired: boolean;
   autoPromote: boolean;
@@ -54,80 +55,197 @@ interface Environment {
   };
 }
 
-const EnvironmentsPanel = () => {
-  const [environments, setEnvironments] = useState<Environment[]>([
-    {
-      id: '1',
-      name: 'Development',
-      strategy: 'rolling',
-      approvalRequired: false,
-      autoPromote: true,
-      guardrails: { healthCheckRequired: true, rollbackOnFailure: true },
-      lastDeployment: { version: 'v2.4.5', status: 'success', timestamp: '10 min ago' },
-    },
-    {
-      id: '2',
-      name: 'Staging',
-      strategy: 'canary',
-      approvalRequired: false,
-      autoPromote: false,
-      guardrails: { healthCheckRequired: true, rollbackOnFailure: true, maxReplicas: 3 },
-      lastDeployment: { version: 'v2.4.4', status: 'success', timestamp: '2 hours ago' },
-    },
-    {
-      id: '3',
-      name: 'Production',
-      strategy: 'blue-green',
-      approvalRequired: true,
-      autoPromote: false,
-      vaultSource: 'azure-keyvault-prod',
-      guardrails: { healthCheckRequired: true, rollbackOnFailure: true, maxReplicas: 10 },
-      lastDeployment: { version: 'v2.4.1', status: 'success', timestamp: '1 day ago' },
-    },
-  ]);
+function formatTimeAgo(date: Date): string {
+  const now = new Date();
+  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
 
+const EnvironmentsPanel = () => {
+  const [environments, setEnvironments] = useState<Environment[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isWizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
-  const [newEnv, setNewEnv] = useState<Partial<Environment>>({
+  const [isCreating, setIsCreating] = useState(false);
+  const [newEnv, setNewEnv] = useState<{
+    name: string;
+    environment: string;
+    strategy: 'rolling' | 'canary' | 'blue-green';
+    approvalRequired: boolean;
+    autoPromote: boolean;
+    vaultSource?: string;
+    guardrails: {
+      healthCheckRequired: boolean;
+      rollbackOnFailure: boolean;
+    };
+  }>({
     name: '',
+    environment: 'development',
     strategy: 'rolling',
     approvalRequired: false,
     autoPromote: false,
     guardrails: { healthCheckRequired: true, rollbackOnFailure: true },
   });
 
-  const handleCreateEnvironment = () => {
+  // Fetch environments from database
+  const fetchEnvironments = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data: envData, error } = await supabase
+        .from('environment_configs')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      if (envData) {
+        // For each environment, get the latest deployment
+        const envsWithDeployments = await Promise.all(
+          envData.map(async (env) => {
+            const { data: deployData } = await supabase
+              .from('deployments')
+              .select('*')
+              .eq('environment', env.environment)
+              .order('deployed_at', { ascending: false })
+              .limit(1)
+              .single();
+
+            const vars = (env.variables as Record<string, unknown>) || {};
+            
+            return {
+              id: env.id,
+              name: env.name,
+              environment: env.environment,
+              strategy: (vars.strategy as string || 'rolling') as 'rolling' | 'canary' | 'blue-green',
+              approvalRequired: (vars.approvalRequired as boolean) || env.environment === 'production',
+              autoPromote: (vars.autoPromote as boolean) || false,
+              vaultSource: vars.vaultSource as string | undefined,
+              guardrails: {
+                healthCheckRequired: (vars.healthCheckRequired as boolean) ?? true,
+                rollbackOnFailure: (vars.rollbackOnFailure as boolean) ?? true,
+                maxReplicas: vars.maxReplicas as number | undefined,
+              },
+              lastDeployment: deployData ? {
+                version: deployData.version,
+                status: deployData.status as 'success' | 'failed' | 'running',
+                timestamp: formatTimeAgo(new Date(deployData.deployed_at))
+              } : undefined
+            };
+          })
+        );
+
+        setEnvironments(envsWithDeployments);
+      }
+    } catch (err) {
+      console.error('[EnvironmentsPanel] Error fetching environments:', err);
+      toast.error('Failed to load environments');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchEnvironments();
+
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel('environments-panel-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'environment_configs' }, fetchEnvironments)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deployments' }, fetchEnvironments)
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [fetchEnvironments]);
+
+  const handleCreateEnvironment = async () => {
     if (!newEnv.name) {
       toast.error('Environment name is required');
       return;
     }
 
-    const env: Environment = {
-      id: Date.now().toString(),
-      name: newEnv.name,
-      strategy: newEnv.strategy || 'rolling',
-      approvalRequired: newEnv.approvalRequired || false,
-      autoPromote: newEnv.autoPromote || false,
-      vaultSource: newEnv.vaultSource,
-      guardrails: newEnv.guardrails || { healthCheckRequired: true, rollbackOnFailure: true },
-    };
+    setIsCreating(true);
+    try {
+      const { error } = await supabase
+        .from('environment_configs')
+        .insert({
+          name: newEnv.name,
+          environment: newEnv.environment,
+          is_active: true,
+          variables: {
+            strategy: newEnv.strategy,
+            approvalRequired: newEnv.approvalRequired,
+            autoPromote: newEnv.autoPromote,
+            vaultSource: newEnv.vaultSource,
+            healthCheckRequired: newEnv.guardrails.healthCheckRequired,
+            rollbackOnFailure: newEnv.guardrails.rollbackOnFailure,
+          }
+        });
 
-    setEnvironments(prev => [...prev, env]);
-    setWizardOpen(false);
-    setWizardStep(1);
-    setNewEnv({
-      name: '',
-      strategy: 'rolling',
-      approvalRequired: false,
-      autoPromote: false,
-      guardrails: { healthCheckRequired: true, rollbackOnFailure: true },
-    });
-    toast.success(`Environment "${env.name}" created`);
+      if (error) throw error;
+
+      toast.success(`Environment "${newEnv.name}" created`);
+      setWizardOpen(false);
+      setWizardStep(1);
+      setNewEnv({
+        name: '',
+        environment: 'development',
+        strategy: 'rolling',
+        approvalRequired: false,
+        autoPromote: false,
+        guardrails: { healthCheckRequired: true, rollbackOnFailure: true },
+      });
+    } catch (err: any) {
+      console.error('[EnvironmentsPanel] Error creating environment:', err);
+      toast.error(err.message || 'Failed to create environment');
+    } finally {
+      setIsCreating(false);
+    }
   };
 
-  const handleDeleteEnvironment = (id: string) => {
-    setEnvironments(prev => prev.filter(e => e.id !== id));
-    toast.success('Environment deleted');
+  const handleDeleteEnvironment = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('environment_configs')
+        .update({ is_active: false })
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success('Environment deleted');
+    } catch (err: any) {
+      console.error('[EnvironmentsPanel] Error deleting environment:', err);
+      toast.error(err.message || 'Failed to delete environment');
+    }
+  };
+
+  const handleDuplicateEnvironment = async (env: Environment) => {
+    try {
+      const { error } = await supabase
+        .from('environment_configs')
+        .insert({
+          name: `${env.name} (Copy)`,
+          environment: env.environment,
+          is_active: true,
+          variables: {
+            strategy: env.strategy,
+            approvalRequired: env.approvalRequired,
+            autoPromote: env.autoPromote,
+            vaultSource: env.vaultSource,
+            healthCheckRequired: env.guardrails.healthCheckRequired,
+            rollbackOnFailure: env.guardrails.rollbackOnFailure,
+          }
+        });
+
+      if (error) throw error;
+      toast.success('Environment duplicated');
+    } catch (err: any) {
+      console.error('[EnvironmentsPanel] Error duplicating environment:', err);
+      toast.error(err.message || 'Failed to duplicate environment');
+    }
   };
 
   const getStrategyBadge = (strategy: Environment['strategy']) => {
@@ -177,118 +295,145 @@ const EnvironmentsPanel = () => {
         </Card>
 
         {/* Environments List */}
-        <div className="space-y-4">
-          {environments.map((env) => (
-            <motion.div
-              key={env.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <Card className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
-                      {/* Environment Indicator */}
-                      <div className={cn(
-                        'w-3 h-full min-h-[80px] rounded-full',
-                        env.name === 'Production' && 'bg-sec-critical',
-                        env.name === 'Staging' && 'bg-sec-warning',
-                        env.name === 'Development' && 'bg-sec-safe',
-                        !['Production', 'Staging', 'Development'].includes(env.name) && 'bg-primary'
-                      )} />
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : environments.length === 0 ? (
+          <Card className="border-dashed border-2 border-muted">
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+                <Globe className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">No Environments Configured</h3>
+              <p className="text-sm text-muted-foreground text-center max-w-md mb-4">
+                Create your first environment to define deployment policies and guardrails.
+              </p>
+              <Button onClick={() => setWizardOpen(true)} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Create Environment
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {environments.map((env) => (
+              <motion.div
+                key={env.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-4">
+                        {/* Environment Indicator */}
+                        <div className={cn(
+                          'w-3 h-full min-h-[80px] rounded-full',
+                          env.environment === 'production' && 'bg-sec-critical',
+                          env.environment === 'staging' && 'bg-sec-warning',
+                          env.environment === 'development' && 'bg-sec-safe',
+                          !['production', 'staging', 'development'].includes(env.environment) && 'bg-primary'
+                        )} />
 
-                      <div className="space-y-3">
-                        {/* Header */}
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-semibold">{env.name}</h3>
-                            {getStrategyBadge(env.strategy)}
+                        <div className="space-y-3">
+                          {/* Header */}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-lg font-semibold">{env.name}</h3>
+                              {getStrategyBadge(env.strategy)}
+                              <Badge variant="outline" className="text-[10px] capitalize">
+                                {env.environment}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              {env.approvalRequired && (
+                                <Badge variant="outline" className="text-[10px] gap-1">
+                                  <Shield className="w-3 h-3" /> Approval Required
+                                </Badge>
+                              )}
+                              {env.autoPromote && (
+                                <Badge variant="outline" className="text-[10px] gap-1">
+                                  <Zap className="w-3 h-3" /> Auto-Promote
+                                </Badge>
+                              )}
+                              {env.vaultSource && (
+                                <Badge variant="outline" className="text-[10px] gap-1">
+                                  <Shield className="w-3 h-3" /> {env.vaultSource}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            {env.approvalRequired && (
-                              <Badge variant="outline" className="text-[10px] gap-1">
-                                <Shield className="w-3 h-3" /> Approval Required
-                              </Badge>
+
+                          {/* Guardrails */}
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            {env.guardrails.healthCheckRequired && (
+                              <span className="flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-sec-safe" /> Health check
+                              </span>
                             )}
-                            {env.autoPromote && (
-                              <Badge variant="outline" className="text-[10px] gap-1">
-                                <Zap className="w-3 h-3" /> Auto-Promote
-                              </Badge>
+                            {env.guardrails.rollbackOnFailure && (
+                              <span className="flex items-center gap-1">
+                                <RefreshCcw className="w-3 h-3 text-sec-safe" /> Auto-rollback
+                              </span>
                             )}
-                            {env.vaultSource && (
-                              <Badge variant="outline" className="text-[10px] gap-1">
-                                <Shield className="w-3 h-3" /> {env.vaultSource}
-                              </Badge>
+                            {env.guardrails.maxReplicas && (
+                              <span>Max {env.guardrails.maxReplicas} replicas</span>
                             )}
                           </div>
+
+                          {/* Last Deployment */}
+                          {env.lastDeployment ? (
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="text-muted-foreground">Last deployment:</span>
+                              <span className="font-mono">{env.lastDeployment.version}</span>
+                              {env.lastDeployment.status === 'success' && (
+                                <CheckCircle2 className="w-3 h-3 text-sec-safe" />
+                              )}
+                              {env.lastDeployment.status === 'failed' && (
+                                <XCircle className="w-3 h-3 text-sec-critical" />
+                              )}
+                              <span className="text-muted-foreground">{env.lastDeployment.timestamp}</span>
+                            </div>
+                          ) : (
+                            <div className="text-xs text-muted-foreground">No deployments yet</div>
+                          )}
                         </div>
-
-                        {/* Guardrails */}
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          {env.guardrails.healthCheckRequired && (
-                            <span className="flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-sec-safe" /> Health check
-                            </span>
-                          )}
-                          {env.guardrails.rollbackOnFailure && (
-                            <span className="flex items-center gap-1">
-                              <RefreshCcw className="w-3 h-3 text-sec-safe" /> Auto-rollback
-                            </span>
-                          )}
-                          {env.guardrails.maxReplicas && (
-                            <span>Max {env.guardrails.maxReplicas} replicas</span>
-                          )}
-                        </div>
-
-                        {/* Last Deployment */}
-                        {env.lastDeployment && (
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="text-muted-foreground">Last deployment:</span>
-                            <span className="font-mono">{env.lastDeployment.version}</span>
-                            {env.lastDeployment.status === 'success' && (
-                              <CheckCircle2 className="w-3 h-3 text-sec-safe" />
-                            )}
-                            {env.lastDeployment.status === 'failed' && (
-                              <XCircle className="w-3 h-3 text-sec-critical" />
-                            )}
-                            <span className="text-muted-foreground">{env.lastDeployment.timestamp}</span>
-                          </div>
-                        )}
                       </div>
-                    </div>
 
-                    {/* Actions */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="gap-2">
-                          <Settings className="w-4 h-4" /> Configure
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="gap-2">
-                          <Copy className="w-4 h-4" /> Duplicate
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="gap-2">
-                          <GitBranch className="w-4 h-4" /> View Deployments
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          className="gap-2 text-sec-critical"
-                          onClick={() => handleDeleteEnvironment(env.id)}
-                        >
-                          <Trash2 className="w-4 h-4" /> Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
+                      {/* Actions */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem className="gap-2">
+                            <Settings className="w-4 h-4" /> Configure
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2" onClick={() => handleDuplicateEnvironment(env)}>
+                            <Copy className="w-4 h-4" /> Duplicate
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2">
+                            <GitBranch className="w-4 h-4" /> View Deployments
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            className="gap-2 text-sec-critical"
+                            onClick={() => handleDeleteEnvironment(env.id)}
+                          >
+                            <Trash2 className="w-4 h-4" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        )}
 
         {/* Create Environment Wizard */}
         <Dialog open={isWizardOpen} onOpenChange={setWizardOpen}>
@@ -315,6 +460,24 @@ const EnvironmentsPanel = () => {
                       value={newEnv.name}
                       onChange={(e) => setNewEnv(prev => ({ ...prev, name: e.target.value }))}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Environment Type</Label>
+                    <Select 
+                      value={newEnv.environment}
+                      onValueChange={(v) => setNewEnv(prev => ({ ...prev, environment: v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="development">Development</SelectItem>
+                        <SelectItem value="staging">Staging</SelectItem>
+                        <SelectItem value="production">Production</SelectItem>
+                        <SelectItem value="qa">QA</SelectItem>
+                        <SelectItem value="uat">UAT</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               )}
@@ -384,10 +547,10 @@ const EnvironmentsPanel = () => {
                       </p>
                     </div>
                     <Switch 
-                      checked={newEnv.guardrails?.healthCheckRequired}
+                      checked={newEnv.guardrails.healthCheckRequired}
                       onCheckedChange={(v) => setNewEnv(prev => ({ 
                         ...prev, 
-                        guardrails: { ...prev.guardrails!, healthCheckRequired: v } 
+                        guardrails: { ...prev.guardrails, healthCheckRequired: v } 
                       }))}
                     />
                   </div>
@@ -399,18 +562,18 @@ const EnvironmentsPanel = () => {
                       </p>
                     </div>
                     <Switch 
-                      checked={newEnv.guardrails?.rollbackOnFailure}
+                      checked={newEnv.guardrails.rollbackOnFailure}
                       onCheckedChange={(v) => setNewEnv(prev => ({ 
                         ...prev, 
-                        guardrails: { ...prev.guardrails!, rollbackOnFailure: v } 
+                        guardrails: { ...prev.guardrails, rollbackOnFailure: v } 
                       }))}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>Vault Source (Optional)</Label>
                     <Select 
-                      value={newEnv.vaultSource}
-                      onValueChange={(v) => setNewEnv(prev => ({ ...prev, vaultSource: v }))}
+                      value={newEnv.vaultSource || ''}
+                      onValueChange={(v) => setNewEnv(prev => ({ ...prev, vaultSource: v || undefined }))}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select vault..." />
@@ -428,16 +591,17 @@ const EnvironmentsPanel = () => {
 
             <DialogFooter>
               {wizardStep > 1 && (
-                <Button variant="outline" onClick={() => setWizardStep(s => s - 1)}>
+                <Button variant="outline" onClick={() => setWizardStep(s => s - 1)} disabled={isCreating}>
                   Back
                 </Button>
               )}
               {wizardStep < 4 ? (
-                <Button onClick={() => setWizardStep(s => s + 1)}>
-                  Next <ArrowRight className="w-4 h-4 ml-1" />
+                <Button onClick={() => setWizardStep(s => s + 1)} disabled={wizardStep === 1 && !newEnv.name}>
+                  Next
                 </Button>
               ) : (
-                <Button onClick={handleCreateEnvironment}>
+                <Button onClick={handleCreateEnvironment} disabled={isCreating} className="gap-2">
+                  {isCreating && <Loader2 className="w-4 h-4 animate-spin" />}
                   Create Environment
                 </Button>
               )}
