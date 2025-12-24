@@ -88,91 +88,33 @@ interface FlowState {
   setTimelineOpen: (open: boolean) => void;
   setActiveView: (view: 'dashboard' | 'flows') => void;
   updateExecutionStatus: (executionId: string, status: NodeStatus, progress: number) => void;
+  setExecutions: (executions: Execution[]) => void;
+  setDeployments: (deployments: Deployment[]) => void;
   addApprovalRequest: (request: ApprovalRequest) => void;
   updateApprovalRequest: (id: string, updates: Partial<ApprovalRequest>) => void;
+  setApprovalRequests: (requests: ApprovalRequest[]) => void;
+  setSystemHealth: (health: Partial<FlowState['systemHealth']>) => void;
 }
 
 export const useFlowStore = create<FlowState>((set) => ({
   selectedNodeId: null,
   selectedExecution: null,
-  executions: [
-    {
-      id: 'exec-1',
-      name: 'api-gateway-v2.4.1',
-      status: 'running',
-      startedAt: '2 min ago',
-      environment: 'production',
-      branch: 'main',
-      commit: 'a3f7c2e',
-      progress: 65,
-      flowType: 'cicd',
-    },
-    {
-      id: 'exec-2',
-      name: 'ml-pipeline-retrain',
-      status: 'success',
-      startedAt: '15 min ago',
-      environment: 'staging',
-      branch: 'feature/v3',
-      commit: 'b8d4f1a',
-      progress: 100,
-      flowType: 'mlops',
-    },
-    {
-      id: 'exec-3',
-      name: 'llm-prompt-deploy',
-      status: 'paused',
-      startedAt: '28 min ago',
-      environment: 'production',
-      branch: 'hotfix/guardrail',
-      commit: 'c2e9a7b',
-      progress: 45,
-      flowType: 'llmops',
-    },
-    {
-      id: 'exec-4',
-      name: 'auth-service-v1.9.0',
-      status: 'warning',
-      startedAt: '1 hour ago',
-      environment: 'staging',
-      branch: 'release/1.9',
-      commit: 'd5f2b8c',
-      progress: 80,
-      flowType: 'cicd',
-    },
-  ],
+  // Start with empty arrays - data will be fetched from Supabase
+  executions: [],
   isInspectorOpen: false,
   activeEnvironment: 'production',
   activeFlowType: 'cicd',
-  approvalRequests: [
-    {
-      id: 'apr-1',
-      executionId: 'exec-1',
-      nodeId: 'approval-gate',
-      title: 'Production Deployment Approval',
-      description: 'Deploy api-gateway-v2.4.1 to production',
-      status: 'pending',
-      requiredApprovals: 2,
-      currentApprovals: 1,
-      createdAt: '5 min ago',
-    },
-  ],
-  deployments: [
-    { id: 'd1', environment: 'production', version: 'v2.4.0', status: 'success', deployedAt: '2024-01-20T10:30:00Z' },
-    { id: 'd2', environment: 'production', version: 'v2.3.5', status: 'success', deployedAt: '2024-01-18T14:15:00Z' },
-    { id: 'd3', environment: 'production', version: 'v2.3.4', status: 'failed', deployedAt: '2024-01-17T09:00:00Z', incidentId: 'INC-2024-0117' },
-    { id: 'd4', environment: 'production', version: 'v2.3.3', status: 'success', deployedAt: '2024-01-15T16:45:00Z' },
-    { id: 'd5', environment: 'production', version: 'v2.3.2', status: 'success', deployedAt: '2024-01-12T11:20:00Z' },
-    { id: 'd6', environment: 'staging', version: 'v2.4.1', status: 'running', deployedAt: '2024-01-20T12:00:00Z' },
-  ],
+  // Start with empty arrays - data will be fetched from Supabase
+  approvalRequests: [],
+  deployments: [],
   isConfigEditorOpen: false,
   isTimelineOpen: false,
   activeView: 'dashboard',
   systemHealth: {
     status: 'healthy',
-    uptime: '99.97%',
-    activeFlows: 12,
-    pendingApprovals: 3,
+    uptime: '0%',
+    activeFlows: 0,
+    pendingApprovals: 0,
   },
 
   setSelectedNodeId: (id) => set({ selectedNodeId: id, isInspectorOpen: id !== null }),
@@ -188,6 +130,8 @@ export const useFlowStore = create<FlowState>((set) => ({
       e.id === executionId ? { ...e, status, progress } : e
     ),
   })),
+  setExecutions: (executions) => set({ executions }),
+  setDeployments: (deployments) => set({ deployments }),
   addApprovalRequest: (request) => set((state) => ({
     approvalRequests: [...state.approvalRequests, request],
   })),
@@ -195,5 +139,9 @@ export const useFlowStore = create<FlowState>((set) => ({
     approvalRequests: state.approvalRequests.map((r) =>
       r.id === id ? { ...r, ...updates } : r
     ),
+  })),
+  setApprovalRequests: (requests) => set({ approvalRequests: requests }),
+  setSystemHealth: (health) => set((state) => ({
+    systemHealth: { ...state.systemHealth, ...health },
   })),
 }));

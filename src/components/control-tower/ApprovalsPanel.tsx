@@ -12,7 +12,8 @@ import {
   AlertTriangle,
   Eye,
   FileText,
-  Sparkles
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,84 +25,79 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { formatDistanceToNow } from 'date-fns';
 
 interface ApprovalRequest {
   id: string;
-  executionId: string;
-  nodeId: string;
+  execution_id: string;
+  node_id: string;
   title: string;
   description?: string;
-  environment: string;
-  artifact: {
-    name: string;
-    version: string;
-    imageDigest: string;
-  };
-  ciStatus: 'passed' | 'failed' | 'running';
-  securityStatus: 'passed' | 'failed' | 'warning' | 'running';
-  changeSummary: {
-    filesChanged: number;
-    riskLevel: 'low' | 'medium' | 'high';
-    aiAnalysis: string;
-  };
-  requestedBy: string;
-  requestedAt: string;
   status: 'pending' | 'approved' | 'rejected';
+  required_approvals: number;
+  current_approvals: number;
+  requested_by?: string;
+  created_at: string;
+  resolved_at?: string;
+  // Joined execution data
+  execution?: {
+    environment: string;
+    branch?: string;
+    name: string;
+  };
 }
 
 const ApprovalsPanel = () => {
-  const [approvals, setApprovals] = useState<ApprovalRequest[]>([
-    {
-      id: '1',
-      executionId: 'exec-1',
-      nodeId: 'approval-gate',
-      title: 'Production Deployment - api-gateway v2.4.3',
-      description: 'Deploy new API gateway version with rate limiting improvements',
-      environment: 'production',
-      artifact: {
-        name: 'api-gateway',
-        version: 'v2.4.3',
-        imageDigest: 'sha256:a3f7c2e...',
-      },
-      ciStatus: 'passed',
-      securityStatus: 'passed',
-      changeSummary: {
-        filesChanged: 12,
-        riskLevel: 'low',
-        aiAnalysis: 'This deployment includes rate limiting improvements and bug fixes. No breaking changes detected. All tests passing. Recommended for approval.',
-      },
-      requestedBy: 'CI/CD Pipeline',
-      requestedAt: '5 min ago',
-      status: 'pending',
-    },
-    {
-      id: '2',
-      executionId: 'exec-2',
-      nodeId: 'approval-gate',
-      title: 'Staging Deployment - auth-service v1.9.0',
-      description: 'New authentication features with MFA support',
-      environment: 'staging',
-      artifact: {
-        name: 'auth-service',
-        version: 'v1.9.0',
-        imageDigest: 'sha256:b8d4f1a...',
-      },
-      ciStatus: 'passed',
-      securityStatus: 'warning',
-      changeSummary: {
-        filesChanged: 45,
-        riskLevel: 'medium',
-        aiAnalysis: 'Major feature addition with MFA support. One medium-severity dependency vulnerability detected but patched. Recommend manual review of auth flows before production promotion.',
-      },
-      requestedBy: 'CI/CD Pipeline',
-      requestedAt: '15 min ago',
-      status: 'pending',
-    },
-  ]);
-
+  const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedApproval, setSelectedApproval] = useState<ApprovalRequest | null>(null);
   const [comment, setComment] = useState('');
   const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending');
+  const [submitting, setSubmitting] = useState(false);
+
+  // Fetch approvals from database
+  const fetchApprovals = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('approval_requests')
+        .select(`
+          *,
+          execution:executions (
+            environment,
+            branch,
+            name
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setApprovals(data || []);
+    } catch (error: any) {
+      console.error('Error fetching approvals:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Setup realtime subscription
+  useEffect(() => {
+    fetchApprovals();
+
+    const channel = supabase
+      .channel('approvals-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'approval_requests' },
+        () => {
+          fetchApprovals();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const pendingApprovals = approvals.filter(a => a.status === 'pending');
   const historyApprovals = approvals.filter(a => a.status !== 'pending');
@@ -112,20 +108,53 @@ const ApprovalsPanel = () => {
       return;
     }
 
-    // Log to audit
-    await supabase.from('audit_logs').insert({
-      action: 'approval_granted',
-      resource_type: 'approval_request',
-      resource_id: id,
-      details: { comment, decision: 'approved' },
-    });
+    setSubmitting(true);
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      const approval = approvals.find(a => a.id === id);
+      
+      if (!approval) return;
 
-    setApprovals(prev => prev.map(a => 
-      a.id === id ? { ...a, status: 'approved' as const } : a
-    ));
-    setSelectedApproval(null);
-    setComment('');
-    toast.success('Deployment approved', { description: 'Execution will resume' });
+      // Insert vote
+      await supabase.from('approval_votes').insert({
+        approval_request_id: id,
+        user_id: user.user?.id || 'anonymous',
+        vote: true,
+        comment,
+      });
+
+      const newApprovals = approval.current_approvals + 1;
+      const newStatus = newApprovals >= approval.required_approvals ? 'approved' : 'pending';
+
+      // Update approval request
+      await supabase
+        .from('approval_requests')
+        .update({
+          current_approvals: newApprovals,
+          status: newStatus,
+          resolved_at: newStatus === 'approved' ? new Date().toISOString() : null,
+        })
+        .eq('id', id);
+
+      // Log to audit
+      await supabase.from('audit_logs').insert({
+        action: 'approval_granted',
+        resource_type: 'approval_request',
+        resource_id: id,
+        user_id: user.user?.id,
+        details: { comment, decision: 'approved', new_count: newApprovals },
+      });
+
+      setSelectedApproval(null);
+      setComment('');
+      toast.success(newStatus === 'approved' ? 'Deployment approved' : 'Vote recorded', { 
+        description: newStatus === 'approved' ? 'Execution will resume' : `${newApprovals}/${approval.required_approvals} approvals`
+      });
+    } catch (error: any) {
+      toast.error(`Failed to approve: ${error.message}`);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleReject = async (id: string) => {
@@ -134,45 +163,75 @@ const ApprovalsPanel = () => {
       return;
     }
 
-    // Log to audit
-    await supabase.from('audit_logs').insert({
-      action: 'approval_rejected',
-      resource_type: 'approval_request',
-      resource_id: id,
-      details: { comment, decision: 'rejected' },
-    });
+    setSubmitting(true);
+    try {
+      const { data: user } = await supabase.auth.getUser();
 
-    setApprovals(prev => prev.map(a => 
-      a.id === id ? { ...a, status: 'rejected' as const } : a
-    ));
-    setSelectedApproval(null);
-    setComment('');
-    toast.warning('Deployment rejected', { description: 'Execution has been stopped' });
-  };
+      // Insert vote
+      await supabase.from('approval_votes').insert({
+        approval_request_id: id,
+        user_id: user.user?.id || 'anonymous',
+        vote: false,
+        comment,
+      });
 
-  const getStatusBadge = (status: 'passed' | 'failed' | 'warning' | 'running') => {
-    switch (status) {
-      case 'passed':
-        return <Badge className="bg-sec-safe/20 text-sec-safe border-0"><CheckCircle2 className="w-3 h-3 mr-1" />Passed</Badge>;
-      case 'failed':
-        return <Badge className="bg-sec-critical/20 text-sec-critical border-0"><XCircle className="w-3 h-3 mr-1" />Failed</Badge>;
-      case 'warning':
-        return <Badge className="bg-sec-warning/20 text-sec-warning border-0"><AlertTriangle className="w-3 h-3 mr-1" />Warning</Badge>;
-      case 'running':
-        return <Badge className="bg-chart-1/20 text-chart-1 border-0"><Clock className="w-3 h-3 mr-1 animate-spin" />Running</Badge>;
+      // Update approval request
+      await supabase
+        .from('approval_requests')
+        .update({
+          status: 'rejected',
+          resolved_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+
+      // Log to audit
+      await supabase.from('audit_logs').insert({
+        action: 'approval_rejected',
+        resource_type: 'approval_request',
+        resource_id: id,
+        user_id: user.user?.id,
+        details: { comment, decision: 'rejected' },
+      });
+
+      setSelectedApproval(null);
+      setComment('');
+      toast.warning('Deployment rejected', { description: 'Execution has been stopped' });
+    } catch (error: any) {
+      toast.error(`Failed to reject: ${error.message}`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const getRiskBadge = (risk: 'low' | 'medium' | 'high') => {
-    switch (risk) {
-      case 'low':
-        return <Badge variant="outline" className="text-sec-safe border-sec-safe/30">Low Risk</Badge>;
-      case 'medium':
-        return <Badge variant="outline" className="text-sec-warning border-sec-warning/30">Medium Risk</Badge>;
-      case 'high':
-        return <Badge variant="outline" className="text-sec-critical border-sec-critical/30">High Risk</Badge>;
+  const formatTimeAgo = (dateString: string) => {
+    try {
+      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+    } catch {
+      return dateString;
     }
   };
+
+  const getEnvironmentColor = (env?: string) => {
+    switch (env?.toLowerCase()) {
+      case 'production':
+      case 'prod':
+        return 'border-sec-critical/50 text-sec-critical';
+      case 'staging':
+      case 'uat':
+      case 'preprod':
+        return 'border-sec-warning/50 text-sec-warning';
+      default:
+        return 'border-sec-safe/50 text-sec-safe';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex">
@@ -229,35 +288,27 @@ const ApprovalsPanel = () => {
                             </div>
                             <Badge 
                               variant="outline" 
-                              className={cn(
-                                approval.environment === 'production' && 'border-sec-critical/50 text-sec-critical',
-                                approval.environment === 'staging' && 'border-sec-warning/50 text-sec-warning',
-                                approval.environment === 'development' && 'border-sec-safe/50 text-sec-safe'
-                              )}
+                              className={getEnvironmentColor(approval.execution?.environment)}
                             >
-                              {approval.environment}
+                              {approval.execution?.environment || 'Unknown'}
                             </Badge>
                           </div>
 
                           <div className="flex items-center gap-4 text-xs text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Package className="w-3 h-3" />
-                              {approval.artifact.version}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <User className="w-3 h-3" />
-                              {approval.requestedBy}
+                              {approval.execution?.name || approval.node_id}
                             </span>
                             <span className="flex items-center gap-1">
                               <Clock className="w-3 h-3" />
-                              {approval.requestedAt}
+                              {formatTimeAgo(approval.created_at)}
                             </span>
                           </div>
 
                           <div className="flex items-center gap-2 mt-3">
-                            {getStatusBadge(approval.ciStatus)}
-                            {getStatusBadge(approval.securityStatus)}
-                            {getRiskBadge(approval.changeSummary.riskLevel)}
+                            <Badge variant="outline" className="text-xs">
+                              {approval.current_approvals}/{approval.required_approvals} approvals
+                            </Badge>
                           </div>
                         </CardContent>
                       </Card>
@@ -283,7 +334,7 @@ const ApprovalsPanel = () => {
                         <div className="flex items-center justify-between">
                           <div>
                             <h4 className="font-medium text-sm">{approval.title}</h4>
-                            <p className="text-xs text-muted-foreground">{approval.requestedAt}</p>
+                            <p className="text-xs text-muted-foreground">{formatTimeAgo(approval.created_at)}</p>
                           </div>
                           <Badge 
                             className={cn(
@@ -336,102 +387,78 @@ const ApprovalsPanel = () => {
                   <CardContent className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Environment</span>
-                      <span className="capitalize font-medium">{selectedApproval.environment}</span>
+                      <span className="capitalize font-medium">{selectedApproval.execution?.environment || 'Unknown'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Execution ID</span>
-                      <span className="font-mono text-xs">{selectedApproval.executionId}</span>
+                      <span className="font-mono text-xs">{selectedApproval.execution_id}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Artifact</span>
-                      <span className="font-mono text-xs">{selectedApproval.artifact.name}:{selectedApproval.artifact.version}</span>
+                      <span className="text-muted-foreground">Branch</span>
+                      <span className="font-mono text-xs">{selectedApproval.execution?.branch || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Image Digest</span>
-                      <span className="font-mono text-xs">{selectedApproval.artifact.imageDigest}</span>
+                      <span className="text-muted-foreground">Requested</span>
+                      <span className="text-xs">{formatTimeAgo(selectedApproval.created_at)}</span>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Preconditions */}
+                {/* Approval Progress */}
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">Preconditions Status</CardTitle>
+                    <CardTitle className="text-sm">Approval Progress</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">CI Pipeline</span>
-                      {getStatusBadge(selectedApproval.ciStatus)}
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Approvals</span>
+                      <span className="font-medium">{selectedApproval.current_approvals} / {selectedApproval.required_approvals}</span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Security Scan</span>
-                      {getStatusBadge(selectedApproval.securityStatus)}
+                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-sec-safe transition-all"
+                        style={{ width: `${(selectedApproval.current_approvals / selectedApproval.required_approvals) * 100}%` }}
+                      />
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Files Changed</span>
-                      <span className="text-sm font-medium">{selectedApproval.changeSummary.filesChanged}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Risk Level</span>
-                      {getRiskBadge(selectedApproval.changeSummary.riskLevel)}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* AI Analysis */}
-                <Card className="border-ai-primary/30 bg-ai-primary/5">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-ai-primary" />
-                      <CardTitle className="text-sm">AI Impact Analysis</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">{selectedApproval.changeSummary.aiAnalysis}</p>
                   </CardContent>
                 </Card>
 
                 <Separator />
 
                 {/* Decision Section */}
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Comment (Required)</label>
-                    <Textarea 
-                      placeholder="Add your approval comment or rejection reason..."
-                      value={comment}
-                      onChange={(e) => setComment(e.target.value)}
-                      className="min-h-[100px]"
-                    />
-                  </div>
+                {selectedApproval.status === 'pending' && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Comment (Required)</label>
+                      <Textarea 
+                        placeholder="Add your approval comment or rejection reason..."
+                        value={comment}
+                        onChange={(e) => setComment(e.target.value)}
+                        className="min-h-[100px]"
+                      />
+                    </div>
 
-                  <div className="flex gap-3">
-                    <Button 
-                      variant="destructive" 
-                      className="flex-1 gap-2"
-                      onClick={() => handleReject(selectedApproval.id)}
-                      disabled={!comment.trim()}
-                    >
-                      <XCircle className="w-4 h-4" />
-                      Reject
-                    </Button>
-                    <Button 
-                      className="flex-1 gap-2 bg-sec-safe hover:bg-sec-safe/90"
-                      onClick={() => handleApprove(selectedApproval.id)}
-                      disabled={!comment.trim() || selectedApproval.ciStatus !== 'passed'}
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                      Approve Deployment
-                    </Button>
+                    <div className="flex gap-3">
+                      <Button 
+                        variant="destructive" 
+                        className="flex-1 gap-2"
+                        onClick={() => handleReject(selectedApproval.id)}
+                        disabled={!comment.trim() || submitting}
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Reject
+                      </Button>
+                      <Button 
+                        className="flex-1 gap-2 bg-sec-safe hover:bg-sec-safe/90"
+                        onClick={() => handleApprove(selectedApproval.id)}
+                        disabled={!comment.trim() || submitting}
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        Approve
+                      </Button>
+                    </div>
                   </div>
-
-                  {selectedApproval.ciStatus !== 'passed' && (
-                    <p className="text-xs text-sec-warning text-center">
-                      <AlertTriangle className="w-3 h-3 inline mr-1" />
-                      Cannot approve: CI pipeline must pass first
-                    </p>
-                  )}
-                </div>
+                )}
               </div>
             </ScrollArea>
           </motion.div>

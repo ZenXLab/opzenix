@@ -395,6 +395,29 @@ export const GitHubConnectionPanel = ({ isOpen, onClose, onConnected }: GitHubCo
                     </div>
 
                     <div className="space-y-2">
+                      <Label htmlFor="webhook_secret">
+                        Webhook Secret
+                        <span className="text-muted-foreground text-xs ml-2">
+                          (used to verify webhook signatures)
+                        </span>
+                      </Label>
+                      <div className="relative">
+                        <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="webhook_secret"
+                          type="password"
+                          placeholder="Enter a secure secret..."
+                          className="pl-9"
+                          value={config.webhook_secret || ''}
+                          onChange={(e) => setConfig(prev => ({ ...prev, webhook_secret: e.target.value }))}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Use the same secret when configuring the webhook in GitHub. This enables signature verification for security.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
                       <Label>Content Type</Label>
                       <Input value="application/json" readOnly />
                     </div>
@@ -404,6 +427,10 @@ export const GitHubConnectionPanel = ({ isOpen, onClose, onConnected }: GitHubCo
                       <div className="p-3 rounded bg-muted text-sm space-y-1">
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="h-3.5 w-3.5 text-sec-safe" />
+                          <span>Push events</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-sec-safe" />
                           <span>Workflow runs</span>
                         </div>
                         <div className="flex items-center gap-2">
@@ -411,6 +438,16 @@ export const GitHubConnectionPanel = ({ isOpen, onClose, onConnected }: GitHubCo
                           <span>Workflow jobs</span>
                         </div>
                       </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-2">
+                      <Button 
+                        onClick={handleSaveConnection}
+                        disabled={loading}
+                        className="flex-1"
+                      >
+                        Save Webhook Secret
+                      </Button>
                     </div>
 
                     <a
