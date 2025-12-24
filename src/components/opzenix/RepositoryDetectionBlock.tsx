@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   GitBranch, Search, RefreshCw, Check, AlertCircle, Code,
-  Layers, Wrench, FileCode, Box
+  Layers, Wrench, Box, Github, XCircle, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LanguageStack } from '@/data/languageTemplates';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface RepoConfig {
   url: string;
@@ -23,6 +25,14 @@ interface RepositoryDetectionBlockProps {
   config?: RepoConfig;
   onChange?: (config: RepoConfig) => void;
   onDetectionComplete?: (stack: { language: string; framework: string; buildTool: string; confidence: number }, repo: string, branch: string) => void;
+}
+
+interface GitHubConnectionStatus {
+  connected: boolean;
+  validating: boolean;
+  branches: string[];
+  error: string | null;
+  connectionId: string | null;
 }
 
 const languageConfigs = {
@@ -41,10 +51,45 @@ const RepositoryDetectionBlock = ({ config, onChange, onDetectionComplete }: Rep
   const [detected, setDetected] = useState<{ language: string; framework: string; buildTool: string; confidence: number } | null>(null);
   const [manualOverride, setManualOverride] = useState(false);
 
+  // GitHub connection state
+  const [githubStatus, setGithubStatus] = useState<GitHubConnectionStatus>({
+    connected: false,
+    validating: false,
+    branches: [],
+    error: null,
+    connectionId: null,
+  });
+
   // Manual override state
   const [selectedLanguage, setSelectedLanguage] = useState<string>(config?.language || '');
   const [selectedFramework, setSelectedFramework] = useState<string>(config?.framework || '');
   const [selectedBuildTool, setSelectedBuildTool] = useState<string>(config?.buildTool || '');
+
+  // Check existing GitHub connection
+  useEffect(() => {
+    const checkGitHubConnection = async () => {
+      const { data: connections } = await supabase
+        .from('connections')
+        .select('*')
+        .eq('type', 'github')
+        .eq('status', 'connected')
+        .limit(1);
+
+      if (connections && connections.length > 0) {
+        const conn = connections[0];
+        const resourceStatus = conn.resource_status as Record<string, unknown> || {};
+        setGithubStatus({
+          connected: true,
+          validating: false,
+          branches: [],
+          error: null,
+          connectionId: conn.id,
+        });
+      }
+    };
+
+    checkGitHubConnection();
+  }, []);
 
   // Sync with external config
   useEffect(() => {
@@ -59,8 +104,67 @@ const RepositoryDetectionBlock = ({ config, onChange, onDetectionComplete }: Rep
     }
   }, [config]);
 
+  // Validate GitHub connection and fetch branches
+  const validateGitHubConnection = async () => {
+    if (!repoUrl || !githubStatus.connectionId) return;
+
+    setGithubStatus(prev => ({ ...prev, validating: true, error: null }));
+
+    try {
+      // Parse repo URL
+      const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+      if (!match) {
+        setGithubStatus(prev => ({ ...prev, validating: false, error: 'Invalid GitHub URL' }));
+        return;
+      }
+
+      const [, owner, repo] = match;
+      const cleanRepo = repo.replace('.git', '');
+
+      const { data, error } = await supabase.functions.invoke('github-validate-connection', {
+        body: {
+          connectionId: githubStatus.connectionId,
+          owner,
+          repo: cleanRepo,
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.valid && data.branches) {
+        setGithubStatus(prev => ({
+          ...prev,
+          validating: false,
+          connected: true,
+          branches: data.branches.map((b: any) => b.name),
+          error: null,
+        }));
+        toast.success('GitHub connection validated');
+      } else {
+        setGithubStatus(prev => ({
+          ...prev,
+          validating: false,
+          error: data.errors?.[0] || 'Validation failed',
+        }));
+      }
+    } catch (err: any) {
+      console.error('[RepositoryDetection] GitHub validation error:', err);
+      setGithubStatus(prev => ({
+        ...prev,
+        validating: false,
+        error: err.message || 'Failed to validate connection',
+      }));
+    }
+  };
+
   const handleDetect = async () => {
     setIsDetecting(true);
+    
+    // First validate GitHub if we have a connection
+    if (githubStatus.connectionId && repoUrl) {
+      await validateGitHubConnection();
+    }
+
     // Simulate detection
     await new Promise(r => setTimeout(r, 1500));
     
@@ -106,16 +210,46 @@ const RepositoryDetectionBlock = ({ config, onChange, onDetectionComplete }: Rep
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-4 bg-card border border-border rounded-lg space-y-4"
+      className="p-4 sm:p-6 bg-card border border-border rounded-lg space-y-4"
     >
-      <div className="flex items-center gap-2 mb-3">
-        <GitBranch className="w-4 h-4 text-ai-primary" />
-        <h3 className="text-sm font-medium text-foreground">Repository & Stack Detection</h3>
+      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <GitBranch className="w-4 h-4 text-ai-primary" />
+          <h3 className="text-sm font-medium text-foreground">Repository & Stack Detection</h3>
+        </div>
+        
+        {/* GitHub Connection Status */}
+        <Badge 
+          variant="outline" 
+          className={cn(
+            "text-[10px] gap-1",
+            githubStatus.connected ? "border-sec-safe/50 text-sec-safe" : "border-sec-warning/50 text-sec-warning"
+          )}
+        >
+          <Github className="w-3 h-3" />
+          {githubStatus.validating ? (
+            <>
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Validating...
+            </>
+          ) : githubStatus.connected ? 'Connected' : 'Not Connected'}
+        </Badge>
       </div>
 
+      {/* GitHub Connection Error */}
+      {githubStatus.error && (
+        <div className="p-3 rounded-lg bg-sec-critical/10 border border-sec-critical/30 flex items-start gap-2">
+          <XCircle className="w-4 h-4 text-sec-critical shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs font-medium text-sec-critical">GitHub Connection Error</p>
+            <p className="text-[10px] text-muted-foreground">{githubStatus.error}</p>
+          </div>
+        </div>
+      )}
+
       {/* Repository Input */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="sm:col-span-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="md:col-span-2">
           <label className="text-xs text-muted-foreground mb-1.5 block">Repository URL</label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -134,9 +268,17 @@ const RepositoryDetectionBlock = ({ config, onChange, onDetectionComplete }: Rep
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="main">main</SelectItem>
-              <SelectItem value="develop">develop</SelectItem>
-              <SelectItem value="staging">staging</SelectItem>
+              {githubStatus.branches.length > 0 ? (
+                githubStatus.branches.map(b => (
+                  <SelectItem key={b} value={b}>{b}</SelectItem>
+                ))
+              ) : (
+                <>
+                  <SelectItem value="main">main</SelectItem>
+                  <SelectItem value="develop">develop</SelectItem>
+                  <SelectItem value="staging">staging</SelectItem>
+                </>
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -168,7 +310,7 @@ const RepositoryDetectionBlock = ({ config, onChange, onDetectionComplete }: Rep
           animate={{ opacity: 1, height: 'auto' }}
           className="space-y-3"
         >
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <Check className="w-4 h-4 text-sec-safe" />
               <span className="text-xs font-medium text-foreground">Detected Configuration</span>
