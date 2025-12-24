@@ -9,7 +9,6 @@ import {
   useNodesState,
   useEdgesState,
   MarkerType,
-  Position,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -25,19 +24,46 @@ import {
   Clock,
   Bookmark,
   Shield,
-  Terminal
+  Terminal,
+  ArrowLeft,
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { useExecutionRealtime } from '@/hooks/useExecutionRealtime';
+import { useNodeStatusRealtime } from '@/hooks/useNodeStatusRealtime';
 
 interface ExecutionFlowViewProps {
   executionId?: string;
   onOpenApproval?: (nodeId: string) => void;
   onRollback?: (checkpointId: string) => void;
+  onBack?: () => void;
+}
+
+interface ExecutionData {
+  id: string;
+  name: string;
+  status: string;
+  environment: string;
+  branch: string | null;
+  progress: number | null;
+  started_at: string;
+  completed_at: string | null;
+  metadata: Record<string, unknown> | null;
+}
+
+interface NodeData {
+  id: string;
+  node_id: string;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  duration_ms: number | null;
+  metadata: Record<string, unknown> | null;
 }
 
 // Custom Node Component for Execution Flow
@@ -112,7 +138,7 @@ const ExecutionFlowNode = ({ data, selected }: { data: any; selected: boolean })
           <motion.div
             className="h-full bg-chart-1"
             initial={{ width: '0%' }}
-            animate={{ width: `${data.progress || 0}%` }}
+            animate={{ width: `${data.progress || 50}%` }}
             transition={{ duration: 0.5 }}
           />
         </div>
@@ -125,39 +151,153 @@ const nodeTypes = {
   executionNode: ExecutionFlowNode,
 };
 
+function formatDuration(ms: number | null): string {
+  if (!ms) return '';
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
+}
+
 const ExecutionFlowView = ({
   executionId,
   onOpenApproval,
   onRollback,
+  onBack,
 }: ExecutionFlowViewProps) => {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [logs, setLogs] = useState<{ level: string; message: string; timestamp: string }[]>([]);
+  const [execution, setExecution] = useState<ExecutionData | null>(null);
+  const [executionNodes, setExecutionNodes] = useState<NodeData[]>([]);
+  const [loading, setLoading] = useState(true);
   
-  // Default flow nodes for demo
-  const initialNodes: Node[] = [
-    { id: 'source', type: 'executionNode', position: { x: 0, y: 100 }, data: { label: 'Source', status: 'success', duration: '2s', isCheckpoint: true } },
-    { id: 'build', type: 'executionNode', position: { x: 250, y: 100 }, data: { label: 'Build', status: 'success', duration: '45s' } },
-    { id: 'test', type: 'executionNode', position: { x: 500, y: 50 }, data: { label: 'Unit Tests', status: 'success', duration: '1m 20s' } },
-    { id: 'integration', type: 'executionNode', position: { x: 500, y: 150 }, data: { label: 'Integration', status: 'success', duration: '2m 10s' } },
-    { id: 'security', type: 'executionNode', position: { x: 750, y: 100 }, data: { label: 'Security Scan', status: 'success', duration: '3m' } },
-    { id: 'approval', type: 'executionNode', position: { x: 1000, y: 100 }, data: { label: 'Approval Gate', status: 'paused', isGate: true, isCheckpoint: true } },
-    { id: 'deploy', type: 'executionNode', position: { x: 1250, y: 100 }, data: { label: 'Deploy (AKS)', status: 'idle' } },
-    { id: 'health', type: 'executionNode', position: { x: 1500, y: 100 }, data: { label: 'Health Check', status: 'idle', isCheckpoint: true } },
-  ];
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
-  const initialEdges: Edge[] = [
-    { id: 'e1', source: 'source', target: 'build', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed }, style: { stroke: 'hsl(var(--sec-safe))' } },
-    { id: 'e2', source: 'build', target: 'test', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed }, style: { stroke: 'hsl(var(--sec-safe))' } },
-    { id: 'e3', source: 'build', target: 'integration', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed }, style: { stroke: 'hsl(var(--sec-safe))' } },
-    { id: 'e4', source: 'test', target: 'security', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed }, style: { stroke: 'hsl(var(--sec-safe))' } },
-    { id: 'e5', source: 'integration', target: 'security', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed }, style: { stroke: 'hsl(var(--sec-safe))' } },
-    { id: 'e6', source: 'security', target: 'approval', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed }, animated: true, style: { stroke: 'hsl(var(--sec-warning))' } },
-    { id: 'e7', source: 'approval', target: 'deploy', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed }, style: { stroke: 'hsl(var(--muted-foreground))', strokeDasharray: '5,5' } },
-    { id: 'e8', source: 'deploy', target: 'health', type: 'smoothstep', markerEnd: { type: MarkerType.ArrowClosed }, style: { stroke: 'hsl(var(--muted-foreground))', strokeDasharray: '5,5' } },
-  ];
+  // Real-time subscription for execution updates
+  useExecutionRealtime(executionId || null, (payload) => {
+    const newExecution = payload.new as ExecutionData;
+    if (newExecution) {
+      setExecution(newExecution);
+    }
+  });
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  // Real-time subscription for node updates
+  useNodeStatusRealtime(executionId || null, (nodeId, status, data) => {
+    setExecutionNodes(prev => {
+      const existing = prev.find(n => n.node_id === nodeId);
+      if (existing) {
+        return prev.map(n => n.node_id === nodeId ? { ...n, status, ...data } : n);
+      }
+      return [...prev, data];
+    });
+  });
+
+  // Fetch execution and nodes data
+  useEffect(() => {
+    if (!executionId) {
+      setLoading(false);
+      return;
+    }
+
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // Fetch execution
+        const { data: execData, error: execError } = await supabase
+          .from('executions')
+          .select('*')
+          .eq('id', executionId)
+          .single();
+
+        if (!execError && execData) {
+          setExecution(execData as ExecutionData);
+        }
+
+        // Fetch execution nodes
+        const { data: nodesData, error: nodesError } = await supabase
+          .from('execution_nodes')
+          .select('*')
+          .eq('execution_id', executionId)
+          .order('started_at', { ascending: true });
+
+        if (!nodesError && nodesData) {
+          setExecutionNodes(nodesData as NodeData[]);
+        }
+      } catch (err) {
+        console.error('[ExecutionFlowView] Error fetching data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [executionId]);
+
+  // Build React Flow nodes from execution_nodes data
+  useEffect(() => {
+    if (executionNodes.length === 0) {
+      // Show empty state with placeholder
+      setNodes([]);
+      setEdges([]);
+      return;
+    }
+
+    // Convert execution_nodes to React Flow nodes
+    const flowNodes: Node[] = executionNodes.map((node, index) => {
+      const metadata = node.metadata || {};
+      return {
+        id: node.node_id,
+        type: 'executionNode',
+        position: { x: index * 250, y: 100 },
+        data: {
+          label: (metadata as any).label || node.node_id,
+          status: node.status,
+          duration: formatDuration(node.duration_ms),
+          isCheckpoint: (metadata as any).isCheckpoint || false,
+          isGate: (metadata as any).isGate || false,
+          progress: (metadata as any).progress || 0,
+        },
+      };
+    });
+
+    // Create edges between sequential nodes
+    const flowEdges: Edge[] = executionNodes.slice(0, -1).map((node, index) => {
+      const nextNode = executionNodes[index + 1];
+      const status = node.status;
+      let strokeColor = 'hsl(var(--muted-foreground))';
+      let animated = false;
+      let dashArray = '5,5';
+
+      if (status === 'success') {
+        strokeColor = 'hsl(var(--sec-safe))';
+        dashArray = '';
+      } else if (status === 'running') {
+        strokeColor = 'hsl(var(--chart-1))';
+        animated = true;
+        dashArray = '';
+      } else if (status === 'failed') {
+        strokeColor = 'hsl(var(--sec-critical))';
+        dashArray = '';
+      } else if (status === 'paused') {
+        strokeColor = 'hsl(var(--sec-warning))';
+        animated = true;
+        dashArray = '';
+      }
+
+      return {
+        id: `e-${node.node_id}-${nextNode.node_id}`,
+        source: node.node_id,
+        target: nextNode.node_id,
+        type: 'smoothstep',
+        markerEnd: { type: MarkerType.ArrowClosed },
+        animated,
+        style: { stroke: strokeColor, strokeDasharray: dashArray },
+      };
+    });
+
+    setNodes(flowNodes);
+    setEdges(flowEdges);
+  }, [executionNodes, setNodes, setEdges]);
 
   // Fetch logs for selected node
   useEffect(() => {
@@ -213,49 +353,81 @@ const ExecutionFlowView = ({
     setSelectedNodeId(node.id);
   }, []);
 
-  return (
-    <div className="h-full flex">
-      {/* Flow Canvas */}
-      <div className="flex-1 relative">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeClick={handleNodeClick}
-          fitView
-          className="bg-muted/20"
-        >
-          <Background color="hsl(var(--border))" gap={20} />
-          <Controls className="bg-background border border-border rounded-lg" />
-          <MiniMap 
-            className="bg-background border border-border rounded-lg"
-            nodeColor={(node) => {
-              const status = node.data?.status as string;
-              if (status === 'success') return 'hsl(var(--sec-safe))';
-              if (status === 'failed') return 'hsl(var(--sec-critical))';
-              if (status === 'running') return 'hsl(var(--chart-1))';
-              if (status === 'paused') return 'hsl(var(--sec-warning))';
-              return 'hsl(var(--muted-foreground))';
-            }}
-          />
-        </ReactFlow>
+  const getStatusBadge = () => {
+    if (!execution) return null;
+    
+    const statusConfig: Record<string, { color: string; label: string }> = {
+      idle: { color: 'bg-muted text-muted-foreground', label: 'Idle' },
+      running: { color: 'bg-chart-1 text-primary-foreground', label: 'Running' },
+      success: { color: 'bg-sec-safe text-sec-safe-foreground', label: 'Completed' },
+      failed: { color: 'bg-sec-critical text-sec-critical-foreground', label: 'Failed' },
+      paused: { color: 'bg-sec-warning text-sec-warning-foreground', label: 'Awaiting Approval' },
+      warning: { color: 'bg-sec-warning text-sec-warning-foreground', label: 'Warning' },
+    };
+    
+    const config = statusConfig[execution.status] || statusConfig.idle;
+    
+    return (
+      <Badge className={cn('gap-1.5', config.color)}>
+        {execution.status === 'running' && <span className="w-2 h-2 rounded-full bg-current animate-pulse" />}
+        {config.label}
+      </Badge>
+    );
+  };
 
-        {/* Flow Header */}
-        <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none">
-          <div className="pointer-events-auto">
-            <Badge variant="outline" className="bg-background/95 backdrop-blur-sm">
-              <span className="w-2 h-2 rounded-full bg-sec-warning mr-2 animate-pulse" />
-              Awaiting Approval
-            </Badge>
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!executionId) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-center px-6">
+        <Play className="w-12 h-12 text-muted-foreground mb-4" />
+        <h2 className="text-xl font-semibold text-foreground mb-2">No Execution Selected</h2>
+        <p className="text-sm text-muted-foreground max-w-md">
+          Select an active execution from the Control Tower dashboard to view its real-time flow progress.
+        </p>
+        {onBack && (
+          <Button variant="outline" className="mt-4 gap-2" onClick={onBack}>
+            <ArrowLeft className="w-4 h-4" />
+            Back to Dashboard
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="border-b border-border bg-background/95 backdrop-blur-sm px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {onBack && (
+              <Button variant="ghost" size="icon" onClick={onBack}>
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+            )}
+            <div>
+              <h1 className="text-lg font-semibold">{execution?.name || 'Execution Flow'}</h1>
+              <div className="flex items-center gap-2 mt-0.5 text-sm text-muted-foreground">
+                <span>{execution?.branch || 'main'}</span>
+                <span>•</span>
+                <span className="capitalize">{execution?.environment}</span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2 pointer-events-auto">
-            <Button variant="outline" size="sm" className="bg-background/95 backdrop-blur-sm gap-1.5">
+          <div className="flex items-center gap-2">
+            {getStatusBadge()}
+            <Button variant="outline" size="sm" className="gap-1.5">
               <RotateCcw className="w-3.5 h-3.5" />
               Rollback
             </Button>
-            <Button variant="outline" size="sm" className="bg-background/95 backdrop-blur-sm gap-1.5">
+            <Button variant="outline" size="sm" className="gap-1.5">
               <GitBranch className="w-3.5 h-3.5" />
               Branch
             </Button>
@@ -263,121 +435,161 @@ const ExecutionFlowView = ({
         </div>
       </div>
 
-      {/* Node Inspector Panel */}
-      <AnimatePresence>
-        {selectedNodeId && selectedNode && (
-          <motion.div
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 350, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="border-l border-border bg-background overflow-hidden"
-          >
-            <div className="w-[350px] h-full flex flex-col">
-              {/* Inspector Header */}
-              <div className="p-4 border-b border-border">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-foreground">{String(selectedNode.label || '')}</h3>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-7 w-7"
-                    onClick={() => setSelectedNodeId(null)}
-                  >
-                    <XCircle className="w-4 h-4" />
-                  </Button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge 
-                    variant={selectedNode.status === 'success' ? 'default' : 'secondary'}
-                    className={cn(
-                      selectedNode.status === 'success' && 'bg-sec-safe text-sec-safe-foreground',
-                      selectedNode.status === 'failed' && 'bg-sec-critical text-sec-critical-foreground',
-                      selectedNode.status === 'running' && 'bg-chart-1 text-primary-foreground',
-                      selectedNode.status === 'paused' && 'bg-sec-warning text-sec-warning-foreground',
-                    )}
-                  >
-                    {String(selectedNode.status || '')}
-                  </Badge>
-                  {selectedNode.duration && (
-                    <span className="text-xs text-muted-foreground">{String(selectedNode.duration)}</span>
-                  )}
-                  {selectedNode.isCheckpoint && (
-                    <Badge variant="outline" className="gap-1">
-                      <Bookmark className="w-3 h-3" /> Checkpoint
-                    </Badge>
-                  )}
-                </div>
-              </div>
-
-              {/* Checkpoint Actions */}
-              {selectedNode.isCheckpoint && (
-                <div className="p-4 border-b border-border space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Checkpoint Actions</p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" className="gap-1.5">
-                      <Pause className="w-3.5 h-3.5" /> Pause
-                    </Button>
-                    <Button variant="outline" size="sm" className="gap-1.5">
-                      <RotateCcw className="w-3.5 h-3.5" /> Re-run from here
-                    </Button>
-                    <Button variant="outline" size="sm" className="gap-1.5">
-                      <GitBranch className="w-3.5 h-3.5" /> Branch
-                    </Button>
-                    <Button variant="outline" size="sm" className="gap-1.5">
-                      <Eye className="w-3.5 h-3.5" /> Inspect state
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Gate Actions */}
-              {selectedNode.isGate && selectedNode.status === 'paused' && (
-                <div className="p-4 border-b border-border">
-                  <Button 
-                    className="w-full gap-2"
-                    onClick={() => onOpenApproval?.(selectedNodeId)}
-                  >
-                    <Shield className="w-4 h-4" />
-                    Open Approval Gate
-                  </Button>
-                </div>
-              )}
-
-              {/* Logs */}
-              <div className="flex-1 flex flex-col min-h-0">
-                <div className="px-4 py-2 border-b border-border flex items-center gap-2">
-                  <Terminal className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Logs</span>
-                  {selectedNode.status === 'running' && (
-                    <div className="w-2 h-2 rounded-full bg-sec-safe animate-pulse ml-auto" />
-                  )}
-                </div>
-                <ScrollArea className="flex-1">
-                  <div className="p-2 font-mono text-[11px] space-y-1">
-                    {logs.length === 0 ? (
-                      <p className="text-muted-foreground text-center py-4">No logs yet</p>
-                    ) : (
-                      logs.map((log, i) => (
-                        <div key={i} className="flex gap-2">
-                          <span className="text-muted-foreground shrink-0">{log.timestamp}</span>
-                          <span className={cn(
-                            'shrink-0',
-                            log.level === 'error' && 'text-sec-critical',
-                            log.level === 'warn' && 'text-sec-warning',
-                            log.level === 'info' && 'text-muted-foreground',
-                          )}>[{log.level.toUpperCase()}]</span>
-                          <span className="text-foreground break-all">{log.message}</span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </ScrollArea>
-              </div>
+      {/* Flow Canvas */}
+      <div className="flex-1 flex">
+        <div className="flex-1 relative">
+          {nodes.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center px-6">
+              <RefreshCw className="w-10 h-10 text-muted-foreground mb-4 animate-spin" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">Waiting for Nodes</h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Execution nodes will appear here as they are created and processed.
+              </p>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          ) : (
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              nodeTypes={nodeTypes}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onNodeClick={handleNodeClick}
+              fitView
+              className="bg-muted/20"
+            >
+              <Background color="hsl(var(--border))" gap={20} />
+              <Controls className="bg-background border border-border rounded-lg" />
+              <MiniMap 
+                className="bg-background border border-border rounded-lg"
+                nodeColor={(node) => {
+                  const status = node.data?.status as string;
+                  if (status === 'success') return 'hsl(var(--sec-safe))';
+                  if (status === 'failed') return 'hsl(var(--sec-critical))';
+                  if (status === 'running') return 'hsl(var(--chart-1))';
+                  if (status === 'paused') return 'hsl(var(--sec-warning))';
+                  return 'hsl(var(--muted-foreground))';
+                }}
+              />
+            </ReactFlow>
+          )}
+        </div>
+
+        {/* Node Inspector Panel */}
+        <AnimatePresence>
+          {selectedNodeId && selectedNode && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 350, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="border-l border-border bg-background overflow-hidden"
+            >
+              <div className="w-[350px] h-full flex flex-col">
+                {/* Inspector Header */}
+                <div className="p-4 border-b border-border">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-foreground">{String(selectedNode.label || '')}</h3>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-7 w-7"
+                      onClick={() => setSelectedNodeId(null)}
+                    >
+                      <XCircle className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge 
+                      variant={selectedNode.status === 'success' ? 'default' : 'secondary'}
+                      className={cn(
+                        selectedNode.status === 'success' && 'bg-sec-safe text-sec-safe-foreground',
+                        selectedNode.status === 'failed' && 'bg-sec-critical text-sec-critical-foreground',
+                        selectedNode.status === 'running' && 'bg-chart-1 text-primary-foreground',
+                        selectedNode.status === 'paused' && 'bg-sec-warning text-sec-warning-foreground',
+                      )}
+                    >
+                      {String(selectedNode.status || '')}
+                    </Badge>
+                    {selectedNode.duration && (
+                      <span className="text-xs text-muted-foreground">{String(selectedNode.duration)}</span>
+                    )}
+                    {selectedNode.isCheckpoint && (
+                      <Badge variant="outline" className="gap-1">
+                        <Bookmark className="w-3 h-3" /> Checkpoint
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                {/* Checkpoint Actions */}
+                {selectedNode.isCheckpoint && (
+                  <div className="p-4 border-b border-border space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Checkpoint Actions</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" className="gap-1.5">
+                        <Pause className="w-3.5 h-3.5" /> Pause
+                      </Button>
+                      <Button variant="outline" size="sm" className="gap-1.5">
+                        <RotateCcw className="w-3.5 h-3.5" /> Re-run from here
+                      </Button>
+                      <Button variant="outline" size="sm" className="gap-1.5">
+                        <GitBranch className="w-3.5 h-3.5" /> Branch
+                      </Button>
+                      <Button variant="outline" size="sm" className="gap-1.5">
+                        <Eye className="w-3.5 h-3.5" /> Inspect state
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Gate Actions */}
+                {selectedNode.isGate && selectedNode.status === 'paused' && (
+                  <div className="p-4 border-b border-border">
+                    <Button 
+                      className="w-full gap-2"
+                      onClick={() => onOpenApproval?.(selectedNodeId)}
+                    >
+                      <Shield className="w-4 h-4" />
+                      Open Approval Gate
+                    </Button>
+                  </div>
+                )}
+
+                {/* Logs */}
+                <div className="flex-1 flex flex-col min-h-0">
+                  <div className="px-4 py-2 border-b border-border flex items-center gap-2">
+                    <Terminal className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Logs</span>
+                    {selectedNode.status === 'running' && (
+                      <div className="w-2 h-2 rounded-full bg-sec-safe animate-pulse ml-auto" />
+                    )}
+                  </div>
+                  <ScrollArea className="flex-1">
+                    <div className="p-2 font-mono text-[11px] space-y-1">
+                      {logs.length === 0 ? (
+                        <p className="text-muted-foreground text-center py-4">No logs yet</p>
+                      ) : (
+                        logs.map((log, i) => (
+                          <div key={i} className="flex gap-2">
+                            <span className="text-muted-foreground shrink-0">{log.timestamp}</span>
+                            <span className={cn(
+                              'shrink-0',
+                              log.level === 'error' && 'text-sec-critical',
+                              log.level === 'warn' && 'text-sec-warning',
+                              log.level === 'info' && 'text-muted-foreground',
+                            )}>[{log.level.toUpperCase()}]</span>
+                            <span className="text-foreground break-all">{log.message}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 };

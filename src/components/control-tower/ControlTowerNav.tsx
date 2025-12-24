@@ -10,6 +10,7 @@ import {
   Activity,
   ChevronLeft,
   ChevronRight,
+  History,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -37,6 +38,12 @@ const navItems = [
     icon: Play, 
     description: 'Active and recent flows',
     badge: 'live'
+  },
+  { 
+    id: 'deployments', 
+    label: 'Deployments', 
+    icon: History, 
+    description: 'Deployment history per environment'
   },
   { 
     id: 'environments', 
