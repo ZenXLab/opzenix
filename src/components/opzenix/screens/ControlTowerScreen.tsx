@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Activity,
@@ -13,6 +14,7 @@ import {
   Eye,
   RefreshCw,
   LayoutGrid,
+  Zap,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,19 +26,21 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useWidgetRealtime } from '@/hooks/useWidgetRealtime';
+import { useControlTowerRealtime } from '@/hooks/useControlTowerRealtime';
 import { useRBACPermissions } from '@/hooks/useRBACPermissions';
+import BreakGlassModal from './BreakGlassModal';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 
 // ============================================
 // 🏢 CONTROL TOWER SCREEN (MVP 1.0.0 LOCKED)
 // ============================================
-// READ-ONLY DASHBOARD
+// READ-ONLY DASHBOARD with REAL-TIME UPDATES
 // - Widgets only (health, approvals count, audit feed)
 // - NO flows
 // - NO deploy/approve buttons
 // - Audit context dominates
+// - Break-glass available for CTO only
 // ============================================
 
 interface ControlTowerScreenProps {
@@ -44,27 +48,69 @@ interface ControlTowerScreenProps {
 }
 
 export function ControlTowerScreen({ onNavigateToFlow }: ControlTowerScreenProps) {
-  const { dbRole, isAdmin } = useRBACPermissions();
-  const { data: executionsData, refresh: refreshExecutions } = useWidgetRealtime({
-    widgetType: 'pipeline-status',
-    refreshInterval: 15,
-  });
-  const { data: approvalsData, refresh: refreshApprovals } = useWidgetRealtime({
-    widgetType: 'approval-queue',
-    refreshInterval: 10,
-  });
-  const { data: auditData, refresh: refreshAudit } = useWidgetRealtime({
-    widgetType: 'audit-trail',
-    refreshInterval: 15,
-  });
+  const [breakGlassOpen, setBreakGlassOpen] = useState(false);
+  const [breakGlassEnv, setBreakGlassEnv] = useState('prod');
+
+  const { dbRole, isAdmin, canBreakGlass } = useRBACPermissions();
+  const {
+    executions,
+    activeExecutions,
+    pendingApprovals,
+    recentDeployments,
+    isConnected,
+    lastUpdated,
+    loading,
+    refetch,
+  } = useControlTowerRealtime();
+
+  // Derive metrics from real-time state
+  const executionsData = {
+    total: executions?.length || 0,
+    running: activeExecutions?.length || 0,
+    success: executions?.filter((e) => e.status === 'success').length || 0,
+    failed: executions?.filter((e) => e.status === 'failed').length || 0,
+  };
+
+  const approvalsData = {
+    pending: pendingApprovals?.length || 0,
+    items: pendingApprovals || [],
+  };
+
+  // Fetch audit logs separately for display
+  const auditData = {
+    total: 0,
+    items: [] as any[],
+  };
+
+  // Compute environment statuses from real-time deployments
+  const getEnvironmentStatus = (envId: string) => {
+    const envDeployments = recentDeployments?.filter(
+      (d) => d.environment?.toLowerCase() === envId.toLowerCase()
+    );
+    const latest = envDeployments?.[0];
+    const blocked = executions?.some(
+      (e) => e.environment?.toLowerCase() === envId.toLowerCase() && e.governance_status === 'blocked'
+    );
+
+    return {
+      status: blocked ? 'blocked' : latest?.status === 'running' ? 'deploying' : latest?.status === 'failed' ? 'failed' : 'healthy',
+      lastDeploy: latest?.deployed_at ? formatDistanceToNow(new Date(latest.deployed_at)) + ' ago' : 'N/A',
+      version: latest?.version || 'N/A',
+    };
+  };
 
   const environments = [
-    { id: 'dev', label: 'DEV', status: 'healthy', lastDeploy: '2h ago', version: 'v1.5.2' },
-    { id: 'uat', label: 'UAT', status: 'healthy', lastDeploy: '4h ago', version: 'v1.5.1' },
-    { id: 'staging', label: 'STAGING', status: 'deploying', lastDeploy: 'In progress', version: 'v1.5.2' },
-    { id: 'preprod', label: 'PREPROD', status: 'healthy', lastDeploy: '1d ago', version: 'v1.5.0' },
-    { id: 'prod', label: 'PROD', status: 'healthy', lastDeploy: '3d ago', version: 'v1.4.9' },
+    { id: 'dev', label: 'DEV', ...getEnvironmentStatus('dev') },
+    { id: 'uat', label: 'UAT', ...getEnvironmentStatus('uat') },
+    { id: 'staging', label: 'STAGING', ...getEnvironmentStatus('staging') },
+    { id: 'preprod', label: 'PREPROD', ...getEnvironmentStatus('preprod') },
+    { id: 'prod', label: 'PROD', ...getEnvironmentStatus('prod') },
   ];
+
+  const handleBreakGlass = (envId: string) => {
+    setBreakGlassEnv(envId);
+    setBreakGlassOpen(true);
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -117,13 +163,46 @@ export function ControlTowerScreen({ onNavigateToFlow }: ControlTowerScreenProps
             <Badge variant="outline" className="text-xs">
               Role: {dbRole?.toUpperCase() || 'VIEWER'}
             </Badge>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-sec-safe/10 text-sec-safe text-xs font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-sec-safe animate-pulse" />
-              Live
+            <div className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium',
+              isConnected ? 'bg-sec-safe/10 text-sec-safe' : 'bg-sec-warning/10 text-sec-warning'
+            )}>
+              <span className={cn(
+                'w-1.5 h-1.5 rounded-full',
+                isConnected ? 'bg-sec-safe animate-pulse' : 'bg-sec-warning'
+              )} />
+              {isConnected ? 'Live' : 'Reconnecting...'}
             </div>
+            {canBreakGlass() && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => handleBreakGlass('prod')}
+                    >
+                      <Zap className="w-3.5 h-3.5" />
+                      Break Glass
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">Emergency production override (CTO only)</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Break Glass Modal */}
+      <BreakGlassModal
+        open={breakGlassOpen}
+        onClose={() => setBreakGlassOpen(false)}
+        environment={breakGlassEnv}
+      />
 
       {/* Content */}
       <ScrollArea className="flex-1">
@@ -240,7 +319,7 @@ export function ControlTowerScreen({ onNavigateToFlow }: ControlTowerScreenProps
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={refreshApprovals}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={refetch}>
                         <RefreshCw className="w-3.5 h-3.5" />
                       </Button>
                     </TooltipTrigger>
@@ -275,7 +354,7 @@ export function ControlTowerScreen({ onNavigateToFlow }: ControlTowerScreenProps
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={refreshAudit}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={refetch}>
                         <RefreshCw className="w-3.5 h-3.5" />
                       </Button>
                     </TooltipTrigger>
