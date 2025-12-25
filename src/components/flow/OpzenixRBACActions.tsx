@@ -10,6 +10,7 @@ import {
   Eye,
   Rocket,
   RefreshCw,
+  Info,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +33,15 @@ import {
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { useRBACPermissions, type Environment as RBACEnvironment } from '@/hooks/useRBACPermissions';
+import {
+  RBAC_ACTION_MATRIX,
+  RBAC_ENVIRONMENT_ACCESS,
+  ENVIRONMENT_CONFIGS,
+  DB_ROLE_TO_OPZENIX,
+  type RBACRole,
+  type RBACAction,
+  type EnvironmentId,
+} from '@/lib/opzenix-constants';
 
 // ============================================
 // 🔒 OPZENIX RBAC UI ENFORCEMENT (LOCKED MVP 1.0.0)
@@ -39,18 +49,13 @@ import { useRBACPermissions, type Environment as RBACEnvironment } from '@/hooks
 // UI actions enabled/disabled based on role
 // Disabled buttons MUST be visible with tooltip
 // No hidden permissions. No implicit actions.
+// CTO override = warning + confirmation + BREAK-GLASS log
 // ============================================
 
-export type OpzenixAction = 
-  | 'view-ci' 
-  | 'view-cd' 
-  | 'approve' 
-  | 'deploy' 
-  | 'rollback' 
-  | 'break-glass';
+export type OpzenixAction = RBACAction;
 
 interface RBACActionButtonProps {
-  action: OpzenixAction;
+  action: RBACAction;
   environment: RBACEnvironment;
   onAction: () => void;
   loading?: boolean;
@@ -59,8 +64,8 @@ interface RBACActionButtonProps {
   className?: string;
 }
 
-// Action configurations
-const ACTION_CONFIG: Record<OpzenixAction, {
+// Action configurations (LOCKED)
+const ACTION_CONFIG: Record<RBACAction, {
   icon: React.ElementType;
   label: string;
   description: string;
@@ -70,13 +75,13 @@ const ACTION_CONFIG: Record<OpzenixAction, {
 }> = {
   'view-ci': {
     icon: Eye,
-    label: 'View CI Flow',
+    label: 'View CI',
     description: 'View continuous integration pipeline',
     requiresConfirmation: false,
   },
   'view-cd': {
     icon: Rocket,
-    label: 'View CD Flow',
+    label: 'View CD',
     description: 'View continuous deployment pipeline',
     requiresConfirmation: false,
   },
@@ -86,7 +91,7 @@ const ACTION_CONFIG: Record<OpzenixAction, {
     description: 'Approve deployment to this environment',
     requiresConfirmation: true,
     confirmationTitle: 'Confirm Approval',
-    confirmationDescription: 'Are you sure you want to approve this deployment? This action will be logged.',
+    confirmationDescription: 'Are you sure you want to approve this deployment? This action will be logged with your identity, role, and timestamp.',
   },
   'deploy': {
     icon: Play,
@@ -94,7 +99,7 @@ const ACTION_CONFIG: Record<OpzenixAction, {
     description: 'Trigger deployment to this environment',
     requiresConfirmation: true,
     confirmationTitle: 'Confirm Deployment',
-    confirmationDescription: 'Are you sure you want to deploy to this environment? This action cannot be undone.',
+    confirmationDescription: 'Are you sure you want to deploy? This will promote the verified artifact to the target environment.',
   },
   'rollback': {
     icon: RotateCcw,
@@ -110,62 +115,51 @@ const ACTION_CONFIG: Record<OpzenixAction, {
     description: 'Emergency override - CTO only',
     requiresConfirmation: true,
     confirmationTitle: '⚠️ BREAK GLASS EMERGENCY OVERRIDE',
-    confirmationDescription: 'This action bypasses all approval gates and will be logged as BREAK-GLASS. Only use in emergency situations. Are you absolutely sure?',
+    confirmationDescription: 'This action bypasses all approval gates. Only use in genuine emergencies. This will be logged as BREAK-GLASS with full audit trail.',
   },
 };
 
-// Role-based permission check
-const checkPermission = (
-  action: OpzenixAction,
-  environment: RBACEnvironment,
-  permissions: ReturnType<typeof useRBACPermissions>
-): { allowed: boolean; reason?: string } => {
-  const { canView, canApprove, canDeploy, canRollback, canBreakGlass, isAdmin, dbRole } = permissions;
+// Get user's OPZENIX roles from database role
+const getOpzenixRoles = (dbRole: string | null): RBACRole[] => {
+  if (!dbRole) return [];
+  return DB_ROLE_TO_OPZENIX[dbRole] || [];
+};
 
-  switch (action) {
-    case 'view-ci':
-      // Everyone can view CI
-      return { allowed: true };
+// Check if action is allowed for role in environment (using LOCKED matrix)
+const checkActionPermission = (
+  action: RBACAction,
+  environment: EnvironmentId,
+  opzenixRoles: RBACRole[]
+): { allowed: boolean; reason: string; allowingRole?: RBACRole } => {
+  // Check each role the user has
+  for (const role of opzenixRoles) {
+    const roleMatrix = RBAC_ACTION_MATRIX[role];
+    if (!roleMatrix) continue;
+
+    const actionPermission = roleMatrix[action];
     
-    case 'view-cd':
-      // Check if user can view CD for this environment
-      if (canView(environment)) return { allowed: true };
-      return { 
-        allowed: false, 
-        reason: `Your role (${dbRole || 'viewer'}) cannot view CD flows for ${environment.toUpperCase()}` 
-      };
+    // If action is boolean true, allowed everywhere
+    if (actionPermission === true) {
+      return { allowed: true, reason: `Allowed for ${role}`, allowingRole: role };
+    }
     
-    case 'approve':
-      if (canApprove(environment)) return { allowed: true };
-      return { 
-        allowed: false, 
-        reason: `Your role (${dbRole || 'viewer'}) cannot approve deployments to ${environment.toUpperCase()}` 
-      };
-    
-    case 'deploy':
-      if (canDeploy(environment)) return { allowed: true };
-      return { 
-        allowed: false, 
-        reason: `Your role (${dbRole || 'viewer'}) cannot deploy to ${environment.toUpperCase()}` 
-      };
-    
-    case 'rollback':
-      if (canRollback(environment)) return { allowed: true };
-      return { 
-        allowed: false, 
-        reason: `Your role (${dbRole || 'viewer'}) cannot rollback in ${environment.toUpperCase()}` 
-      };
-    
-    case 'break-glass':
-      if (canBreakGlass()) return { allowed: true };
-      return { 
-        allowed: false, 
-        reason: 'Break-Glass is only available to CTO (Super Admin)' 
-      };
-    
-    default:
-      return { allowed: false, reason: 'Unknown action' };
+    // If action is array, check if environment is in it
+    if (Array.isArray(actionPermission)) {
+      if (actionPermission.includes(environment)) {
+        return { allowed: true, reason: `Allowed for ${role} in ${environment.toUpperCase()}`, allowingRole: role };
+      }
+    }
   }
+
+  // Not allowed
+  const roleNames = opzenixRoles.length > 0 ? opzenixRoles.join(', ') : 'Viewer';
+  const envConfig = ENVIRONMENT_CONFIGS[environment];
+  const requiredRoles = envConfig?.approval.roles.join(' or ') || 'authorized personnel';
+  
+  return {
+    allowed: false,
+    reason: `Action not permitted for your role in ${environment.toUpperCase()}. Required: ${requiredRoles}`,
+  };
 };
 
 // RBAC Action Button Component
@@ -178,9 +172,10 @@ export const RBACActionButton = memo(({
   size = 'default',
   className,
 }: RBACActionButtonProps) => {
-  const permissions = useRBACPermissions();
+  const { dbRole, isAdmin } = useRBACPermissions();
+  const opzenixRoles = getOpzenixRoles(dbRole);
   const config = ACTION_CONFIG[action];
-  const { allowed, reason } = checkPermission(action, environment, permissions);
+  const { allowed, reason, allowingRole } = checkActionPermission(action, environment as EnvironmentId, opzenixRoles);
   const Icon = config.icon;
 
   const buttonContent = (
@@ -191,36 +186,47 @@ export const RBACActionButton = memo(({
       onClick={allowed && !config.requiresConfirmation ? onAction : undefined}
       className={cn(
         'gap-2',
-        !allowed && 'opacity-60 cursor-not-allowed',
-        action === 'break-glass' && allowed && 'bg-red-600 hover:bg-red-700 text-white',
+        !allowed && 'opacity-50 cursor-not-allowed',
+        action === 'break-glass' && allowed && 'bg-destructive hover:bg-destructive/90 text-destructive-foreground',
         className
       )}
     >
-      <Icon className={cn('w-4 h-4', loading && 'animate-spin')} />
+      {loading ? (
+        <RefreshCw className="w-4 h-4 animate-spin" />
+      ) : (
+        <Icon className="w-4 h-4" />
+      )}
       {config.label}
     </Button>
   );
 
-  // Wrap with tooltip for disabled state
+  // Wrap with tooltip (ALWAYS visible for disabled state explanation)
   const buttonWithTooltip = (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
           <span className="inline-block">{buttonContent}</span>
         </TooltipTrigger>
-        {!allowed && reason && (
-          <TooltipContent className="max-w-xs">
-            <div className="flex items-center gap-2">
-              <Lock className="w-3 h-3 text-muted-foreground" />
-              <span>{reason}</span>
-            </div>
-          </TooltipContent>
-        )}
+        <TooltipContent className="max-w-xs">
+          <div className="space-y-1">
+            {!allowed ? (
+              <div className="flex items-start gap-2">
+                <Lock className="w-3 h-3 mt-0.5 text-amber-400 flex-shrink-0" />
+                <span className="text-xs">{reason}</span>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="w-3 h-3 mt-0.5 text-emerald-400 flex-shrink-0" />
+                <span className="text-xs">{reason}</span>
+              </div>
+            )}
+          </div>
+        </TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
 
-  // Wrap with confirmation dialog if needed
+  // Wrap with confirmation dialog if needed and allowed
   if (allowed && config.requiresConfirmation) {
     return (
       <AlertDialog>
@@ -229,17 +235,37 @@ export const RBACActionButton = memo(({
         </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className={action === 'break-glass' ? 'text-red-500' : ''}>
+            <AlertDialogTitle className={action === 'break-glass' ? 'text-destructive' : ''}>
               {config.confirmationTitle}
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              {config.confirmationDescription}
+            <AlertDialogDescription className="space-y-3">
+              <p>{config.confirmationDescription}</p>
+              
+              {/* Audit info */}
+              <div className="p-3 bg-muted/50 rounded-lg border border-border text-xs space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Environment:</span>
+                  <span className="font-medium text-foreground">{environment.toUpperCase()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Role:</span>
+                  <span className="font-medium text-foreground">{allowingRole || dbRole?.toUpperCase()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Action:</span>
+                  <span className="font-medium text-foreground">{config.label}</span>
+                </div>
+              </div>
+
               {action === 'break-glass' && (
-                <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-                  <div className="flex items-center gap-2 text-red-500 font-medium">
+                <div className="p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
+                  <div className="flex items-center gap-2 text-destructive font-medium text-sm">
                     <AlertTriangle className="w-4 h-4" />
                     This action will be logged as BREAK-GLASS
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Full audit trail with identity, timestamp, and justification will be recorded.
+                  </p>
                 </div>
               )}
             </AlertDialogDescription>
@@ -248,7 +274,7 @@ export const RBACActionButton = memo(({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={onAction}
-              className={action === 'break-glass' ? 'bg-red-600 hover:bg-red-700' : ''}
+              className={action === 'break-glass' ? 'bg-destructive hover:bg-destructive/90' : ''}
             >
               Confirm {config.label}
             </AlertDialogAction>
@@ -280,23 +306,43 @@ export const RBACActionsPanel = memo(({
   onBreakGlass,
   loading = {},
 }: RBACActionsPanelProps) => {
-  const { dbRole, rbacRoles, isAdmin } = useRBACPermissions();
+  const { dbRole, isAdmin } = useRBACPermissions();
+  const opzenixRoles = getOpzenixRoles(dbRole);
+  const envConfig = ENVIRONMENT_CONFIGS[environment as EnvironmentId];
 
   return (
     <div className="space-y-4">
-      {/* Role Badge */}
+      {/* Role & Environment Info */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Shield className="w-4 h-4 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">Your Role:</span>
+          <span className="text-xs text-muted-foreground">Role:</span>
           <Badge variant="secondary" className="text-xs">
-            {dbRole?.toUpperCase() || 'VIEWER'}
+            {opzenixRoles[0] || dbRole?.toUpperCase() || 'VIEWER'}
           </Badge>
         </div>
         <Badge variant="outline" className="text-xs">
           {environment.toUpperCase()}
         </Badge>
       </div>
+
+      {/* Environment Info */}
+      {envConfig && (
+        <div className="p-2 bg-muted/30 rounded-lg text-xs space-y-1">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Strategy:</span>
+            <span className="text-foreground capitalize">{envConfig.cd.deploymentStrategy}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Required Approvals:</span>
+            <span className="text-foreground">{envConfig.approval.requiredApprovers}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Required Roles:</span>
+            <span className="text-foreground">{envConfig.approval.roles.join(', ')}</span>
+          </div>
+        </div>
+      )}
 
       {/* Actions Grid */}
       <div className="grid grid-cols-2 gap-2">
@@ -343,27 +389,25 @@ export const RBACActionsPanel = memo(({
         )}
       </div>
 
-      {/* RBAC Info */}
-      <div className="text-[10px] text-muted-foreground border-t border-border pt-2">
-        <div className="flex items-center gap-1">
-          <Lock className="w-3 h-3" />
-          Actions enforced by RBAC policy MVP 1.0.0
-        </div>
+      {/* RBAC Notice */}
+      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground border-t border-border pt-2">
+        <Lock className="w-3 h-3" />
+        <span>Actions enforced by RBAC policy MVP 1.0.0 (LOCKED)</span>
       </div>
     </div>
   );
 });
 RBACActionsPanel.displayName = 'RBACActionsPanel';
 
-// Role Matrix Display
+// RBAC Role Matrix Display (LOCKED)
 export const RBACRoleMatrix = memo(() => {
-  const roles = [
+  const roles: { name: RBACRole; envs: string[]; actions: string[] }[] = [
     { name: 'Tech Lead', envs: ['Dev'], actions: ['View CI/CD', 'Approve', 'Deploy'] },
     { name: 'QA Lead', envs: ['UAT'], actions: ['View CI', 'Approve'] },
     { name: 'Architect', envs: ['Staging', 'PreProd'], actions: ['View CI/CD', 'Approve'] },
     { name: 'Platform Owner', envs: ['Prod'], actions: ['View CI/CD', 'Approve', 'Deploy', 'Rollback'] },
     { name: 'Security Head', envs: ['Prod'], actions: ['View CI', 'Approve'] },
-    { name: 'CTO', envs: ['All'], actions: ['All', 'Break-Glass'] },
+    { name: 'CTO', envs: ['All'], actions: ['All + Break-Glass'] },
   ];
 
   return (
@@ -372,6 +416,7 @@ export const RBACRoleMatrix = memo(() => {
         <Shield className="w-3 h-3" />
         RBAC Role Matrix (MVP 1.0.0 LOCKED)
       </div>
+      
       <div className="space-y-2">
         {roles.map((role) => (
           <div 
@@ -383,12 +428,26 @@ export const RBACRoleMatrix = memo(() => {
               <Badge variant="outline" className="text-[10px]">
                 {role.envs.join(', ')}
               </Badge>
-              <span className="text-muted-foreground">
-                {role.actions.slice(0, 2).join(', ')}{role.actions.length > 2 ? '...' : ''}
+              <span className="text-muted-foreground text-[10px]">
+                {role.actions.length > 2 
+                  ? `${role.actions.slice(0, 2).join(', ')}...` 
+                  : role.actions.join(', ')}
               </span>
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+        <div className="flex items-start gap-2 text-xs">
+          <Info className="w-3 h-3 mt-0.5 text-amber-400 flex-shrink-0" />
+          <div>
+            <p className="text-amber-400 font-medium">No Hidden Permissions</p>
+            <p className="text-muted-foreground">
+              Disabled buttons show tooltips explaining why. No self-approval allowed.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

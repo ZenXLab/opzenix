@@ -15,6 +15,7 @@ import {
   Rocket,
   Shield,
   Info,
+  Package,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -31,15 +32,26 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useRBACPermissions } from '@/hooks/useRBACPermissions';
+import {
+  ENVIRONMENT_ORDER as LOCKED_ENV_ORDER,
+  ENVIRONMENT_DISPLAY_NAMES as LOCKED_ENV_NAMES,
+  ENVIRONMENT_CONFIGS,
+  PROMOTION_RULES,
+  canPromote,
+  getNextEnvironment,
+  type EnvironmentId,
+  type EnvironmentConfig,
+} from '@/lib/opzenix-constants';
 
 // ============================================
 // 🔒 OPZENIX ENVIRONMENT LAYER (LOCKED MVP 1.0.0)
 // ============================================
 // Order is IMMUTABLE: DEV → UAT → STAGING → PREPROD → PROD
 // Boxes are NOT draggable
+// No skipping. No sideways promotion. No rebuilds.
 // ============================================
 
-export type EnvironmentId = 'dev' | 'uat' | 'staging' | 'preprod' | 'prod';
+export type { EnvironmentId };
 export type EnvironmentStatus = 'healthy' | 'blocked' | 'failed' | 'pending';
 export type FlowViewMode = 'ci' | 'cd' | 'ci+cd';
 
@@ -56,22 +68,17 @@ interface EnvironmentData {
     timestamp: string;
     status: 'success' | 'failed' | 'running';
     deployedBy?: string;
+    artifactSha?: string; // Track artifact SHA for promotion validation
   };
   policyId?: string;
   approvalStatus?: 'approved' | 'pending' | 'rejected';
   ciStatus?: 'passed' | 'failed' | 'running' | 'pending';
+  sourceArtifactSha?: string; // SHA of artifact promoted from previous env
 }
 
-// LOCKED Environment Order (NON-NEGOTIABLE)
-const ENVIRONMENT_ORDER: EnvironmentId[] = ['dev', 'uat', 'staging', 'preprod', 'prod'];
-
-const ENVIRONMENT_DISPLAY_NAMES: Record<EnvironmentId, string> = {
-  dev: 'DEV',
-  uat: 'UAT',
-  staging: 'STAGING',
-  preprod: 'PREPROD',
-  prod: 'PROD',
-};
+// Re-export locked constants
+export const ENVIRONMENT_ORDER = LOCKED_ENV_ORDER;
+export const ENVIRONMENT_DISPLAY_NAMES = LOCKED_ENV_NAMES;
 
 // Status colors (LOCKED)
 const STATUS_CONFIG: Record<EnvironmentStatus, { 
@@ -111,7 +118,7 @@ const STATUS_CONFIG: Record<EnvironmentStatus, {
   },
 };
 
-// Arrow colors based on promotion status
+// Arrow colors based on promotion status (LOCKED)
 const ARROW_CONFIG: Record<ArrowStatus, { 
   color: string; 
   label: string;
@@ -125,7 +132,7 @@ const ARROW_CONFIG: Record<ArrowStatus, {
   'ci-passed': { 
     color: '#3B82F6', 
     label: 'CI Passed',
-    description: 'CI passed, ready for promotion',
+    description: 'Artifact verified, ready for promotion',
   },
   'awaiting-approval': { 
     color: '#F59E0B', 
@@ -135,7 +142,7 @@ const ARROW_CONFIG: Record<ArrowStatus, {
   'promoted': { 
     color: '#22C55E', 
     label: 'Promoted',
-    description: 'Successfully promoted to this environment',
+    description: 'Same artifact successfully promoted (SHA verified)',
   },
   'blocked': { 
     color: '#EF4444', 
@@ -574,4 +581,4 @@ export const OpzenixEnvironmentLayer = memo(({
 });
 OpzenixEnvironmentLayer.displayName = 'OpzenixEnvironmentLayer';
 
-export { ENVIRONMENT_ORDER, ENVIRONMENT_DISPLAY_NAMES, STATUS_CONFIG, ARROW_CONFIG };
+export { STATUS_CONFIG, ARROW_CONFIG };
