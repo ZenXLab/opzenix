@@ -51,16 +51,32 @@ const colorThemes: ThemeOption[] = [
 
 export function SettingsModal() {
   const { theme, setTheme } = useTheme();
-  const [colorTheme, setColorTheme] = useState<ColorTheme>('obsidian');
+  const [colorTheme, setColorTheme] = useState<ColorTheme>('midnight');
 
   useEffect(() => {
     const saved = localStorage.getItem('opzenix-color-theme') as ColorTheme;
-    if (saved) setColorTheme(saved);
+    if (saved) {
+      setColorTheme(saved);
+      applyColorTheme(saved);
+    } else {
+      applyColorTheme('midnight');
+    }
   }, []);
+
+  const applyColorTheme = (themeId: ColorTheme) => {
+    const root = document.documentElement;
+    
+    // Remove all color theme classes
+    root.classList.remove('theme-obsidian', 'theme-midnight', 'theme-ocean', 'theme-forest');
+    
+    // Add new theme class
+    root.classList.add(`theme-${themeId}`);
+  };
 
   const handleColorThemeChange = (newTheme: ColorTheme) => {
     setColorTheme(newTheme);
     localStorage.setItem('opzenix-color-theme', newTheme);
+    applyColorTheme(newTheme);
   };
 
   return (

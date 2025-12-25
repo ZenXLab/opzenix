@@ -1,14 +1,56 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   MessageCircle, X, Send, Loader2, Volume2, VolumeX, 
-  Bot, User, Sparkles 
+  Bot, User, Sparkles, Mic, MicOff, Square
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+
+// Type declarations for Web Speech API
+interface SpeechRecognitionEvent {
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+}
+
+interface SpeechRecognitionErrorEvent {
+  error: string;
+}
+
+interface SpeechRecognitionInstance {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: new () => SpeechRecognitionInstance;
+    webkitSpeechRecognition?: new () => SpeechRecognitionInstance;
+  }
+}
 
 interface Message {
   role: 'user' | 'assistant';
@@ -30,14 +72,74 @@ export function OpzenixChatbot() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [isListening, setIsListening] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = 'en-US';
+
+      recognitionRef.current.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map((result) => result[0].transcript)
+          .join('');
+        setInput(transcript);
+        
+        if (event.results[0].isFinal) {
+          setIsListening(false);
+        }
+      };
+
+      recognitionRef.current.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        if (event.error === 'not-allowed') {
+          toast.error('Microphone access denied. Please allow microphone access.');
+        }
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+    };
+  }, []);
+
+  const startListening = useCallback(() => {
+    if (recognitionRef.current && !isListening) {
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (error) {
+        console.error('Failed to start speech recognition:', error);
+      }
+    }
+  }, [isListening]);
+
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current && isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+  }, [isListening]);
 
   const playAudio = async (text: string) => {
     if (!voiceEnabled) return;
@@ -180,16 +282,18 @@ export function OpzenixChatbot() {
     }
   };
 
+  const hasSpeechRecognition = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
+
   return (
     <>
-      {/* Chat Toggle Button */}
+      {/* Chat Toggle Button - RIGHT SIDE */}
       <AnimatePresence>
         {!isOpen && (
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
-            className="fixed bottom-6 left-6 z-50"
+            className="fixed bottom-6 right-6 z-50"
           >
             <Button
               onClick={() => setIsOpen(true)}
@@ -202,14 +306,14 @@ export function OpzenixChatbot() {
         )}
       </AnimatePresence>
 
-      {/* Chat Window */}
+      {/* Chat Window - RIGHT SIDE */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
             initial={{ opacity: 0, y: 100, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 100, scale: 0.9 }}
-            className="fixed bottom-6 left-6 z-50 w-[380px] max-w-[calc(100vw-3rem)]"
+            className="fixed bottom-6 right-6 z-50 w-[380px] max-w-[calc(100vw-3rem)]"
           >
             <div className="bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[500px]">
               {/* Header */}
@@ -245,6 +349,7 @@ export function OpzenixChatbot() {
                     onClick={() => {
                       setIsOpen(false);
                       stopAudio();
+                      stopListening();
                     }}
                     className="text-white hover:bg-white/20"
                   >
@@ -321,6 +426,22 @@ export function OpzenixChatbot() {
                 </div>
               )}
 
+              {/* Listening Indicator */}
+              {isListening && (
+                <div className="px-4 py-2 bg-red-500/10 border-t border-border flex items-center gap-2 text-xs text-muted-foreground">
+                  <Mic className="h-3 w-3 animate-pulse text-red-500" />
+                  Listening... Speak now
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs ml-auto"
+                    onClick={stopListening}
+                  >
+                    <Square className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+
               {/* Input */}
               <div className="p-4 border-t border-border">
                 <form
@@ -337,6 +458,22 @@ export function OpzenixChatbot() {
                     disabled={isLoading}
                     className="flex-1"
                   />
+                  {hasSpeechRecognition && (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant={isListening ? 'destructive' : 'outline'}
+                      onClick={isListening ? stopListening : startListening}
+                      disabled={isLoading}
+                      title={isListening ? 'Stop listening' : 'Start voice input'}
+                    >
+                      {isListening ? (
+                        <MicOff className="h-4 w-4" />
+                      ) : (
+                        <Mic className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
                   <Button
                     type="submit"
                     size="icon"

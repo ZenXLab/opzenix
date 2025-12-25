@@ -118,6 +118,102 @@
     --shadow-glow: 0 0 12px hsla(188, 94%, 43%, 0.15);
   }
 
+  /* COLOR THEME: OBSIDIAN - Deep violet accents */
+  .theme-obsidian {
+    --primary: 263 70% 50%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 280 80% 60%;
+    --accent-foreground: 0 0% 100%;
+    --ring: 263 70% 50%;
+    --sidebar-primary: 263 70% 50%;
+    --sidebar-accent: 280 80% 60%;
+    --chart-1: 263 70% 50%;
+    --chart-2: 280 80% 60%;
+  }
+
+  .dark.theme-obsidian {
+    --primary: 263 70% 55%;
+    --accent: 280 80% 65%;
+    --ring: 263 70% 55%;
+    --sidebar-primary: 263 70% 55%;
+    --sidebar-accent: 280 80% 65%;
+    --chart-1: 263 70% 55%;
+    --chart-2: 280 80% 65%;
+    --shadow-glow: 0 0 12px hsla(263, 70%, 50%, 0.2);
+  }
+
+  /* COLOR THEME: MIDNIGHT - Navy blue enterprise */
+  .theme-midnight {
+    --primary: 230 75% 55%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 188 94% 43%;
+    --accent-foreground: 220 25% 7%;
+    --ring: 230 75% 55%;
+    --sidebar-primary: 230 75% 55%;
+    --sidebar-accent: 188 94% 43%;
+    --chart-1: 230 75% 55%;
+    --chart-2: 188 94% 43%;
+  }
+
+  .dark.theme-midnight {
+    --primary: 230 75% 55%;
+    --accent: 188 94% 43%;
+    --ring: 230 75% 55%;
+    --sidebar-primary: 230 75% 55%;
+    --sidebar-accent: 188 94% 43%;
+    --chart-1: 230 75% 55%;
+    --chart-2: 188 94% 43%;
+    --shadow-glow: 0 0 12px hsla(188, 94%, 43%, 0.15);
+  }
+
+  /* COLOR THEME: OCEAN - Teal and cyan */
+  .theme-ocean {
+    --primary: 188 94% 43%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 172 66% 50%;
+    --accent-foreground: 0 0% 100%;
+    --ring: 188 94% 43%;
+    --sidebar-primary: 188 94% 43%;
+    --sidebar-accent: 172 66% 50%;
+    --chart-1: 188 94% 43%;
+    --chart-2: 172 66% 50%;
+  }
+
+  .dark.theme-ocean {
+    --primary: 188 94% 48%;
+    --accent: 172 66% 55%;
+    --ring: 188 94% 48%;
+    --sidebar-primary: 188 94% 48%;
+    --sidebar-accent: 172 66% 55%;
+    --chart-1: 188 94% 48%;
+    --chart-2: 172 66% 55%;
+    --shadow-glow: 0 0 12px hsla(188, 94%, 48%, 0.2);
+  }
+
+  /* COLOR THEME: FOREST - Natural greens */
+  .theme-forest {
+    --primary: 142 76% 36%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 158 64% 52%;
+    --accent-foreground: 0 0% 100%;
+    --ring: 142 76% 36%;
+    --sidebar-primary: 142 76% 36%;
+    --sidebar-accent: 158 64% 52%;
+    --chart-1: 142 76% 36%;
+    --chart-2: 158 64% 52%;
+  }
+
+  .dark.theme-forest {
+    --primary: 142 76% 42%;
+    --accent: 158 64% 58%;
+    --ring: 142 76% 42%;
+    --sidebar-primary: 142 76% 42%;
+    --sidebar-accent: 158 64% 58%;
+    --chart-1: 142 76% 42%;
+    --chart-2: 158 64% 58%;
+    --shadow-glow: 0 0 12px hsla(142, 76%, 42%, 0.2);
+  }
+
   /* OPZENIX NODE STATE TOKENS */
   :root, .dark {
     --node-idle: 220 15% 45%;
