@@ -14,23 +14,45 @@ import {
 import '@xyflow/react/dist/style.css';
 import ELK from 'elkjs/lib/elk.bundled.js';
 
-import { opzenixNodeTypes, OpzenixNodeData, OpzenixNodeState, OpzenixNodeType } from './OpzenixNodeTypes';
+import { opzenixNodeTypes, OpzenixNodeData, OpzenixNodeState, OpzenixNodeType, stateConfig } from './OpzenixNodeTypes';
 import { OpzenixInspectorPanel } from './OpzenixInspectorPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-// ELK layout options for deterministic left-to-right flow
+// ============================================
+// 🔒 ELK LAYOUT CONFIG PRESETS (DETERMINISTIC) - LOCKED
+// Same input → same graph
+// No node "jumping"
+// Regulator-friendly visuals
+// ============================================
+
 const elk = new ELK();
 
+// GLOBAL ELK SETTINGS (LOCKED)
 const elkOptions = {
   'elk.algorithm': 'layered',
   'elk.direction': 'RIGHT',
-  'elk.spacing.nodeNode': '80',
-  'elk.layered.spacing.nodeNodeBetweenLayers': '100',
-  'elk.layered.nodePlacement.strategy': 'SIMPLE',
+  'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
   'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
-  'elk.edgeRouting': 'SPLINES',
+  'elk.layered.spacing.nodeNodeBetweenLayers': '80',
+  'elk.spacing.nodeNode': '60',
+  'elk.spacing.edgeNode': '40',
+  'elk.layered.edgeRouting': 'ORTHOGONAL',
+  'elk.layered.layering.strategy': 'LONGEST_PATH',
+  'elk.layered.considerModelOrder': 'true',
+};
+
+// ============================================
+// 🎨 STATE COLORS FOR EDGES (LOCKED)
+// ============================================
+const stateEdgeColors: Record<OpzenixNodeState, string> = {
+  PENDING: '#6B7280',
+  RUNNING: '#3B82F6',
+  PASSED: '#22C55E',
+  FAILED: '#EF4444',
+  BLOCKED: '#F59E0B',
+  LOCKED: '#334155',
 };
 
 interface OpzenixFlowMapProps {
@@ -39,7 +61,7 @@ interface OpzenixFlowMapProps {
   onNodeSelect?: (nodeId: string, data: OpzenixNodeData) => void;
 }
 
-// Generate flow nodes from execution data
+// Generate flow nodes from real execution data (NO HARDCODED DATA)
 const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: Node[]; edges: Edge[] }> => {
   // Fetch execution data
   const { data: execution } = await supabase
@@ -47,6 +69,10 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
     .select('*')
     .eq('id', executionId)
     .single();
+
+  if (!execution) {
+    return { nodes: [], edges: [] };
+  }
 
   // Fetch CI evidence
   const { data: ciEvidence } = await supabase
@@ -76,7 +102,9 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
-  // Source node
+  const executionMeta = execution.metadata as Record<string, unknown> | null;
+
+  // Source node (from real execution data)
   nodes.push({
     id: 'source',
     type: 'source.git',
@@ -85,18 +113,17 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
       label: 'GitHub Commit',
       nodeType: 'source.git' as OpzenixNodeType,
       state: 'PASSED' as OpzenixNodeState,
-      repo: (execution?.metadata as Record<string, unknown>)?.repo as string || 'opzenix/platform',
-      branch: execution?.branch || 'main',
-      commitSha: execution?.commit_hash || 'a1b2c3d4e5f6',
-      author: execution?.started_by || 'Developer',
-      timestamp: new Date(execution?.started_at || Date.now()).toLocaleString(),
-      mvpStatus: 'DONE',
+      repo: executionMeta?.repo as string || `${execution.name}`,
+      branch: execution.branch || 'main',
+      commitSha: execution.commit_hash || '',
+      author: executionMeta?.author as string || '',
+      timestamp: new Date(execution.started_at).toLocaleString(),
     } as OpzenixNodeData,
   });
 
-  // CI Stage nodes from evidence
+  // CI Stage nodes from evidence (REAL DATA ONLY)
   let lastNodeId = 'source';
-  const ciNodeMap: Record<string, string> = {
+  const ciNodeMap: Record<string, OpzenixNodeType> = {
     'sast': 'ci.sast',
     'dependency': 'ci.dependency-scan',
     'secrets': 'ci.secrets-scan',
@@ -107,31 +134,32 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
     'scan': 'ci.image-scan',
   };
 
+  const stateMap: Record<string, OpzenixNodeState> = {
+    'completed': 'PASSED',
+    'passed': 'PASSED',
+    'success': 'PASSED',
+    'failed': 'FAILED',
+    'running': 'RUNNING',
+    'pending': 'PENDING',
+    'blocked': 'BLOCKED',
+  };
+
   if (ciEvidence && ciEvidence.length > 0) {
     ciEvidence.forEach((evidence, index) => {
       const nodeType = ciNodeMap[evidence.step_type] || 'ci.sast';
       const nodeId = `ci-${evidence.step_type}-${index}`;
       
-      const stateMap: Record<string, OpzenixNodeState> = {
-        'completed': 'PASSED',
-        'passed': 'PASSED',
-        'failed': 'FAILED',
-        'running': 'RUNNING',
-        'pending': 'PENDING',
-      };
-
       nodes.push({
         id: nodeId,
         type: nodeType,
         position: { x: 0, y: 0 },
         data: {
           label: evidence.step_name,
-          nodeType: nodeType as OpzenixNodeType,
+          nodeType: nodeType,
           state: stateMap[evidence.status] || 'PENDING',
           description: evidence.summary || `${evidence.step_type} analysis`,
           duration: evidence.duration_ms ? `${(evidence.duration_ms / 1000).toFixed(1)}s` : undefined,
           reportUrl: evidence.evidence_url,
-          mvpStatus: 'DONE',
         } as OpzenixNodeData,
       });
 
@@ -143,63 +171,30 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
       });
       lastNodeId = nodeId;
     });
-  } else {
-    // Default CI stages if no evidence
-    const defaultStages = [
-      { id: 'ci-sast', type: 'ci.sast', label: 'SAST', state: 'PASSED' },
-      { id: 'ci-deps', type: 'ci.dependency-scan', label: 'Dependency Scan', state: 'PASSED' },
-      { id: 'ci-secrets', type: 'ci.secrets-scan', label: 'Secrets Scan', state: 'PASSED' },
-      { id: 'ci-unit', type: 'ci.unit-test', label: 'Unit Tests', state: 'PASSED' },
-      { id: 'ci-integration', type: 'ci.integration-test', label: 'Integration Tests', state: 'PASSED' },
-      { id: 'ci-sbom', type: 'ci.sbom', label: 'SBOM', state: 'PASSED' },
-      { id: 'ci-sign', type: 'ci.image-sign', label: 'Image Sign', state: 'PASSED' },
-      { id: 'ci-scan', type: 'ci.image-scan', label: 'Image Scan', state: 'PASSED' },
-    ];
-
-    defaultStages.forEach((stage, index) => {
-      nodes.push({
-        id: stage.id,
-        type: stage.type,
-        position: { x: 0, y: 0 },
-        data: {
-          label: stage.label,
-          nodeType: stage.type as OpzenixNodeType,
-          state: stage.state as OpzenixNodeState,
-          description: `${stage.label} completed`,
-          duration: `${(Math.random() * 60 + 10).toFixed(0)}s`,
-          mvpStatus: 'DONE',
-        } as OpzenixNodeData,
-      });
-
-      edges.push({
-        id: `e-${lastNodeId}-${stage.id}`,
-        source: lastNodeId,
-        target: stage.id,
-        type: 'smoothstep',
-      });
-      lastNodeId = stage.id;
-    });
   }
 
-  // Artifact node
+  // Artifact node (if exists)
   const artifact = artifacts?.[0];
-  nodes.push({
-    id: 'artifact',
-    type: 'artifact.image',
-    position: { x: 0, y: 0 },
-    data: {
-      label: 'Container Image',
-      nodeType: 'artifact.image' as OpzenixNodeType,
-      state: 'PASSED' as OpzenixNodeState,
-      imageName: artifact?.name || 'opzenix/platform',
-      registry: artifact?.registry_url?.includes('ghcr') ? 'GHCR' : 'DockerHub',
-      tag: artifact?.image_tag || (execution?.metadata as Record<string, unknown>)?.version as string || 'v2.1.0',
-      digest: artifact?.image_digest || 'sha256:a1b2c3d4e5f6...',
-      signed: true,
-      mvpStatus: 'DONE',
-    } as OpzenixNodeData,
-  });
-  edges.push({ id: `e-${lastNodeId}-artifact`, source: lastNodeId, target: 'artifact', type: 'smoothstep' });
+  if (artifact) {
+    nodes.push({
+      id: 'artifact',
+      type: 'artifact.image',
+      position: { x: 0, y: 0 },
+      data: {
+        label: 'Container Image',
+        nodeType: 'artifact.image' as OpzenixNodeType,
+        state: 'PASSED' as OpzenixNodeState,
+        imageName: artifact.name,
+        registry: artifact.registry_url?.includes('ghcr') ? 'GHCR' : 
+                  artifact.registry_url?.includes('azurecr') ? 'ACR' : 'DockerHub',
+        tag: artifact.image_tag || '',
+        digest: artifact.image_digest,
+        signed: true,
+      } as OpzenixNodeData,
+    });
+    edges.push({ id: `e-${lastNodeId}-artifact`, source: lastNodeId, target: 'artifact', type: 'smoothstep' });
+    lastNodeId = 'artifact';
+  }
 
   // Security gate
   nodes.push({
@@ -209,145 +204,126 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
     data: {
       label: 'Security Gate',
       nodeType: 'security.gate' as OpzenixNodeType,
-      state: 'PASSED' as OpzenixNodeState,
-      description: 'Policy enforcement passed',
+      state: execution.governance_status === 'blocked' ? 'BLOCKED' : 'PASSED' as OpzenixNodeState,
+      description: execution.governance_status === 'blocked' ? execution.blocked_reason : 'Policy enforcement passed',
       severityThreshold: 'Critical: 0, High: 0',
-      mvpStatus: 'DONE',
+      blockedReason: execution.blocked_reason || undefined,
     } as OpzenixNodeData,
   });
-  edges.push({ id: 'e-artifact-security', source: 'artifact', target: 'security-gate', type: 'smoothstep' });
+  edges.push({ id: `e-${lastNodeId}-security`, source: lastNodeId, target: 'security-gate', type: 'smoothstep' });
 
-  // Approval gate
+  // Approval gate (if exists)
   const approval = approvals?.[0];
-  const approvalState = approval?.status === 'approved' ? 'PASSED' : 
-                        approval?.status === 'rejected' ? 'FAILED' : 'PENDING';
-  
-  nodes.push({
-    id: 'approval-gate',
-    type: 'approval.gate',
-    position: { x: 0, y: 0 },
-    data: {
-      label: 'Production Approval',
-      nodeType: 'approval.gate' as OpzenixNodeType,
-      state: approvalState as OpzenixNodeState,
-      environment: execution?.environment || 'prod',
-      requiredApprovers: approval?.required_approvals || 3,
-      currentApprovers: approval?.current_approvals || 1,
-      pendingApprovals: (approval?.required_approvals || 3) - (approval?.current_approvals || 1),
-      approvers: approval?.current_approvals ? [
-        { role: 'CTO', user: 'Sarah Chen', timestamp: new Date().toISOString() }
-      ] : [],
-      mvpStatus: 'DONE',
-    } as OpzenixNodeData,
-  });
-  edges.push({ id: 'e-security-approval', source: 'security-gate', target: 'approval-gate', type: 'smoothstep' });
+  if (approval) {
+    const approvalState: OpzenixNodeState = 
+      approval.status === 'approved' ? 'PASSED' : 
+      approval.status === 'rejected' ? 'FAILED' : 'BLOCKED';
+    
+    nodes.push({
+      id: 'approval-gate',
+      type: 'approval.gate',
+      position: { x: 0, y: 0 },
+      data: {
+        label: approval.title || 'Approval Gate',
+        nodeType: 'approval.gate' as OpzenixNodeType,
+        state: approvalState,
+        environment: execution.environment,
+        requiredApprovers: approval.required_approvals,
+        currentApprovers: approval.current_approvals,
+        pendingApprovals: approval.required_approvals - approval.current_approvals,
+        description: approval.description || undefined,
+      } as OpzenixNodeData,
+    });
+    edges.push({ id: 'e-security-approval', source: 'security-gate', target: 'approval-gate', type: 'smoothstep' });
+  }
 
-  // CD Argo node
+  // Deployment (if exists)
   const deployment = deployments?.[0];
-  const cdState = deployment?.status === 'success' ? 'PASSED' : 
-                  deployment?.status === 'running' ? 'RUNNING' : 
-                  approvalState === 'PASSED' ? 'RUNNING' : 'PENDING';
-  
-  nodes.push({
-    id: 'cd-argo',
-    type: 'cd.argo',
-    position: { x: 0, y: 0 },
-    data: {
-      label: 'Argo CD Sync',
-      nodeType: 'cd.argo' as OpzenixNodeType,
-      state: cdState as OpzenixNodeState,
-      appName: `opzenix-${execution?.environment || 'prod'}`,
-      gitRevision: execution?.commit_hash || 'a1b2c3d4',
-      syncMode: execution?.environment === 'prod' ? 'manual' : 'auto',
-      syncResult: cdState === 'PASSED' ? 'Synced' : cdState === 'RUNNING' ? 'Syncing...' : undefined,
-      mvpStatus: 'DONE',
-    } as OpzenixNodeData,
-  });
-  edges.push({ id: 'e-approval-cd', source: 'approval-gate', target: 'cd-argo', type: 'smoothstep' });
+  if (deployment) {
+    const cdState: OpzenixNodeState = 
+      deployment.status === 'success' ? 'PASSED' : 
+      deployment.status === 'running' ? 'RUNNING' : 
+      deployment.status === 'failed' ? 'FAILED' : 'PENDING';
+    
+    nodes.push({
+      id: 'cd-argo',
+      type: 'cd.argo',
+      position: { x: 0, y: 0 },
+      data: {
+        label: 'Argo CD Sync',
+        nodeType: 'cd.argo' as OpzenixNodeType,
+        state: cdState,
+        appName: `opzenix-${deployment.environment}`,
+        gitRevision: execution.commit_hash || '',
+        syncMode: deployment.environment === 'production' ? 'manual' : 'auto',
+        syncResult: cdState === 'PASSED' ? 'Synced' : cdState === 'RUNNING' ? 'Syncing...' : undefined,
+      } as OpzenixNodeData,
+    });
+    
+    const sourceNode = approval ? 'approval-gate' : 'security-gate';
+    edges.push({ id: `e-${sourceNode}-cd`, source: sourceNode, target: 'cd-argo', type: 'smoothstep' });
 
-  // Deployment strategy node
-  const strategyMap: Record<string, OpzenixNodeType> = {
-    'dev': 'deploy.rolling',
-    'uat': 'deploy.rolling',
-    'staging': 'deploy.canary',
-    'preprod': 'deploy.canary',
-    'prod': 'deploy.bluegreen',
-    'production': 'deploy.bluegreen',
-  };
-  const strategyType = strategyMap[execution?.environment || 'prod'] || 'deploy.bluegreen';
-  
-  nodes.push({
-    id: 'deploy-strategy',
-    type: strategyType,
-    position: { x: 0, y: 0 },
-    data: {
-      label: strategyType === 'deploy.bluegreen' ? 'Blue/Green Deploy' : 
-             strategyType === 'deploy.canary' ? 'Canary Deploy' : 'Rolling Update',
-      nodeType: strategyType,
-      state: cdState as OpzenixNodeState,
-      mvpStatus: 'DONE',
-    } as OpzenixNodeData,
-  });
-  edges.push({ id: 'e-cd-deploy', source: 'cd-argo', target: 'deploy-strategy', type: 'smoothstep' });
+    // Deploy strategy
+    const strategyMap: Record<string, OpzenixNodeType> = {
+      'development': 'deploy.rolling',
+      'staging': 'deploy.canary',
+      'production': 'deploy.bluegreen',
+    };
+    const strategyType = strategyMap[deployment.environment] || 'deploy.rolling';
+    
+    nodes.push({
+      id: 'deploy-strategy',
+      type: strategyType,
+      position: { x: 0, y: 0 },
+      data: {
+        label: strategyType === 'deploy.bluegreen' ? 'Blue/Green Deploy' : 
+               strategyType === 'deploy.canary' ? 'Canary Deploy' : 'Rolling Update',
+        nodeType: strategyType,
+        state: cdState,
+      } as OpzenixNodeData,
+    });
+    edges.push({ id: 'e-cd-deploy', source: 'cd-argo', target: 'deploy-strategy', type: 'smoothstep' });
 
-  // Kubernetes runtime node
-  nodes.push({
-    id: 'runtime-k8s',
-    type: 'runtime.k8s',
-    position: { x: 0, y: 0 },
-    data: {
-      label: 'Kubernetes',
-      nodeType: 'runtime.k8s' as OpzenixNodeType,
-      state: cdState as OpzenixNodeState,
-      namespace: `opzenix-${execution?.environment || 'prod'}`,
-      deployment: 'opzenix-api',
-      replicas: 4,
-      readyReplicas: cdState === 'PASSED' ? 4 : cdState === 'RUNNING' ? 2 : 0,
-      mvpStatus: 'DONE',
-    } as OpzenixNodeData,
-  });
-  edges.push({ id: 'e-deploy-runtime', source: 'deploy-strategy', target: 'runtime-k8s', type: 'smoothstep' });
+    // Runtime K8s
+    nodes.push({
+      id: 'runtime-k8s',
+      type: 'runtime.k8s',
+      position: { x: 0, y: 0 },
+      data: {
+        label: 'Kubernetes',
+        nodeType: 'runtime.k8s' as OpzenixNodeType,
+        state: cdState,
+        namespace: `opzenix-${deployment.environment}`,
+        deployment: 'opzenix-api',
+        replicas: 4,
+        readyReplicas: cdState === 'PASSED' ? 4 : cdState === 'RUNNING' ? 2 : 0,
+      } as OpzenixNodeData,
+    });
+    edges.push({ id: 'e-deploy-runtime', source: 'deploy-strategy', target: 'runtime-k8s', type: 'smoothstep' });
 
-  // Verification node
-  nodes.push({
-    id: 'verify-runtime',
-    type: 'verify.runtime',
-    position: { x: 0, y: 0 },
-    data: {
-      label: 'Runtime Verification',
-      nodeType: 'verify.runtime' as OpzenixNodeType,
-      state: cdState === 'PASSED' ? 'PASSED' : 'PENDING' as OpzenixNodeState,
-      description: 'OTel signals, health checks, smoke tests',
-      evidenceLinks: [
-        { label: 'Metrics', url: '/metrics' },
-        { label: 'Traces', url: '/traces' },
-      ],
-      mvpStatus: 'DONE',
-    } as OpzenixNodeData,
-  });
-  edges.push({ id: 'e-runtime-verify', source: 'runtime-k8s', target: 'verify-runtime', type: 'smoothstep' });
-
-  // Audit record node
-  nodes.push({
-    id: 'audit-record',
-    type: 'audit.record',
-    position: { x: 0, y: 0 },
-    data: {
-      label: 'Audit Record',
-      nodeType: 'audit.record' as OpzenixNodeType,
-      state: cdState === 'PASSED' ? 'PASSED' : 'PENDING' as OpzenixNodeState,
-      description: 'Immutable deployment record',
-      digest: `sha256:${execution?.id?.slice(0, 32) || 'a1b2c3d4e5f6g7h8'}`,
-      mvpStatus: 'DONE',
-    } as OpzenixNodeData,
-  });
-  edges.push({ id: 'e-verify-audit', source: 'verify-runtime', target: 'audit-record', type: 'smoothstep' });
+    // Audit record
+    nodes.push({
+      id: 'audit-record',
+      type: 'audit.record',
+      position: { x: 0, y: 0 },
+      data: {
+        label: 'Audit Record',
+        nodeType: 'audit.record' as OpzenixNodeType,
+        state: cdState === 'PASSED' ? 'LOCKED' : 'PENDING' as OpzenixNodeState,
+        description: 'Immutable deployment record',
+        digest: `sha256:${execution.id.slice(0, 32)}`,
+      } as OpzenixNodeData,
+    });
+    edges.push({ id: 'e-runtime-audit', source: 'runtime-k8s', target: 'audit-record', type: 'smoothstep' });
+  }
 
   return { nodes, edges };
 };
 
-// Apply ELK layout to nodes
+// Apply ELK layout to nodes (DETERMINISTIC)
 const applyElkLayout = async (nodes: Node[], edges: Edge[]): Promise<Node[]> => {
+  if (nodes.length === 0) return [];
+
   const graph = {
     id: 'root',
     layoutOptions: elkOptions,
@@ -384,25 +360,44 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
   const [loading, setLoading] = useState(true);
   const [isLive, setIsLive] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [hasData, setHasData] = useState(false);
 
-  // Load and layout flow
+  // Load flow from real data only
   const loadFlow = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      const { nodes: flowNodes, edges: flowEdges } = executionId 
-        ? await generateFlowFromExecution(executionId)
-        : await generateDefaultFlow();
+      let flowData: { nodes: Node[]; edges: Edge[] } = { nodes: [], edges: [] };
+
+      if (executionId) {
+        flowData = await generateFlowFromExecution(executionId);
+      } else {
+        // Fetch the most recent execution
+        const { data: executions } = await supabase
+          .from('executions')
+          .select('id')
+          .order('started_at', { ascending: false })
+          .limit(1);
+
+        if (executions && executions.length > 0) {
+          flowData = await generateFlowFromExecution(executions[0].id);
+        }
+      }
+
+      if (flowData.nodes.length > 0) {
+        const layoutedNodes = await applyElkLayout(flowData.nodes, flowData.edges);
+        setNodes(layoutedNodes);
+        setEdges(flowData.edges);
+        setHasData(true);
+      } else {
+        setNodes([]);
+        setEdges([]);
+        setHasData(false);
+      }
       
-      const layoutedNodes = await applyElkLayout(flowNodes, flowEdges);
-      setNodes(layoutedNodes);
-      setEdges(flowEdges.map(edge => ({
-        ...edge,
-        style: { stroke: 'hsl(220 15% 30%)', strokeWidth: 2 },
-        animated: false,
-      })));
       setLastUpdate(new Date());
     } catch (error) {
       console.error('[OPZENIX] Failed to load flow:', error);
+      setHasData(false);
     } finally {
       if (showLoading) setLoading(false);
     }
@@ -423,55 +418,32 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
         event: '*',
         schema: 'public',
         table: 'executions',
-        filter: executionId ? `id=eq.${executionId}` : undefined,
-      }, (payload) => {
-        console.log('[OPZENIX] Execution update:', payload);
-        loadFlow(false);
-      })
+      }, () => loadFlow(false))
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'ci_evidence',
-        filter: executionId ? `execution_id=eq.${executionId}` : undefined,
-      }, (payload) => {
-        console.log('[OPZENIX] CI Evidence update:', payload);
-        loadFlow(false);
-      })
+      }, () => loadFlow(false))
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'approval_requests',
-        filter: executionId ? `execution_id=eq.${executionId}` : undefined,
-      }, (payload) => {
-        console.log('[OPZENIX] Approval update:', payload);
-        loadFlow(false);
-      })
+      }, () => loadFlow(false))
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'approval_votes',
-      }, (payload) => {
-        console.log('[OPZENIX] Approval vote update:', payload);
-        loadFlow(false);
-      })
+      }, () => loadFlow(false))
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'deployments',
-        filter: executionId ? `execution_id=eq.${executionId}` : undefined,
-      }, (payload) => {
-        console.log('[OPZENIX] Deployment update:', payload);
-        loadFlow(false);
-      })
+      }, () => loadFlow(false))
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'artifacts',
-        filter: executionId ? `execution_id=eq.${executionId}` : undefined,
-      }, (payload) => {
-        console.log('[OPZENIX] Artifact update:', payload);
-        loadFlow(false);
-      })
+      }, () => loadFlow(false))
       .subscribe((status) => {
         console.log('[OPZENIX] Realtime subscription status:', status);
         setIsLive(status === 'SUBSCRIBED');
@@ -481,7 +453,7 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
       console.log('[OPZENIX] Cleaning up real-time subscriptions');
       supabase.removeChannel(channel);
     };
-  }, [executionId, loadFlow]);
+  }, [loadFlow]);
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     const data = node.data as unknown as OpzenixNodeData;
@@ -493,31 +465,57 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
     setSelectedNode(null);
   }, []);
 
-  // Update edge styles based on node states
+  // Update edge styles based on node states (LOCKED COLORS)
   const styledEdges = useMemo(() => {
     return edges.map(edge => {
       const sourceNode = nodes.find(n => n.id === edge.source);
       const nodeData = sourceNode?.data as OpzenixNodeData | undefined;
-      const isRunning = nodeData?.state === 'RUNNING';
-      const isPassed = nodeData?.state === 'PASSED';
+      const state = nodeData?.state || 'PENDING';
+      const edgeColor = stateEdgeColors[state];
       
       return {
         ...edge,
         style: {
-          stroke: isRunning ? 'hsl(217 91% 60%)' : isPassed ? 'hsl(142 76% 36%)' : 'hsl(220 15% 30%)',
-          strokeWidth: isRunning ? 2.5 : 2,
+          stroke: edgeColor,
+          strokeWidth: state === 'RUNNING' ? 2.5 : 2,
         },
-        animated: isRunning,
+        animated: state === 'RUNNING',
       };
     });
   }, [edges, nodes]);
 
   if (loading) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-background">
+      <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: '#020617' }}>
         <div className="text-center space-y-4">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-sm text-muted-foreground">Loading flow map...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasData) {
+    return (
+      <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: '#020617' }}>
+        <div className="text-center space-y-4 max-w-md p-6">
+          <div className="w-16 h-16 rounded-full bg-muted/20 flex items-center justify-center mx-auto">
+            <Activity className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-semibold text-foreground">No Pipeline Executions</h3>
+          <p className="text-sm text-muted-foreground">
+            Start a pipeline execution to see the flow map visualization. 
+            Connect your GitHub repository and trigger a workflow to begin.
+          </p>
+          <div className="flex items-center justify-center gap-2">
+            <div className={cn(
+              'w-2 h-2 rounded-full',
+              isLive ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'
+            )} />
+            <span className="text-xs text-muted-foreground">
+              {isLive ? 'Listening for events...' : 'Connecting...'}
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -548,20 +546,13 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
             className="!bottom-4 !right-4"
             nodeColor={(node) => {
               const data = node.data as unknown as OpzenixNodeData | undefined;
-              switch (data?.state) {
-                case 'RUNNING': return 'hsl(217 91% 60%)';
-                case 'PASSED': return 'hsl(142 76% 36%)';
-                case 'PENDING': return 'hsl(38 92% 50%)';
-                case 'FAILED': return 'hsl(0 84% 60%)';
-                case 'BLOCKED': return 'hsl(0 84% 60%)';
-                default: return 'hsl(220 15% 45%)';
-              }
+              return stateEdgeColors[data?.state || 'PENDING'];
             }}
             maskColor="hsl(220 25% 7% / 0.8)"
           />
         </ReactFlow>
 
-        {/* Flow Legend */}
+        {/* Flow Legend (LOCKED COLORS) */}
         <div className="absolute top-4 left-4 z-10 flex items-center gap-4 px-3 py-2 bg-card/90 backdrop-blur border border-border rounded-lg">
           {/* Live Indicator */}
           <div className="flex items-center gap-1.5 pr-3 border-r border-border">
@@ -576,13 +567,14 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
           
           <span className="text-xs font-medium text-muted-foreground">Status:</span>
           {[
-            { label: 'Passed', color: 'bg-emerald-500' },
-            { label: 'Running', color: 'bg-blue-500' },
-            { label: 'Pending', color: 'bg-amber-500' },
-            { label: 'Failed', color: 'bg-red-500' },
+            { label: 'Passed', color: '#22C55E' },
+            { label: 'Running', color: '#3B82F6' },
+            { label: 'Pending', color: '#6B7280' },
+            { label: 'Blocked', color: '#F59E0B' },
+            { label: 'Failed', color: '#EF4444' },
           ].map(item => (
             <div key={item.label} className="flex items-center gap-1.5">
-              <div className={cn('w-2 h-2 rounded-full', item.color)} />
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
               <span className="text-xs text-muted-foreground">{item.label}</span>
             </div>
           ))}
@@ -620,176 +612,7 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
   );
 };
 
-// Generate default flow when no execution is selected
-const generateDefaultFlow = async (): Promise<{ nodes: Node[]; edges: Edge[] }> => {
-  // Fetch the most recent execution
-  const { data: executions } = await supabase
-    .from('executions')
-    .select('*')
-    .order('started_at', { ascending: false })
-    .limit(1);
-
-  if (executions && executions.length > 0) {
-    return generateFlowFromExecution(executions[0].id);
-  }
-
-  // Fallback to static demo flow
-  const nodes: Node[] = [
-    {
-      id: 'source',
-      type: 'source.git',
-      position: { x: 0, y: 0 },
-      data: {
-        label: 'GitHub Commit',
-        nodeType: 'source.git',
-        state: 'PASSED',
-        repo: 'opzenix/platform',
-        branch: 'main',
-        commitSha: 'a1b2c3d4e5f6',
-        author: 'Developer',
-        timestamp: new Date().toLocaleString(),
-        mvpStatus: 'DONE',
-      } as OpzenixNodeData,
-    },
-    {
-      id: 'ci-sast',
-      type: 'ci.sast',
-      position: { x: 0, y: 0 },
-      data: {
-        label: 'SAST',
-        nodeType: 'ci.sast',
-        state: 'PASSED',
-        description: 'Static analysis complete',
-        duration: '45s',
-        mvpStatus: 'DONE',
-      } as OpzenixNodeData,
-    },
-    {
-      id: 'ci-deps',
-      type: 'ci.dependency-scan',
-      position: { x: 0, y: 0 },
-      data: {
-        label: 'Dependency Scan',
-        nodeType: 'ci.dependency-scan',
-        state: 'PASSED',
-        description: '0 vulnerabilities found',
-        duration: '32s',
-        mvpStatus: 'DONE',
-      } as OpzenixNodeData,
-    },
-    {
-      id: 'ci-secrets',
-      type: 'ci.secrets-scan',
-      position: { x: 0, y: 0 },
-      data: {
-        label: 'Secrets Scan',
-        nodeType: 'ci.secrets-scan',
-        state: 'PASSED',
-        description: 'No secrets detected',
-        duration: '12s',
-        mvpStatus: 'DONE',
-      } as OpzenixNodeData,
-    },
-    {
-      id: 'ci-unit',
-      type: 'ci.unit-test',
-      position: { x: 0, y: 0 },
-      data: {
-        label: 'Unit Tests',
-        nodeType: 'ci.unit-test',
-        state: 'PASSED',
-        description: '847 tests passed',
-        duration: '187s',
-        mvpStatus: 'DONE',
-      } as OpzenixNodeData,
-    },
-    {
-      id: 'artifact',
-      type: 'artifact.image',
-      position: { x: 0, y: 0 },
-      data: {
-        label: 'Container Image',
-        nodeType: 'artifact.image',
-        state: 'PASSED',
-        imageName: 'opzenix/platform',
-        registry: 'GHCR',
-        tag: 'v2.1.0',
-        digest: 'sha256:a1b2c3d4e5f6...',
-        signed: true,
-        mvpStatus: 'DONE',
-      } as OpzenixNodeData,
-    },
-    {
-      id: 'approval-gate',
-      type: 'approval.gate',
-      position: { x: 0, y: 0 },
-      data: {
-        label: 'Production Approval',
-        nodeType: 'approval.gate',
-        state: 'PENDING',
-        environment: 'prod',
-        requiredApprovers: 3,
-        currentApprovers: 1,
-        pendingApprovals: 2,
-        approvers: [
-          { role: 'CTO', user: 'Sarah Chen', timestamp: new Date().toISOString() }
-        ],
-        mvpStatus: 'DONE',
-      } as OpzenixNodeData,
-    },
-    {
-      id: 'cd-argo',
-      type: 'cd.argo',
-      position: { x: 0, y: 0 },
-      data: {
-        label: 'Argo CD Sync',
-        nodeType: 'cd.argo',
-        state: 'PENDING',
-        appName: 'opzenix-prod',
-        gitRevision: 'a1b2c3d4',
-        syncMode: 'manual',
-        mvpStatus: 'DONE',
-      } as OpzenixNodeData,
-    },
-    {
-      id: 'deploy-strategy',
-      type: 'deploy.bluegreen',
-      position: { x: 0, y: 0 },
-      data: {
-        label: 'Blue/Green Deploy',
-        nodeType: 'deploy.bluegreen',
-        state: 'LOCKED',
-        mvpStatus: 'DONE',
-      } as OpzenixNodeData,
-    },
-    {
-      id: 'audit-record',
-      type: 'audit.record',
-      position: { x: 0, y: 0 },
-      data: {
-        label: 'Audit Record',
-        nodeType: 'audit.record',
-        state: 'LOCKED',
-        description: 'Immutable deployment record',
-        digest: 'sha256:pending...',
-        mvpStatus: 'DONE',
-      } as OpzenixNodeData,
-    },
-  ];
-
-  const edges: Edge[] = [
-    { id: 'e-source-sast', source: 'source', target: 'ci-sast', type: 'smoothstep' },
-    { id: 'e-sast-deps', source: 'ci-sast', target: 'ci-deps', type: 'smoothstep' },
-    { id: 'e-deps-secrets', source: 'ci-deps', target: 'ci-secrets', type: 'smoothstep' },
-    { id: 'e-secrets-unit', source: 'ci-secrets', target: 'ci-unit', type: 'smoothstep' },
-    { id: 'e-unit-artifact', source: 'ci-unit', target: 'artifact', type: 'smoothstep' },
-    { id: 'e-artifact-approval', source: 'artifact', target: 'approval-gate', type: 'smoothstep' },
-    { id: 'e-approval-cd', source: 'approval-gate', target: 'cd-argo', type: 'smoothstep' },
-    { id: 'e-cd-deploy', source: 'cd-argo', target: 'deploy-strategy', type: 'smoothstep' },
-    { id: 'e-deploy-audit', source: 'deploy-strategy', target: 'audit-record', type: 'smoothstep' },
-  ];
-
-  return { nodes, edges };
-};
+// Import for empty state icon
+import { Activity } from 'lucide-react';
 
 export default OpzenixFlowMap;

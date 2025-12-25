@@ -20,21 +20,26 @@ import {
   Users,
   GitCommit,
   Container,
-  Rocket,
-  Server,
   Activity,
   FileText,
   AlertTriangle,
   RefreshCw,
   Layers,
-  Box,
   ArrowRightLeft,
+  Pause,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 
-// OPZENIX Node State Types
-export type OpzenixNodeState = 'PASSED' | 'FAILED' | 'PENDING' | 'RUNNING' | 'LOCKED' | 'BLOCKED';
+// ============================================
+// OPZENIX NODE STATE & COLOR SPEC (LOCKED MVP 1.0.0)
+// ============================================
+// Color = state + trust, not decoration.
+// Frontend may NEVER override state color.
+// ============================================
+
+// OPZENIX Node State Types (NON-NEGOTIABLE)
+export type OpzenixNodeState = 'PENDING' | 'RUNNING' | 'PASSED' | 'FAILED' | 'BLOCKED' | 'LOCKED';
 
 // OPZENIX Node Types (from taxonomy)
 export type OpzenixNodeType = 
@@ -118,17 +123,64 @@ interface OpzenixNodeProps {
   selected?: boolean;
 }
 
-// State configuration
-const stateConfig: Record<OpzenixNodeState, { icon: React.ElementType; className: string; borderClass: string }> = {
-  PASSED: { icon: CheckCircle2, className: 'text-emerald-400', borderClass: 'border-emerald-500/50' },
-  FAILED: { icon: XCircle, className: 'text-red-400', borderClass: 'border-red-500/50' },
-  PENDING: { icon: Clock, className: 'text-amber-400', borderClass: 'border-amber-500/50' },
-  RUNNING: { icon: RefreshCw, className: 'text-blue-400 animate-spin', borderClass: 'border-blue-500/50' },
-  LOCKED: { icon: Lock, className: 'text-muted-foreground', borderClass: 'border-muted' },
-  BLOCKED: { icon: AlertTriangle, className: 'text-red-400', borderClass: 'border-red-500/50' },
+// ============================================
+// 🎨 COLOR PALETTE (Enterprise / Regulator-Safe)
+// LOCKED - NON-NEGOTIABLE
+// ============================================
+// State      | Border    | Fill    | Animation
+// PENDING    | #6B7280   | #0F172A | None
+// RUNNING    | #3B82F6   | #020617 | Soft pulse
+// PASSED     | #22C55E   | #020617 | 1x success glow
+// FAILED     | #EF4444   | #020617 | Shake + halt
+// BLOCKED    | #F59E0B   | #020617 | Static
+// LOCKED     | #334155   | #020617 | None
+// ============================================
+
+const stateConfig: Record<OpzenixNodeState, { 
+  icon: React.ElementType; 
+  borderColor: string;
+  textColor: string;
+  animation: string;
+}> = {
+  PENDING: { 
+    icon: Clock, 
+    borderColor: '#6B7280', // Grey
+    textColor: '#9CA3AF',
+    animation: '' 
+  },
+  RUNNING: { 
+    icon: RefreshCw, 
+    borderColor: '#3B82F6', // Blue
+    textColor: '#60A5FA',
+    animation: 'animate-pulse' 
+  },
+  PASSED: { 
+    icon: CheckCircle2, 
+    borderColor: '#22C55E', // Green
+    textColor: '#4ADE80',
+    animation: '' 
+  },
+  FAILED: { 
+    icon: XCircle, 
+    borderColor: '#EF4444', // Red
+    textColor: '#F87171',
+    animation: 'animate-shake' 
+  },
+  BLOCKED: { 
+    icon: Pause, 
+    borderColor: '#F59E0B', // Amber
+    textColor: '#FBBF24',
+    animation: '' 
+  },
+  LOCKED: { 
+    icon: Lock, 
+    borderColor: '#334155', // Steel
+    textColor: '#64748B',
+    animation: '' 
+  },
 };
 
-// Node type icons
+// Node type icons (Icons Only - NO color overrides)
 const nodeTypeIcons: Record<OpzenixNodeType, React.ElementType> = {
   'source.git': GitBranch,
   'ci.sast': Shield,
@@ -140,7 +192,7 @@ const nodeTypeIcons: Record<OpzenixNodeType, React.ElementType> = {
   'ci.image-sign': PenTool,
   'ci.image-scan': ScanLine,
   'artifact.image': Package,
-  'security.gate': ShieldAlert,
+  'security.gate': Lock,
   'approval.gate': Users,
   'cd.argo': GitCommit,
   'deploy.rolling': RefreshCw,
@@ -151,26 +203,15 @@ const nodeTypeIcons: Record<OpzenixNodeType, React.ElementType> = {
   'audit.record': FileText,
 };
 
-// Node category colors
-const getNodeCategoryClass = (nodeType: OpzenixNodeType): string => {
-  if (nodeType.startsWith('source')) return 'bg-slate-800/90';
-  if (nodeType.startsWith('ci.')) return 'bg-blue-950/90';
-  if (nodeType.startsWith('artifact')) return 'bg-purple-950/90';
-  if (nodeType.startsWith('security')) return 'bg-red-950/90';
-  if (nodeType.startsWith('approval')) return 'bg-amber-950/90';
-  if (nodeType.startsWith('cd.') || nodeType.startsWith('deploy.')) return 'bg-emerald-950/90';
-  if (nodeType.startsWith('runtime')) return 'bg-cyan-950/90';
-  if (nodeType.startsWith('verify')) return 'bg-teal-950/90';
-  if (nodeType.startsWith('audit')) return 'bg-slate-900/90';
-  return 'bg-card';
-};
+// Fill color is consistent: #020617 (dark slate)
+const FILL_COLOR = '#020617';
 
-// Base Node Component for CI stages
+// Base Node Component (LOCKED SPEC)
 const BaseOpzenixNode = memo(({ data, selected }: OpzenixNodeProps) => {
   const stateInfo = stateConfig[data.state];
   const StateIcon = stateInfo.icon;
   const NodeIcon = nodeTypeIcons[data.nodeType];
-  const categoryClass = getNodeCategoryClass(data.nodeType);
+  const isImmutable = data.state === 'PASSED' || data.state === 'FAILED' || data.state === 'BLOCKED' || data.state === 'LOCKED';
 
   return (
     <motion.div
@@ -178,23 +219,29 @@ const BaseOpzenixNode = memo(({ data, selected }: OpzenixNodeProps) => {
       animate={{ opacity: 1, scale: 1 }}
       className={cn(
         'relative min-w-[180px] rounded-lg border-2 backdrop-blur-sm',
-        categoryClass,
-        stateInfo.borderClass,
-        selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
-        data.state === 'RUNNING' && 'shadow-lg shadow-blue-500/20'
+        stateInfo.animation,
+        selected && 'ring-2 ring-offset-2 ring-offset-background'
       )}
+      style={{ 
+        backgroundColor: FILL_COLOR,
+        borderColor: stateInfo.borderColor,
+        boxShadow: data.state === 'RUNNING' ? `0 0 20px ${stateInfo.borderColor}40` : undefined
+      }}
     >
-      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
       
-      <div className="px-3 py-2 border-b border-border/50">
+      <div className="px-3 py-2 border-b" style={{ borderColor: `${stateInfo.borderColor}30` }}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className={cn('p-1.5 rounded-md', stateInfo.borderClass.replace('border-', 'bg-').replace('/50', '/20'))}>
+            <div className="p-1.5 rounded-md" style={{ backgroundColor: `${stateInfo.borderColor}20` }}>
               <NodeIcon className="w-4 h-4 text-foreground" />
             </div>
             <span className="font-semibold text-sm text-foreground">{data.label}</span>
           </div>
-          <StateIcon className={cn('w-4 h-4', stateInfo.className)} />
+          <StateIcon 
+            className={cn('w-4 h-4', data.state === 'RUNNING' && 'animate-spin')} 
+            style={{ color: stateInfo.textColor }} 
+          />
         </div>
       </div>
 
@@ -210,22 +257,18 @@ const BaseOpzenixNode = memo(({ data, selected }: OpzenixNodeProps) => {
           </div>
         )}
 
-        {data.mvpStatus && (
+        {isImmutable && (
           <Badge 
             variant="outline" 
-            className={cn(
-              'text-[10px] px-1.5 py-0',
-              data.mvpStatus === 'DONE' && 'border-emerald-500/50 text-emerald-400',
-              data.mvpStatus === 'LOCKED' && 'border-amber-500/50 text-amber-400',
-              data.mvpStatus === 'FUTURE' && 'border-muted text-muted-foreground'
-            )}
+            className="text-[10px] px-1.5 py-0"
+            style={{ borderColor: `${stateInfo.borderColor}50`, color: stateInfo.textColor }}
           >
-            {data.mvpStatus}
+            IMMUTABLE
           </Badge>
         )}
       </div>
 
-      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
     </motion.div>
   );
 });
@@ -241,22 +284,23 @@ export const SourceGitNode = memo(({ data, selected }: OpzenixNodeProps) => {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className={cn(
-        'relative min-w-[200px] rounded-lg border-2 bg-slate-800/90 backdrop-blur-sm',
-        stateInfo.borderClass,
-        selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+        'relative min-w-[200px] rounded-lg border-2 backdrop-blur-sm',
+        stateInfo.animation,
+        selected && 'ring-2 ring-offset-2 ring-offset-background'
       )}
+      style={{ backgroundColor: FILL_COLOR, borderColor: stateInfo.borderColor }}
     >
-      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
       
-      <div className="px-3 py-2 border-b border-border/50">
+      <div className="px-3 py-2 border-b" style={{ borderColor: `${stateInfo.borderColor}30` }}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-slate-700/50">
+            <div className="p-1.5 rounded-md" style={{ backgroundColor: `${stateInfo.borderColor}20` }}>
               <GitBranch className="w-4 h-4 text-foreground" />
             </div>
             <span className="font-semibold text-sm text-foreground">{data.label}</span>
           </div>
-          <StateIcon className={cn('w-4 h-4', stateInfo.className)} />
+          <StateIcon className={cn('w-4 h-4', data.state === 'RUNNING' && 'animate-spin')} style={{ color: stateInfo.textColor }} />
         </div>
       </div>
 
@@ -285,7 +329,7 @@ export const SourceGitNode = memo(({ data, selected }: OpzenixNodeProps) => {
         )}
       </div>
 
-      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
     </motion.div>
   );
 });
@@ -301,24 +345,25 @@ export const ArtifactImageNode = memo(({ data, selected }: OpzenixNodeProps) => 
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className={cn(
-        'relative min-w-[220px] rounded-lg border-2 bg-purple-950/90 backdrop-blur-sm',
-        stateInfo.borderClass,
-        selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+        'relative min-w-[220px] rounded-lg border-2 backdrop-blur-sm',
+        stateInfo.animation,
+        selected && 'ring-2 ring-offset-2 ring-offset-background'
       )}
+      style={{ backgroundColor: FILL_COLOR, borderColor: stateInfo.borderColor }}
     >
-      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
       
-      <div className="px-3 py-2 border-b border-border/50">
+      <div className="px-3 py-2 border-b" style={{ borderColor: `${stateInfo.borderColor}30` }}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-purple-800/50">
-              <Package className="w-4 h-4 text-purple-300" />
+            <div className="p-1.5 rounded-md" style={{ backgroundColor: `${stateInfo.borderColor}20` }}>
+              <Package className="w-4 h-4 text-foreground" />
             </div>
             <span className="font-semibold text-sm text-foreground">{data.label}</span>
           </div>
           <div className="flex items-center gap-1.5">
-            {data.signed && <ShieldCheck className="w-4 h-4 text-emerald-400" />}
-            <StateIcon className={cn('w-4 h-4', stateInfo.className)} />
+            {data.signed && <ShieldCheck className="w-4 h-4" style={{ color: '#22C55E' }} />}
+            <StateIcon className={cn('w-4 h-4', data.state === 'RUNNING' && 'animate-spin')} style={{ color: stateInfo.textColor }} />
           </div>
         </div>
       </div>
@@ -329,7 +374,7 @@ export const ArtifactImageNode = memo(({ data, selected }: OpzenixNodeProps) => 
         )}
         <div className="flex items-center gap-2 text-xs">
           {data.registry && (
-            <Badge variant="outline" className="text-[10px]">{data.registry}</Badge>
+            <Badge variant="outline" className="text-[10px]" style={{ borderColor: `${stateInfo.borderColor}50` }}>{data.registry}</Badge>
           )}
           {data.tag && (
             <span className="font-mono text-muted-foreground">:{data.tag}</span>
@@ -340,12 +385,12 @@ export const ArtifactImageNode = memo(({ data, selected }: OpzenixNodeProps) => 
             SHA: {data.digest.slice(0, 16)}...
           </div>
         )}
-        <Badge variant="outline" className="text-[10px] border-purple-500/50 text-purple-300">
+        <Badge variant="outline" className="text-[10px]" style={{ borderColor: `${stateInfo.borderColor}50`, color: stateInfo.textColor }}>
           IMMUTABLE
         </Badge>
       </div>
 
-      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
     </motion.div>
   );
 });
@@ -362,23 +407,27 @@ export const SecurityGateNode = memo(({ data, selected }: OpzenixNodeProps) => {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className={cn(
-        'relative min-w-[200px] rounded-lg border-2 bg-red-950/90 backdrop-blur-sm',
-        stateInfo.borderClass,
-        selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
-        isBlocked && 'shadow-lg shadow-red-500/30'
+        'relative min-w-[200px] rounded-lg border-2 backdrop-blur-sm',
+        stateInfo.animation,
+        selected && 'ring-2 ring-offset-2 ring-offset-background'
       )}
+      style={{ 
+        backgroundColor: FILL_COLOR, 
+        borderColor: stateInfo.borderColor,
+        boxShadow: isBlocked ? `0 0 15px ${stateInfo.borderColor}30` : undefined
+      }}
     >
-      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
       
-      <div className="px-3 py-2 border-b border-border/50">
+      <div className="px-3 py-2 border-b" style={{ borderColor: `${stateInfo.borderColor}30` }}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className={cn('p-1.5 rounded-md', isBlocked ? 'bg-red-800/50' : 'bg-emerald-800/50')}>
-              {isBlocked ? <ShieldAlert className="w-4 h-4 text-red-300" /> : <ShieldCheck className="w-4 h-4 text-emerald-300" />}
+            <div className="p-1.5 rounded-md" style={{ backgroundColor: `${stateInfo.borderColor}20` }}>
+              {isBlocked ? <ShieldAlert className="w-4 h-4 text-foreground" /> : <ShieldCheck className="w-4 h-4 text-foreground" />}
             </div>
             <span className="font-semibold text-sm text-foreground">{data.label}</span>
           </div>
-          <StateIcon className={cn('w-4 h-4', stateInfo.className)} />
+          <StateIcon className={cn('w-4 h-4', data.state === 'RUNNING' && 'animate-spin')} style={{ color: stateInfo.textColor }} />
         </div>
       </div>
 
@@ -391,13 +440,13 @@ export const SecurityGateNode = memo(({ data, selected }: OpzenixNodeProps) => {
           </div>
         )}
         {isBlocked && data.blockedReason && (
-          <div className="p-2 bg-red-900/50 rounded text-xs text-red-200">
+          <div className="p-2 rounded text-xs" style={{ backgroundColor: `${stateInfo.borderColor}20`, color: stateInfo.textColor }}>
             {data.blockedReason}
           </div>
         )}
       </div>
 
-      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
     </motion.div>
   );
 });
@@ -407,46 +456,49 @@ SecurityGateNode.displayName = 'SecurityGateNode';
 export const ApprovalGateNode = memo(({ data, selected }: OpzenixNodeProps) => {
   const stateInfo = stateConfig[data.state];
   const StateIcon = stateInfo.icon;
-  const isPending = data.state === 'PENDING';
+  const isPending = data.state === 'PENDING' || data.state === 'BLOCKED';
 
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className={cn(
-        'relative min-w-[220px] rounded-lg border-2 bg-amber-950/90 backdrop-blur-sm',
-        stateInfo.borderClass,
-        selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
-        isPending && 'shadow-lg shadow-amber-500/20'
+        'relative min-w-[220px] rounded-lg border-2 backdrop-blur-sm',
+        stateInfo.animation,
+        selected && 'ring-2 ring-offset-2 ring-offset-background'
       )}
+      style={{ 
+        backgroundColor: FILL_COLOR, 
+        borderColor: stateInfo.borderColor,
+        boxShadow: isPending ? `0 0 15px ${stateInfo.borderColor}20` : undefined
+      }}
     >
-      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
       
-      <div className="px-3 py-2 border-b border-border/50">
+      <div className="px-3 py-2 border-b" style={{ borderColor: `${stateInfo.borderColor}30` }}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-amber-800/50">
-              <Users className="w-4 h-4 text-amber-300" />
+            <div className="p-1.5 rounded-md" style={{ backgroundColor: `${stateInfo.borderColor}20` }}>
+              <Users className="w-4 h-4 text-foreground" />
             </div>
             <span className="font-semibold text-sm text-foreground">{data.label}</span>
           </div>
-          <StateIcon className={cn('w-4 h-4', stateInfo.className)} />
+          <StateIcon className={cn('w-4 h-4', data.state === 'RUNNING' && 'animate-spin')} style={{ color: stateInfo.textColor }} />
         </div>
       </div>
 
       <div className="px-3 py-2 space-y-2">
         {data.environment && (
-          <Badge variant="outline" className="text-[10px] border-amber-500/50 text-amber-300">
+          <Badge variant="outline" className="text-[10px]" style={{ borderColor: `${stateInfo.borderColor}50`, color: stateInfo.textColor }}>
             {data.environment.toUpperCase()}
           </Badge>
         )}
         
         <div className="text-xs">
           <span className="text-muted-foreground">Approvals: </span>
-          <span className={cn(
-            'font-semibold',
-            (data.currentApprovers || 0) >= (data.requiredApprovers || 1) ? 'text-emerald-400' : 'text-amber-400'
-          )}>
+          <span className="font-semibold" style={{ 
+            color: (data.currentApprovers || 0) >= (data.requiredApprovers || 1) ? '#22C55E' : '#F59E0B' 
+          }}>
             {data.currentApprovers || 0}/{data.requiredApprovers || 1}
           </span>
         </div>
@@ -455,7 +507,7 @@ export const ApprovalGateNode = memo(({ data, selected }: OpzenixNodeProps) => {
           <div className="space-y-1">
             {data.approvers.map((approver, i) => (
               <div key={i} className="flex items-center gap-1.5 text-xs">
-                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                <CheckCircle2 className="w-3 h-3" style={{ color: '#22C55E' }} />
                 <span className="text-muted-foreground">{approver.role}:</span>
                 <span className="text-foreground">{approver.user}</span>
               </div>
@@ -464,17 +516,17 @@ export const ApprovalGateNode = memo(({ data, selected }: OpzenixNodeProps) => {
         )}
 
         {isPending && data.pendingApprovals && data.pendingApprovals > 0 && (
-          <div className="text-xs text-amber-400">
+          <div className="text-xs" style={{ color: stateInfo.textColor }}>
             Waiting for {data.pendingApprovals} more approval{data.pendingApprovals > 1 ? 's' : ''}
           </div>
         )}
 
-        <Badge variant="outline" className="text-[10px] border-muted text-muted-foreground">
+        <Badge variant="outline" className="text-[10px] text-muted-foreground">
           READ-ONLY AFTER APPROVAL
         </Badge>
       </div>
 
-      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
     </motion.div>
   );
 });
@@ -490,22 +542,27 @@ export const CDArgoNode = memo(({ data, selected }: OpzenixNodeProps) => {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className={cn(
-        'relative min-w-[200px] rounded-lg border-2 bg-emerald-950/90 backdrop-blur-sm',
-        stateInfo.borderClass,
-        selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+        'relative min-w-[200px] rounded-lg border-2 backdrop-blur-sm',
+        stateInfo.animation,
+        selected && 'ring-2 ring-offset-2 ring-offset-background'
       )}
+      style={{ 
+        backgroundColor: FILL_COLOR, 
+        borderColor: stateInfo.borderColor,
+        boxShadow: data.state === 'RUNNING' ? `0 0 20px ${stateInfo.borderColor}40` : undefined
+      }}
     >
-      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
       
-      <div className="px-3 py-2 border-b border-border/50">
+      <div className="px-3 py-2 border-b" style={{ borderColor: `${stateInfo.borderColor}30` }}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-emerald-800/50">
-              <Rocket className="w-4 h-4 text-emerald-300" />
+            <div className="p-1.5 rounded-md" style={{ backgroundColor: `${stateInfo.borderColor}20` }}>
+              <GitCommit className="w-4 h-4 text-foreground" />
             </div>
             <span className="font-semibold text-sm text-foreground">{data.label}</span>
           </div>
-          <StateIcon className={cn('w-4 h-4', stateInfo.className)} />
+          <StateIcon className={cn('w-4 h-4', data.state === 'RUNNING' && 'animate-spin')} style={{ color: stateInfo.textColor }} />
         </div>
       </div>
 
@@ -513,116 +570,84 @@ export const CDArgoNode = memo(({ data, selected }: OpzenixNodeProps) => {
         {data.appName && (
           <div className="text-xs font-mono text-foreground">{data.appName}</div>
         )}
-        {data.gitRevision && (
-          <div className="flex items-center gap-1.5 text-xs">
-            <GitCommit className="w-3 h-3 text-muted-foreground" />
-            <span className="font-mono text-muted-foreground">{data.gitRevision.slice(0, 7)}</span>
-          </div>
-        )}
-        {data.syncMode && (
-          <Badge 
-            variant="outline" 
-            className={cn(
-              'text-[10px]',
-              data.syncMode === 'manual' ? 'border-amber-500/50 text-amber-300' : 'border-emerald-500/50 text-emerald-300'
-            )}
-          >
-            {data.syncMode.toUpperCase()} SYNC
-          </Badge>
-        )}
+        <div className="flex items-center gap-2 text-xs">
+          {data.gitRevision && (
+            <span className="font-mono text-muted-foreground">{data.gitRevision.slice(0, 8)}</span>
+          )}
+          {data.syncMode && (
+            <Badge variant="outline" className="text-[10px]" style={{ borderColor: `${stateInfo.borderColor}50` }}>
+              {data.syncMode.toUpperCase()}
+            </Badge>
+          )}
+        </div>
         {data.syncResult && (
-          <div className="text-xs text-muted-foreground">{data.syncResult}</div>
+          <div className="text-xs" style={{ color: stateInfo.textColor }}>{data.syncResult}</div>
         )}
       </div>
 
-      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
     </motion.div>
   );
 });
 CDArgoNode.displayName = 'CDArgoNode';
 
-// Deployment Strategy Node
-export const DeploymentStrategyNode = memo(({ data, selected }: OpzenixNodeProps) => {
-  const stateInfo = stateConfig[data.state];
-  const StateIcon = stateInfo.icon;
-  
-  const strategyType = data.nodeType.split('.')[1] as 'rolling' | 'canary' | 'bluegreen';
-  const strategyIcons = {
-    rolling: RefreshCw,
-    canary: Layers,
-    bluegreen: ArrowRightLeft,
-  };
-  const StrategyIcon = strategyIcons[strategyType];
+// Deploy Strategy Nodes
+const createDeployNode = (type: 'rolling' | 'canary' | 'bluegreen', Icon: React.ElementType) => {
+  const Node = memo(({ data, selected }: OpzenixNodeProps) => {
+    const stateInfo = stateConfig[data.state];
+    const StateIcon = stateInfo.icon;
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className={cn(
-        'relative min-w-[200px] rounded-lg border-2 bg-emerald-950/90 backdrop-blur-sm',
-        stateInfo.borderClass,
-        selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
-        data.state === 'RUNNING' && 'shadow-lg shadow-emerald-500/20'
-      )}
-    >
-      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
-      
-      <div className="px-3 py-2 border-b border-border/50">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-emerald-800/50">
-              <StrategyIcon className={cn('w-4 h-4 text-emerald-300', data.state === 'RUNNING' && 'animate-spin')} />
-            </div>
-            <span className="font-semibold text-sm text-foreground">{data.label}</span>
-          </div>
-          <StateIcon className={cn('w-4 h-4', stateInfo.className)} />
-        </div>
-      </div>
-
-      <div className="px-3 py-2 space-y-2">
-        <Badge variant="outline" className="text-[10px] border-emerald-500/50 text-emerald-300">
-          {strategyType.toUpperCase()}
-        </Badge>
-        
-        {data.state === 'RUNNING' && (
-          <div className="space-y-1">
-            {strategyType === 'rolling' && (
-              <div className="flex items-center gap-1">
-                {[1, 2, 3, 4].map((i) => (
-                  <motion.div
-                    key={i}
-                    className="w-3 h-3 rounded-sm bg-emerald-500"
-                    animate={{ opacity: [0.3, 1, 0.3] }}
-                    transition={{ duration: 1, delay: i * 0.2, repeat: Infinity }}
-                  />
-                ))}
-              </div>
-            )}
-            {strategyType === 'canary' && (
-              <div className="flex items-center gap-2 text-xs">
-                <div className="flex-1 h-2 bg-blue-500/50 rounded" style={{ width: '70%' }} />
-                <div className="h-2 bg-emerald-500 rounded" style={{ width: '30%' }} />
-                <span className="text-muted-foreground">30%</span>
-              </div>
-            )}
-            {strategyType === 'bluegreen' && (
-              <div className="flex items-center gap-2">
-                <div className="px-2 py-1 bg-blue-500/50 rounded text-xs">Blue</div>
-                <ArrowRightLeft className="w-3 h-3 text-muted-foreground" />
-                <div className="px-2 py-1 bg-emerald-500/50 rounded text-xs">Green</div>
-              </div>
-            )}
-          </div>
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className={cn(
+          'relative min-w-[180px] rounded-lg border-2 backdrop-blur-sm',
+          stateInfo.animation,
+          selected && 'ring-2 ring-offset-2 ring-offset-background'
         )}
-      </div>
+        style={{ 
+          backgroundColor: FILL_COLOR, 
+          borderColor: stateInfo.borderColor,
+          boxShadow: data.state === 'RUNNING' ? `0 0 20px ${stateInfo.borderColor}40` : undefined
+        }}
+      >
+        <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
+        
+        <div className="px-3 py-2 border-b" style={{ borderColor: `${stateInfo.borderColor}30` }}>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-md" style={{ backgroundColor: `${stateInfo.borderColor}20` }}>
+                <Icon className="w-4 h-4 text-foreground" />
+              </div>
+              <span className="font-semibold text-sm text-foreground">{data.label}</span>
+            </div>
+            <StateIcon className={cn('w-4 h-4', data.state === 'RUNNING' && 'animate-spin')} style={{ color: stateInfo.textColor }} />
+          </div>
+        </div>
 
-      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
-    </motion.div>
-  );
-});
-DeploymentStrategyNode.displayName = 'DeploymentStrategyNode';
+        <div className="px-3 py-2 space-y-1.5">
+          <Badge variant="outline" className="text-[10px] capitalize" style={{ borderColor: `${stateInfo.borderColor}50` }}>
+            {type.replace('-', ' ')} strategy
+          </Badge>
+          {data.description && (
+            <p className="text-xs text-muted-foreground">{data.description}</p>
+          )}
+        </div>
 
-// Kubernetes Runtime Node
+        <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
+      </motion.div>
+    );
+  });
+  Node.displayName = `Deploy${type.charAt(0).toUpperCase() + type.slice(1)}Node`;
+  return Node;
+};
+
+export const DeployRollingNode = createDeployNode('rolling', RefreshCw);
+export const DeployCanaryNode = createDeployNode('canary', Layers);
+export const DeployBlueGreenNode = createDeployNode('bluegreen', ArrowRightLeft);
+
+// Runtime Kubernetes Node
 export const RuntimeK8sNode = memo(({ data, selected }: OpzenixNodeProps) => {
   const stateInfo = stateConfig[data.state];
   const StateIcon = stateInfo.icon;
@@ -632,66 +657,56 @@ export const RuntimeK8sNode = memo(({ data, selected }: OpzenixNodeProps) => {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className={cn(
-        'relative min-w-[200px] rounded-lg border-2 bg-cyan-950/90 backdrop-blur-sm',
-        stateInfo.borderClass,
-        selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+        'relative min-w-[200px] rounded-lg border-2 backdrop-blur-sm',
+        stateInfo.animation,
+        selected && 'ring-2 ring-offset-2 ring-offset-background'
       )}
+      style={{ 
+        backgroundColor: FILL_COLOR, 
+        borderColor: stateInfo.borderColor,
+        boxShadow: data.state === 'RUNNING' ? `0 0 20px ${stateInfo.borderColor}40` : undefined
+      }}
     >
-      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
       
-      <div className="px-3 py-2 border-b border-border/50">
+      <div className="px-3 py-2 border-b" style={{ borderColor: `${stateInfo.borderColor}30` }}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-cyan-800/50">
-              <Container className="w-4 h-4 text-cyan-300" />
+            <div className="p-1.5 rounded-md" style={{ backgroundColor: `${stateInfo.borderColor}20` }}>
+              <Container className="w-4 h-4 text-foreground" />
             </div>
             <span className="font-semibold text-sm text-foreground">{data.label}</span>
           </div>
-          <StateIcon className={cn('w-4 h-4', stateInfo.className)} />
+          <StateIcon className={cn('w-4 h-4', data.state === 'RUNNING' && 'animate-spin')} style={{ color: stateInfo.textColor }} />
         </div>
       </div>
 
       <div className="px-3 py-2 space-y-1.5">
         {data.namespace && (
-          <div className="flex items-center gap-1.5 text-xs">
-            <Box className="w-3 h-3 text-muted-foreground" />
-            <span className="font-mono text-foreground">{data.namespace}</span>
-          </div>
+          <div className="text-xs font-mono text-muted-foreground">{data.namespace}</div>
         )}
         {data.deployment && (
-          <div className="flex items-center gap-1.5 text-xs">
-            <Server className="w-3 h-3 text-muted-foreground" />
-            <span className="font-mono text-foreground">{data.deployment}</span>
-          </div>
+          <div className="text-xs font-mono text-foreground">{data.deployment}</div>
         )}
         {data.replicas !== undefined && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Replicas:</span>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: data.replicas }).map((_, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    'w-2 h-2 rounded-full',
-                    i < (data.readyReplicas || 0) ? 'bg-emerald-500' : 'bg-muted'
-                  )}
-                />
-              ))}
-            </div>
-            <span className="text-xs text-foreground">
+          <div className="text-xs">
+            <span className="text-muted-foreground">Replicas: </span>
+            <span className="font-semibold" style={{ 
+              color: (data.readyReplicas || 0) >= (data.replicas || 0) ? '#22C55E' : '#F59E0B' 
+            }}>
               {data.readyReplicas || 0}/{data.replicas}
             </span>
           </div>
         )}
       </div>
 
-      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
     </motion.div>
   );
 });
 RuntimeK8sNode.displayName = 'RuntimeK8sNode';
 
-// Verification Node
+// Verify Runtime Node
 export const VerifyRuntimeNode = memo(({ data, selected }: OpzenixNodeProps) => {
   const stateInfo = stateConfig[data.state];
   const StateIcon = stateInfo.icon;
@@ -701,37 +716,34 @@ export const VerifyRuntimeNode = memo(({ data, selected }: OpzenixNodeProps) => 
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className={cn(
-        'relative min-w-[180px] rounded-lg border-2 bg-teal-950/90 backdrop-blur-sm',
-        stateInfo.borderClass,
-        selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+        'relative min-w-[200px] rounded-lg border-2 backdrop-blur-sm',
+        stateInfo.animation,
+        selected && 'ring-2 ring-offset-2 ring-offset-background'
       )}
+      style={{ backgroundColor: FILL_COLOR, borderColor: stateInfo.borderColor }}
     >
-      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
       
-      <div className="px-3 py-2 border-b border-border/50">
+      <div className="px-3 py-2 border-b" style={{ borderColor: `${stateInfo.borderColor}30` }}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-teal-800/50">
-              <Activity className="w-4 h-4 text-teal-300" />
+            <div className="p-1.5 rounded-md" style={{ backgroundColor: `${stateInfo.borderColor}20` }}>
+              <Activity className="w-4 h-4 text-foreground" />
             </div>
             <span className="font-semibold text-sm text-foreground">{data.label}</span>
           </div>
-          <StateIcon className={cn('w-4 h-4', stateInfo.className)} />
+          <StateIcon className={cn('w-4 h-4', data.state === 'RUNNING' && 'animate-spin')} style={{ color: stateInfo.textColor }} />
         </div>
       </div>
 
       <div className="px-3 py-2 space-y-1.5">
-        <p className="text-xs text-muted-foreground">{data.description}</p>
-        {data.duration && (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Clock className="w-3 h-3" />
-            <span>{data.duration}</span>
-          </div>
+        {data.description && (
+          <p className="text-xs text-muted-foreground">{data.description}</p>
         )}
         {data.evidenceLinks && data.evidenceLinks.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {data.evidenceLinks.map((link, i) => (
-              <Badge key={i} variant="outline" className="text-[10px]">
+              <Badge key={i} variant="outline" className="text-[10px]" style={{ borderColor: `${stateInfo.borderColor}50` }}>
                 {link.label}
               </Badge>
             ))}
@@ -739,7 +751,7 @@ export const VerifyRuntimeNode = memo(({ data, selected }: OpzenixNodeProps) => 
         )}
       </div>
 
-      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
     </motion.div>
   );
 });
@@ -755,69 +767,68 @@ export const AuditRecordNode = memo(({ data, selected }: OpzenixNodeProps) => {
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className={cn(
-        'relative min-w-[180px] rounded-lg border-2 border-dashed bg-slate-900/90 backdrop-blur-sm',
-        stateInfo.borderClass,
-        selected && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+        'relative min-w-[200px] rounded-lg border-2 backdrop-blur-sm',
+        stateInfo.animation,
+        selected && 'ring-2 ring-offset-2 ring-offset-background'
       )}
+      style={{ backgroundColor: FILL_COLOR, borderColor: stateInfo.borderColor }}
     >
-      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="target" position={Position.Left} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
       
-      <div className="px-3 py-2 border-b border-border/50">
+      <div className="px-3 py-2 border-b" style={{ borderColor: `${stateInfo.borderColor}30` }}>
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-slate-800/50">
-              <FileText className="w-4 h-4 text-slate-300" />
+            <div className="p-1.5 rounded-md" style={{ backgroundColor: `${stateInfo.borderColor}20` }}>
+              <FileText className="w-4 h-4 text-foreground" />
             </div>
             <span className="font-semibold text-sm text-foreground">{data.label}</span>
           </div>
-          <StateIcon className={cn('w-4 h-4', stateInfo.className)} />
+          <StateIcon className={cn('w-4 h-4', data.state === 'RUNNING' && 'animate-spin')} style={{ color: stateInfo.textColor }} />
         </div>
       </div>
 
       <div className="px-3 py-2 space-y-1.5">
-        <p className="text-xs text-muted-foreground">{data.description}</p>
-        <div className="flex items-center gap-2">
-          <Lock className="w-3 h-3 text-muted-foreground" />
-          <span className="text-[10px] text-muted-foreground">Immutable • Cryptographically linked</span>
-        </div>
+        {data.description && (
+          <p className="text-xs text-muted-foreground">{data.description}</p>
+        )}
         {data.digest && (
           <div className="text-[10px] font-mono text-muted-foreground truncate">
             {data.digest}
           </div>
         )}
+        <Badge variant="outline" className="text-[10px]" style={{ borderColor: `${stateInfo.borderColor}50`, color: stateInfo.textColor }}>
+          IMMUTABLE RECORD
+        </Badge>
       </div>
 
-      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !bg-muted-foreground !border-2 !border-background" />
+      <Handle type="source" position={Position.Right} className="!w-3 !h-3 !border-2 !border-background" style={{ backgroundColor: stateInfo.borderColor }} />
     </motion.div>
   );
 });
 AuditRecordNode.displayName = 'AuditRecordNode';
 
-// CI Stage Node (generic for all CI types)
-export const CIStageNode = memo(({ data, selected }: OpzenixNodeProps) => {
-  return <BaseOpzenixNode data={data} selected={selected} />;
-});
-CIStageNode.displayName = 'CIStageNode';
-
-// Export all node types for React Flow registration
+// Export node types map for ReactFlow
 export const opzenixNodeTypes = {
   'source.git': SourceGitNode,
-  'ci.sast': CIStageNode,
-  'ci.dependency-scan': CIStageNode,
-  'ci.secrets-scan': CIStageNode,
-  'ci.unit-test': CIStageNode,
-  'ci.integration-test': CIStageNode,
-  'ci.sbom': CIStageNode,
-  'ci.image-sign': CIStageNode,
-  'ci.image-scan': CIStageNode,
+  'ci.sast': BaseOpzenixNode,
+  'ci.dependency-scan': BaseOpzenixNode,
+  'ci.secrets-scan': BaseOpzenixNode,
+  'ci.unit-test': BaseOpzenixNode,
+  'ci.integration-test': BaseOpzenixNode,
+  'ci.sbom': BaseOpzenixNode,
+  'ci.image-sign': BaseOpzenixNode,
+  'ci.image-scan': BaseOpzenixNode,
   'artifact.image': ArtifactImageNode,
   'security.gate': SecurityGateNode,
   'approval.gate': ApprovalGateNode,
   'cd.argo': CDArgoNode,
-  'deploy.rolling': DeploymentStrategyNode,
-  'deploy.canary': DeploymentStrategyNode,
-  'deploy.bluegreen': DeploymentStrategyNode,
+  'deploy.rolling': DeployRollingNode,
+  'deploy.canary': DeployCanaryNode,
+  'deploy.bluegreen': DeployBlueGreenNode,
   'runtime.k8s': RuntimeK8sNode,
   'verify.runtime': VerifyRuntimeNode,
   'audit.record': AuditRecordNode,
 };
+
+// Export state config for external use
+export { stateConfig };
