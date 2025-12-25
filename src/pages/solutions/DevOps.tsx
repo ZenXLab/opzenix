@@ -2,7 +2,8 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { 
   GitBranch, Workflow, RotateCcw, Activity, Shield, 
-  Zap, CheckCircle2, ArrowRight, Terminal, Eye
+  Zap, CheckCircle2, ArrowRight, Terminal, Eye,
+  Server, Clock, AlertTriangle, TrendingUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +38,29 @@ const DevOps = () => {
     { value: '99.9%', label: 'Deployment reliability' },
   ];
 
+  const features = [
+    {
+      icon: Workflow,
+      title: 'Visual Pipeline Builder',
+      description: 'Drag-and-drop pipeline creation with real-time validation and instant feedback.',
+    },
+    {
+      icon: RotateCcw,
+      title: 'Instant Rollbacks',
+      description: 'One-click rollback to any checkpoint with full state preservation.',
+    },
+    {
+      icon: Eye,
+      title: 'Real-time Monitoring',
+      description: 'Live execution tracking with detailed logs and metrics for every stage.',
+    },
+    {
+      icon: Shield,
+      title: 'Governance Gates',
+      description: 'Automated approval workflows with RBAC and environment protection.',
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-background">
       <EnterpriseNavigation />
@@ -44,6 +68,29 @@ const DevOps = () => {
       {/* Hero */}
       <section className="pt-32 pb-20 px-6 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-transparent" />
+        
+        {/* Animated background elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          {[...Array(5)].map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute w-64 h-64 rounded-full bg-primary/5"
+              initial={{ x: -100, y: 100 * i, scale: 0.5, opacity: 0 }}
+              animate={{ 
+                x: [0, 100, 0], 
+                y: [100 * i, 100 * i + 50, 100 * i],
+                scale: [0.5, 1, 0.5],
+                opacity: [0.1, 0.3, 0.1]
+              }}
+              transition={{ 
+                duration: 8 + i * 2, 
+                repeat: Infinity, 
+                ease: "easeInOut" 
+              }}
+            />
+          ))}
+        </div>
+
         <div className="max-w-6xl mx-auto relative">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -56,7 +103,7 @@ const DevOps = () => {
               </Badge>
               <h1 className="text-5xl font-bold mb-6">
                 DevOps Without the{' '}
-                <span className="bg-gradient-to-r from-sec-critical to-sec-warning bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-destructive to-orange-500 bg-clip-text text-transparent">
                   Drama
                 </span>
               </h1>
@@ -74,19 +121,67 @@ const DevOps = () => {
               </div>
             </div>
             
+            {/* Animated Pipeline Visualization */}
             <motion.div
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 }}
               className="relative"
             >
-              <div className="aspect-square rounded-2xl bg-gradient-to-br from-primary/20 via-chart-1/10 to-transparent border p-8 flex items-center justify-center">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-                >
-                  <Workflow className="w-32 h-32 text-primary/50" />
-                </motion.div>
+              <div className="aspect-square rounded-2xl bg-gradient-to-br from-card via-card/80 to-transparent border p-6 overflow-hidden">
+                {/* Pipeline nodes animation */}
+                <div className="absolute inset-6 flex items-center justify-center">
+                  <svg className="w-full h-full" viewBox="0 0 300 300">
+                    {/* Connection lines */}
+                    <motion.path
+                      d="M 50 150 L 150 50 L 250 150 L 150 250 Z"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth="2"
+                      fill="none"
+                      strokeDasharray="10 5"
+                      initial={{ pathLength: 0 }}
+                      animate={{ pathLength: 1 }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    />
+                    
+                    {/* Animated pulse along path */}
+                    <motion.circle
+                      r="6"
+                      fill="hsl(var(--primary))"
+                      initial={{ offsetDistance: "0%" }}
+                      animate={{ offsetDistance: "100%" }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                      style={{ offsetPath: "path('M 50 150 L 150 50 L 250 150 L 150 250 Z')" }}
+                    />
+                  </svg>
+                </div>
+
+                {/* Pipeline nodes */}
+                {[
+                  { x: 'left-4', y: 'top-1/2', icon: GitBranch, label: 'Source', delay: 0 },
+                  { x: 'left-1/2 -translate-x-1/2', y: 'top-4', icon: Server, label: 'Build', delay: 0.2 },
+                  { x: 'right-4', y: 'top-1/2', icon: Activity, label: 'Test', delay: 0.4 },
+                  { x: 'left-1/2 -translate-x-1/2', y: 'bottom-4', icon: Zap, label: 'Deploy', delay: 0.6 },
+                ].map((node, i) => (
+                  <motion.div
+                    key={node.label}
+                    className={`absolute ${node.x} ${node.y} -translate-y-1/2`}
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.5 + node.delay, type: "spring" }}
+                  >
+                    <motion.div 
+                      className="flex flex-col items-center gap-2"
+                      animate={{ y: [0, -5, 0] }}
+                      transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
+                    >
+                      <div className="w-14 h-14 rounded-xl bg-primary/20 border border-primary/40 flex items-center justify-center">
+                        <node.icon className="w-6 h-6 text-primary" />
+                      </div>
+                      <span className="text-xs font-medium">{node.label}</span>
+                    </motion.div>
+                  </motion.div>
+                ))}
               </div>
             </motion.div>
           </motion.div>
@@ -106,7 +201,15 @@ const DevOps = () => {
                 transition={{ delay: index * 0.1 }}
                 className="text-center"
               >
-                <div className="text-4xl font-bold text-primary mb-2">{stat.value}</div>
+                <motion.div 
+                  className="text-4xl font-bold text-primary mb-2"
+                  initial={{ scale: 0.5 }}
+                  whileInView={{ scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 + 0.2, type: "spring" }}
+                >
+                  {stat.value}
+                </motion.div>
                 <div className="text-sm text-muted-foreground">{stat.label}</div>
               </motion.div>
             ))}
@@ -114,8 +217,51 @@ const DevOps = () => {
         </div>
       </section>
 
-      {/* Problem/Solution */}
+      {/* Features Grid */}
       <section className="py-20 px-6">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-12"
+          >
+            <h2 className="text-3xl font-bold mb-4">Built for DevOps Excellence</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Everything you need to ship with confidence and recover instantly.
+            </p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {features.map((feature, index) => (
+              <motion.div
+                key={feature.title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1 }}
+                whileHover={{ scale: 1.02 }}
+              >
+                <Card className="h-full hover:border-primary/50 transition-all group">
+                  <CardContent className="p-8">
+                    <motion.div 
+                      className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform"
+                      whileHover={{ rotate: 5 }}
+                    >
+                      <feature.icon className="w-7 h-7 text-primary" />
+                    </motion.div>
+                    <h3 className="text-xl font-semibold mb-3">{feature.title}</h3>
+                    <p className="text-muted-foreground">{feature.description}</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Problem/Solution */}
+      <section className="py-20 px-6 bg-muted/20">
         <div className="max-w-4xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -137,19 +283,29 @@ const DevOps = () => {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
+                whileHover={{ x: 10 }}
               >
-                <Card>
+                <Card className="overflow-hidden">
                   <CardContent className="p-6 flex items-center gap-6">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 text-sec-critical mb-2">
-                        <span className="w-2 h-2 rounded-full bg-sec-critical" />
+                      <div className="flex items-center gap-2 text-destructive mb-2">
+                        <motion.span 
+                          className="w-2 h-2 rounded-full bg-destructive"
+                          animate={{ scale: [1, 1.2, 1] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        />
                         <span className="text-sm font-medium">Problem</span>
                       </div>
                       <p className="font-medium">{item.problem}</p>
                     </div>
-                    <ArrowRight className="w-5 h-5 text-muted-foreground" />
+                    <motion.div
+                      animate={{ x: [0, 5, 0] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <ArrowRight className="w-5 h-5 text-muted-foreground" />
+                    </motion.div>
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 text-sec-safe mb-2">
+                      <div className="flex items-center gap-2 text-green-500 mb-2">
                         <CheckCircle2 className="w-4 h-4" />
                         <span className="text-sm font-medium">Solution</span>
                       </div>
@@ -164,15 +320,21 @@ const DevOps = () => {
       </section>
 
       {/* CTA */}
-      <section className="py-20 px-6 bg-gradient-to-r from-primary/10 via-background to-chart-1/10">
+      <section className="py-20 px-6 bg-gradient-to-r from-primary/10 via-background to-accent/10">
         <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-4">Ready to Level Up Your DevOps?</h2>
-          <p className="text-muted-foreground mb-8">
-            Join thousands of DevOps engineers who trust Opzenix for their critical deployments.
-          </p>
-          <Button size="lg" asChild>
-            <Link to="/auth">Start Free Trial</Link>
-          </Button>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            <h2 className="text-3xl font-bold mb-4">Ready to Level Up Your DevOps?</h2>
+            <p className="text-muted-foreground mb-8">
+              Join thousands of DevOps engineers who trust Opzenix for their critical deployments.
+            </p>
+            <Button size="lg" asChild>
+              <Link to="/auth">Start Free Trial</Link>
+            </Button>
+          </motion.div>
         </div>
       </section>
 
