@@ -42,7 +42,7 @@ interface StageDetails {
 }
 
 interface ArgoFlowGraphProps {
-  executionId: string;
+  executionId?: string;
   environment: string;
   onStageClick?: (stageId: string, details: StageDetails) => void;
 }
@@ -79,10 +79,15 @@ export function ArgoFlowGraph({ executionId, environment, onStageClick }: ArgoFl
   } | null>(null);
 
   useEffect(() => {
+    if (!executionId) {
+      setLoading(false);
+      return;
+    }
+    
     fetchStageData();
     
     const channel = supabase
-      .channel('argo-flow')
+      .channel(`argo-flow-${executionId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'executions', filter: `id=eq.${executionId}` }, fetchStageData)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ci_evidence', filter: `execution_id=eq.${executionId}` }, fetchStageData)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'approval_requests', filter: `execution_id=eq.${executionId}` }, fetchStageData)
@@ -92,6 +97,8 @@ export function ArgoFlowGraph({ executionId, environment, onStageClick }: ArgoFl
   }, [executionId]);
 
   const fetchStageData = async () => {
+    if (!executionId) return;
+    
     const [execRes, ciRes, approvalRes, deployRes, artifactRes] = await Promise.all([
       supabase.from('executions').select('*').eq('id', executionId).single(),
       supabase.from('ci_evidence').select('*').eq('execution_id', executionId).order('step_order'),
@@ -285,6 +292,16 @@ export function ArgoFlowGraph({ executionId, environment, onStageClick }: ArgoFl
       onStageClick(stageId, stageStates[stageId]);
     }
   };
+
+  if (!executionId) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-12 text-muted-foreground">
+          <p>No execution selected</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (loading) {
     return (
