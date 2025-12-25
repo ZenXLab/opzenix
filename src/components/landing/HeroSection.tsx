@@ -15,8 +15,9 @@ const HeroSection = () => {
     offset: ["start start", "end start"]
   });
   
-  const y = useTransform(scrollYProgress, [0, 1], [0, 100]);
-  const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+  const y = useTransform(scrollYProgress, [0, 1], [0, 50]);
+  // Keep opacity at 1 so the live preview doesn't disappear on scroll
+  const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0.85]);
 
   return (
     <section ref={containerRef} className="relative min-h-screen w-full flex flex-col overflow-hidden">
