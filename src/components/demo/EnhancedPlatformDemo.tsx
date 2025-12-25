@@ -154,9 +154,14 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
     }
 
     if (currentPhase === 'pipeline') {
+      resetPipeline();
       setTimeout(() => addLog('success', 'Template: Enterprise CI/CD'), 700);
       setTimeout(() => addLog('success', 'Approval gates configured'), 1800);
       setTimeout(() => addLog('success', 'Environment locks enabled'), 2800);
+      // Prepare nodes for visual display
+      setTimeout(() => {
+        setPipelineNodes(nodes => nodes.map(n => ({ ...n, status: 'idle' })));
+      }, 500);
     }
 
     if (currentPhase === 'execution') {
@@ -164,32 +169,34 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
       
       const runPipeline = async () => {
         const durations = ['1.2s', '45s', '32s', '12s', '28s', '2s', '16s'];
-        const runTimes = [600, 900, 900, 900, 900, 700, 900]; // Smooth fast execution
+        const runTimes = [700, 800, 800, 800, 800, 700, 800]; // Smooth consistent timing
         
-        // Run through all nodes
+        // Run through all nodes with smooth transitions
         for (let i = 0; i < 7; i++) {
-          await new Promise(r => setTimeout(r, 150));
           setCurrentNodeIndex(i);
           
-          // Set to running
+          // Set to running with smooth state update
           setPipelineNodes(nodes => 
             nodes.map((n, idx) => ({
               ...n,
-              status: idx < i ? 'success' : idx === i ? 'running' : 'pending',
-              duration: idx < i ? durations[idx] : '0s'
+              status: idx < i ? 'success' : idx === i ? 'running' : 'idle',
+              duration: idx < i ? durations[idx] : idx === i ? '0s' : '0s'
             }))
           );
           
           await new Promise(r => setTimeout(r, runTimes[i]));
           
-          // Complete node
+          // Complete node smoothly
           setPipelineNodes(nodes =>
             nodes.map((n, idx) => ({
               ...n,
-              status: idx <= i ? 'success' : 'pending',
+              status: idx <= i ? 'success' : 'idle',
               duration: idx <= i ? durations[idx] : '0s'
             }))
           );
+          
+          // Small delay between nodes for smooth visual flow
+          await new Promise(r => setTimeout(r, 100));
         }
       };
       
@@ -388,9 +395,10 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
                     {currentPhase === 'intro' && (
                       <motion.div
                         key="intro"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
                         className="flex flex-col items-center justify-center h-[480px]"
                       >
                         <motion.div
@@ -423,9 +431,10 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
                     {currentPhase === 'dashboard' && (
                       <motion.div
                         key="dashboard"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
                         className="space-y-4"
                       >
                         <div className="flex items-center justify-between">
@@ -552,9 +561,10 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
                     {currentPhase === 'github' && (
                       <motion.div
                         key="github"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
                         className="space-y-4"
                       >
                         <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -633,9 +643,10 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
                     {currentPhase === 'pipeline' && (
                       <motion.div
                         key="pipeline"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
                         className="space-y-4"
                       >
                         <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -699,9 +710,10 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
                     {(currentPhase === 'execution' || currentPhase === 'failure' || currentPhase === 'rollback') && (
                       <motion.div
                         key="execution"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
                         className="space-y-4"
                       >
                         <div className="flex items-center justify-between">
@@ -885,9 +897,10 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
                     {currentPhase === 'analytics' && (
                       <motion.div
                         key="analytics"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
                         className="space-y-4"
                       >
                         <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -959,9 +972,10 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
                     {currentPhase === 'ai' && (
                       <motion.div
                         key="ai"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
                         className="space-y-4"
                       >
                         <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -1028,9 +1042,10 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
                     {currentPhase === 'governance' && (
                       <motion.div
                         key="governance"
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
                         className="space-y-4"
                       >
                         <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -1119,9 +1134,10 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
                     {currentPhase === 'complete' && (
                       <motion.div
                         key="complete"
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
+                        transition={{ duration: 0.3 }}
                         className="flex flex-col items-center justify-center h-[480px] text-center"
                       >
                         <motion.div
