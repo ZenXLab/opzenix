@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity,
@@ -23,11 +23,15 @@ import {
   Users,
   Database,
   Globe,
+  Plug,
+  Play,
+  ChevronRight,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Tooltip,
   TooltipContent,
@@ -46,6 +50,7 @@ import { formatDistanceToNow } from 'date-fns';
 
 interface OpzenixDashboardProps {
   onNavigateToFlow: (flowType: 'ci-flow' | 'cd-flow' | 'full-flow', env: string) => void;
+  onNavigateTo?: (section: string) => void;
   currentEnvironment: string;
 }
 
@@ -57,7 +62,7 @@ const ENVIRONMENT_CONFIG = {
   prod: { label: 'Production', color: 'bg-sec-danger', textColor: 'text-sec-danger' },
 };
 
-export function OpzenixDashboard({ onNavigateToFlow, currentEnvironment }: OpzenixDashboardProps) {
+export function OpzenixDashboard({ onNavigateToFlow, onNavigateTo, currentEnvironment }: OpzenixDashboardProps) {
   const [breakGlassOpen, setBreakGlassOpen] = useState(false);
   const { dbRole, isAdmin, canBreakGlass } = useRBACPermissions();
 
@@ -83,49 +88,49 @@ export function OpzenixDashboard({ onNavigateToFlow, currentEnvironment }: Opzen
   const isProd = currentEnvironment === 'prod';
 
   return (
-    <div className="h-full flex flex-col bg-background">
-      {/* Dashboard Header */}
-      <header className={cn(
-        'flex-shrink-0 border-b px-6 py-4',
-        isProd ? 'border-sec-danger/30 bg-sec-danger/5' : 'border-border bg-card/30'
-      )}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className={cn(
-              'w-10 h-10 rounded-xl flex items-center justify-center',
-              isProd ? 'bg-sec-danger/10' : 'bg-primary/10'
-            )}>
-              <BarChart3 className={cn('w-5 h-5', isProd ? 'text-sec-danger' : 'text-primary')} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">Control Tower</h1>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className={cn('w-2 h-2 rounded-full', envConfig.color)} />
-                <span className={cn('text-sm font-medium', envConfig.textColor)}>
-                  {envConfig.label} Environment
-                </span>
-                {isProd && (
-                  <Badge variant="outline" className="text-[10px] border-sec-danger/50 text-sec-danger">
-                    <Lock className="w-2.5 h-2.5 mr-1" />
-                    Restricted
-                  </Badge>
-                )}
+    <TooltipProvider>
+      <div className="h-full flex flex-col bg-background">
+        {/* Dashboard Header */}
+        <header className={cn(
+          'flex-shrink-0 border-b px-6 py-4',
+          isProd ? 'border-sec-danger/30 bg-sec-danger/5' : 'border-border bg-card/30'
+        )}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className={cn(
+                'w-10 h-10 rounded-xl flex items-center justify-center',
+                isProd ? 'bg-sec-danger/10' : 'bg-primary/10'
+              )}>
+                <BarChart3 className={cn('w-5 h-5', isProd ? 'text-sec-danger' : 'text-primary')} />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-foreground">Control Tower</h1>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className={cn('w-2 h-2 rounded-full', envConfig.color)} />
+                  <span className={cn('text-sm font-medium', envConfig.textColor)}>
+                    {envConfig.label} Environment
+                  </span>
+                  {isProd && (
+                    <Badge variant="outline" className="text-[10px] border-sec-danger/50 text-sec-danger">
+                      <Lock className="w-2.5 h-2.5 mr-1" />
+                      Restricted
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <Badge variant="outline" className="text-xs capitalize">
-              {dbRole || 'viewer'}
-            </Badge>
-            <div className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium',
-              isConnected ? 'bg-sec-safe/10 text-sec-safe' : 'bg-sec-warning/10 text-sec-warning'
-            )}>
-              <span className={cn('w-1.5 h-1.5 rounded-full', isConnected ? 'bg-sec-safe animate-pulse' : 'bg-sec-warning')} />
-              {isConnected ? 'Live' : 'Reconnecting'}
-            </div>
-            <TooltipProvider>
+            <div className="flex items-center gap-3">
+              <Badge variant="outline" className="text-xs capitalize">
+                {dbRole || 'viewer'}
+              </Badge>
+              <div className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium',
+                isConnected ? 'bg-sec-safe/10 text-sec-safe' : 'bg-sec-warning/10 text-sec-warning'
+              )}>
+                <span className={cn('w-1.5 h-1.5 rounded-full', isConnected ? 'bg-sec-safe animate-pulse' : 'bg-sec-warning')} />
+                {isConnected ? 'Live' : 'Reconnecting'}
+              </div>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-9 w-9" onClick={refetch}>
@@ -134,176 +139,212 @@ export function OpzenixDashboard({ onNavigateToFlow, currentEnvironment }: Opzen
                 </TooltipTrigger>
                 <TooltipContent>Refresh Data</TooltipContent>
               </Tooltip>
-            </TooltipProvider>
-            {canBreakGlass() && (
-              <Button variant="destructive" size="sm" className="gap-1.5" onClick={() => setBreakGlassOpen(true)}>
-                <Zap className="w-3.5 h-3.5" />
-                Break Glass
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* Break Glass Modal */}
-      <BreakGlassModal open={breakGlassOpen} onClose={() => setBreakGlassOpen(false)} environment={currentEnvironment} />
-
-      {/* Main Content */}
-      <ScrollArea className="flex-1">
-        <div className="p-6 space-y-6">
-          {/* Key Metrics Row */}
-          <section className="grid grid-cols-5 gap-4">
-            <MetricCard
-              icon={Activity}
-              label="Active Pipelines"
-              value={metrics.running}
-              trend={metrics.running > 0 ? 'up' : 'neutral'}
-              color="text-node-running"
-              bgColor="bg-node-running/10"
-            />
-            <MetricCard
-              icon={FileText}
-              label="Pending Approvals"
-              value={metrics.pending}
-              trend={metrics.pending > 0 ? 'attention' : 'neutral'}
-              color="text-sec-warning"
-              bgColor="bg-sec-warning/10"
-            />
-            <MetricCard
-              icon={CheckCircle}
-              label="Success Rate"
-              value={`${successRate}%`}
-              trend={successRate >= 90 ? 'up' : 'down'}
-              color="text-sec-safe"
-              bgColor="bg-sec-safe/10"
-            />
-            <MetricCard
-              icon={AlertTriangle}
-              label="Failed"
-              value={metrics.failed}
-              trend={metrics.failed > 0 ? 'down' : 'neutral'}
-              color="text-sec-danger"
-              bgColor="bg-sec-danger/10"
-            />
-            <MetricCard
-              icon={Shield}
-              label="Security Score"
-              value="A+"
-              trend="up"
-              color="text-primary"
-              bgColor="bg-primary/10"
-            />
-          </section>
-
-          {/* Pipeline Quick Access */}
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <Layers className="w-4 h-4 text-primary" />
-                Pipeline Access
-              </h2>
-              <Badge variant="outline" className="text-[10px]">{currentEnvironment.toUpperCase()}</Badge>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <PipelineCard
-                title="CI Pipeline"
-                description="Build, Test, Scan, Package"
-                icon={GitBranch}
-                status="healthy"
-                stages={8}
-                color="blue"
-                onClick={() => onNavigateToFlow('ci-flow', currentEnvironment)}
-              />
-              <PipelineCard
-                title="CD Pipeline"
-                description="Deploy, Verify, Monitor"
-                icon={Rocket}
-                status={isProd ? 'gated' : 'healthy'}
-                stages={7}
-                color="green"
-                onClick={() => onNavigateToFlow('cd-flow', currentEnvironment)}
-              />
-              <PipelineCard
-                title="Full Flow View"
-                description="End-to-End Pipeline"
-                icon={Layers}
-                status="readonly"
-                stages={15}
-                color="purple"
-                onClick={() => onNavigateToFlow('full-flow', currentEnvironment)}
-              />
-            </div>
-          </section>
-
-          {/* Two Column Layout */}
-          <div className="grid grid-cols-2 gap-6">
-            {/* Pending Approvals */}
-            <section className="rounded-xl border border-border bg-card p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-sec-warning" />
-                  Pending Approvals
-                </h2>
-                {metrics.pending > 0 && (
-                  <Badge className="bg-sec-warning/20 text-sec-warning text-xs">{metrics.pending}</Badge>
-                )}
-              </div>
-              {pendingApprovals && pendingApprovals.length > 0 ? (
-                <div className="space-y-3">
-                  {pendingApprovals.slice(0, 4).map((approval: any) => (
-                    <ApprovalItem key={approval.id} approval={approval} />
-                  ))}
-                </div>
-              ) : (
-                <EmptyState icon={CheckCircle} message="No pending approvals" />
+              {canBreakGlass() && (
+                <Button variant="destructive" size="sm" className="gap-1.5" onClick={() => setBreakGlassOpen(true)}>
+                  <Zap className="w-3.5 h-3.5" />
+                  Break Glass
+                </Button>
               )}
+            </div>
+          </div>
+        </header>
+
+        <BreakGlassModal open={breakGlassOpen} onClose={() => setBreakGlassOpen(false)} environment={currentEnvironment} />
+
+        <ScrollArea className="flex-1">
+          <div className="p-6 space-y-6">
+            {/* Key Metrics */}
+            <section className="grid grid-cols-5 gap-4">
+              <MetricCard
+                icon={Activity}
+                label="Active Pipelines"
+                value={metrics.running}
+                trend={metrics.running > 0 ? 'up' : 'neutral'}
+                color="text-node-running"
+                bgColor="bg-node-running/10"
+              />
+              <MetricCard
+                icon={FileText}
+                label="Pending Approvals"
+                value={metrics.pending}
+                trend={metrics.pending > 0 ? 'attention' : 'neutral'}
+                color="text-sec-warning"
+                bgColor="bg-sec-warning/10"
+              />
+              <MetricCard
+                icon={CheckCircle}
+                label="Success Rate"
+                value={`${successRate}%`}
+                trend={successRate >= 90 ? 'up' : 'down'}
+                color="text-sec-safe"
+                bgColor="bg-sec-safe/10"
+              />
+              <MetricCard
+                icon={AlertTriangle}
+                label="Failed"
+                value={metrics.failed}
+                trend={metrics.failed > 0 ? 'down' : 'neutral'}
+                color="text-sec-danger"
+                bgColor="bg-sec-danger/10"
+              />
+              <MetricCard
+                icon={Shield}
+                label="Security Score"
+                value="A+"
+                trend="up"
+                color="text-primary"
+                bgColor="bg-primary/10"
+              />
             </section>
 
-            {/* Recent Deployments */}
-            <section className="rounded-xl border border-border bg-card p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <Rocket className="w-4 h-4 text-primary" />
-                  Recent Deployments
-                </h2>
-                <Button variant="ghost" size="sm" className="text-xs h-7">View All</Button>
-              </div>
-              {recentDeployments && recentDeployments.length > 0 ? (
-                <div className="space-y-3">
-                  {recentDeployments.slice(0, 4).map((deployment: any) => (
-                    <DeploymentItem key={deployment.id} deployment={deployment} />
-                  ))}
-                </div>
-              ) : (
-                <EmptyState icon={Rocket} message="No recent deployments" />
-              )}
-            </section>
-          </div>
-
-          {/* Environment Health Grid */}
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <Server className="w-4 h-4 text-primary" />
-                Environment Health
-              </h2>
-            </div>
-            <div className="grid grid-cols-5 gap-4">
-              {Object.entries(ENVIRONMENT_CONFIG).map(([envId, config]) => (
-                <EnvironmentHealthCard
-                  key={envId}
-                  envId={envId}
-                  label={config.label}
-                  color={config.color}
-                  isActive={currentEnvironment === envId}
-                  isAdmin={isAdmin}
+            {/* Quick Actions for Admin */}
+            {isAdmin && (
+              <section className="grid grid-cols-4 gap-4">
+                <QuickActionCard
+                  icon={Users}
+                  label="User Management"
+                  description="Manage roles and permissions"
+                  onClick={() => onNavigateTo?.('admin-users')}
                 />
-              ))}
+                <QuickActionCard
+                  icon={Plug}
+                  label="Connections"
+                  description="Configure integrations"
+                  onClick={() => onNavigateTo?.('connections')}
+                />
+                <QuickActionCard
+                  icon={Lock}
+                  label="Environment Locks"
+                  description="Control deployments"
+                  onClick={() => onNavigateTo?.('admin-locks')}
+                />
+                <QuickActionCard
+                  icon={Settings2}
+                  label="Settings"
+                  description="Platform configuration"
+                  onClick={() => onNavigateTo?.('admin-settings')}
+                />
+              </section>
+            )}
+
+            {/* Pipeline Quick Access */}
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-primary" />
+                  Pipeline Access
+                </h2>
+                <Badge variant="outline" className="text-[10px]">{currentEnvironment.toUpperCase()}</Badge>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <PipelineCard
+                  title="CI Pipeline"
+                  description="Build, Test, Scan, Package"
+                  icon={GitBranch}
+                  status="healthy"
+                  stages={9}
+                  color="blue"
+                  onClick={() => onNavigateToFlow('ci-flow', currentEnvironment)}
+                />
+                <PipelineCard
+                  title="CD Pipeline"
+                  description="Deploy, Verify, Monitor"
+                  icon={Rocket}
+                  status={isProd ? 'gated' : 'healthy'}
+                  stages={7}
+                  color="green"
+                  onClick={() => onNavigateToFlow('cd-flow', currentEnvironment)}
+                />
+                <PipelineCard
+                  title="Full Flow View"
+                  description="End-to-End Pipeline"
+                  icon={Layers}
+                  status="readonly"
+                  stages={16}
+                  color="purple"
+                  onClick={() => onNavigateToFlow('full-flow', currentEnvironment)}
+                />
+              </div>
+            </section>
+
+            {/* Two Column Layout */}
+            <div className="grid grid-cols-2 gap-6">
+              {/* Pending Approvals */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-sec-warning" />
+                      Pending Approvals
+                    </CardTitle>
+                    {metrics.pending > 0 && (
+                      <Badge className="bg-sec-warning/20 text-sec-warning text-xs">{metrics.pending}</Badge>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {pendingApprovals && pendingApprovals.length > 0 ? (
+                    <div className="space-y-3">
+                      {pendingApprovals.slice(0, 4).map((approval: any) => (
+                        <ApprovalItem key={approval.id} approval={approval} />
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState icon={CheckCircle} message="No pending approvals" />
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Recent Deployments */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <Rocket className="w-4 h-4 text-primary" />
+                      Recent Deployments
+                    </CardTitle>
+                    <Button variant="ghost" size="sm" className="text-xs h-7">View All</Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {recentDeployments && recentDeployments.length > 0 ? (
+                    <div className="space-y-3">
+                      {recentDeployments.slice(0, 4).map((deployment: any) => (
+                        <DeploymentItem key={deployment.id} deployment={deployment} />
+                      ))}
+                    </div>
+                  ) : (
+                    <EmptyState icon={Rocket} message="No recent deployments" />
+                  )}
+                </CardContent>
+              </Card>
             </div>
-          </section>
-        </div>
-      </ScrollArea>
-    </div>
+
+            {/* Environment Health Grid */}
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Server className="w-4 h-4 text-primary" />
+                  Environment Health
+                </h2>
+              </div>
+              <div className="grid grid-cols-5 gap-4">
+                {Object.entries(ENVIRONMENT_CONFIG).map(([envId, config]) => (
+                  <EnvironmentHealthCard
+                    key={envId}
+                    envId={envId}
+                    label={config.label}
+                    color={config.color}
+                    isActive={currentEnvironment === envId}
+                    isAdmin={isAdmin}
+                  />
+                ))}
+              </div>
+            </section>
+          </div>
+        </ScrollArea>
+      </div>
+    </TooltipProvider>
   );
 }
 
@@ -341,6 +382,34 @@ function MetricCard({
         'bg-muted'
       )} />
     </div>
+  );
+}
+
+function QuickActionCard({
+  icon: Icon,
+  label,
+  description,
+  onClick,
+}: {
+  icon: any;
+  label: string;
+  description: string;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="p-4 rounded-xl border border-border bg-card text-left hover:shadow-md hover:border-primary/50 transition-all group"
+    >
+      <div className="flex items-center justify-between mb-2">
+        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
+          <Icon className="w-4.5 h-4.5 text-primary" />
+        </div>
+        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+      </div>
+      <p className="text-sm font-medium text-foreground">{label}</p>
+      <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+    </button>
   );
 }
 
@@ -429,10 +498,10 @@ function ApprovalItem({ approval }: { approval: any }) {
 
 function DeploymentItem({ deployment }: { deployment: any }) {
   const statusColors = {
-    success: 'bg-sec-safe text-sec-safe',
-    failed: 'bg-sec-danger text-sec-danger',
-    running: 'bg-node-running text-node-running',
-    pending: 'bg-muted-foreground text-muted-foreground',
+    success: 'bg-sec-safe',
+    failed: 'bg-sec-danger',
+    running: 'bg-node-running',
+    pending: 'bg-muted-foreground',
   };
   const statusColor = statusColors[deployment.status as keyof typeof statusColors] || statusColors.pending;
 
@@ -440,7 +509,7 @@ function DeploymentItem({ deployment }: { deployment: any }) {
     <div className="p-3 rounded-lg border border-border bg-muted/20 hover:bg-muted/40 transition-colors">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className={cn('w-2 h-2 rounded-full', statusColor.split(' ')[0])} />
+          <div className={cn('w-2 h-2 rounded-full', statusColor)} />
           <div>
             <p className="text-sm font-medium text-foreground">{deployment.version}</p>
             <p className="text-[10px] text-muted-foreground">
@@ -479,24 +548,23 @@ function EnvironmentHealthCard({
         <span className={cn('w-2.5 h-2.5 rounded-full', color)} />
         {isProd && <Lock className="w-3 h-3 text-sec-danger" />}
       </div>
-      <p className="text-sm font-semibold text-foreground">{label}</p>
-      <div className="flex items-center gap-1 mt-2">
-        <CheckCircle className="w-3 h-3 text-sec-safe" />
-        <span className="text-[10px] text-sec-safe">Healthy</span>
+      <p className="text-sm font-medium text-foreground">{label}</p>
+      <div className="flex items-center gap-2 mt-2">
+        <div className="flex-1">
+          <Progress value={isActive ? 100 : Math.random() * 40 + 60} className="h-1" />
+        </div>
+        <span className="text-[10px] text-muted-foreground">
+          {isActive ? 'Active' : 'Healthy'}
+        </span>
       </div>
-      {isActive && (
-        <Badge variant="secondary" className="mt-2 text-[9px] w-full justify-center">
-          Current
-        </Badge>
-      )}
     </div>
   );
 }
 
 function EmptyState({ icon: Icon, message }: { icon: any; message: string }) {
   return (
-    <div className="py-8 text-center text-muted-foreground">
-      <Icon className="w-10 h-10 mx-auto mb-3 opacity-20" />
+    <div className="text-center py-6 text-muted-foreground">
+      <Icon className="w-8 h-8 mx-auto mb-2 opacity-30" />
       <p className="text-sm">{message}</p>
     </div>
   );
