@@ -24,8 +24,8 @@ serve(async (req) => {
       throw new Error('Text is required');
     }
 
-    // Default to George voice - professional, neutral, enterprise-grade
-    const selectedVoice = voiceId || 'JBFqnCBsd6RMkjVDRZzb';
+    // Default to Jessica voice - professional, calm, gentle female voice
+    const selectedVoice = voiceId || 'cgSgspJ2msm6clMCkdW9';
 
     console.log(`Generating TTS for text: "${text.substring(0, 50)}..." with voice: ${selectedVoice}`);
 
@@ -42,11 +42,11 @@ serve(async (req) => {
           model_id: 'eleven_multilingual_v2',
           output_format: 'mp3_44100_128',
           voice_settings: {
-            stability: 0.7,
-            similarity_boost: 0.75,
-            style: 0.3,
+            stability: 0.75,
+            similarity_boost: 0.8,
+            style: 0.2,
             use_speaker_boost: true,
-            speed: 1.0,
+            speed: 0.95,
           },
         }),
       }
