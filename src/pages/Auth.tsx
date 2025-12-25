@@ -304,7 +304,7 @@ const Auth = () => {
         </div>
         
         <p className="text-sm text-muted-foreground relative z-10">
-          © 2025 Opzenix. Enterprise-ready DevOps platform.
+          © {new Date().getFullYear()} Opzenix by Cropxon Innovations Pvt Ltd. Enterprise-ready DevOps platform.
         </p>
       </div>
       

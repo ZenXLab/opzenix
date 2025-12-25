@@ -177,7 +177,7 @@ const FooterSection = () => {
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-muted-foreground">
-            <p>© 2025 Opzenix by Cropxon Innovations Pvt Ltd. All rights reserved.</p>
+            <p>© {new Date().getFullYear()} Opzenix by Cropxon Innovations Pvt Ltd. All rights reserved.</p>
           </div>
           
           <div className="flex items-center gap-6 text-sm">

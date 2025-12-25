@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import LiveDashboardPreview from './LiveDashboardPreview';
 import { EnhancedPlatformDemo } from '@/components/demo/EnhancedPlatformDemo';
+import { AnimatedParticles } from './AnimatedParticles';
 
 const HeroSection = () => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -22,6 +23,9 @@ const HeroSection = () => {
   return (
     <section ref={containerRef} className="relative min-h-screen w-full flex flex-col overflow-hidden">
       <EnhancedPlatformDemo open={demoOpen} onClose={() => setDemoOpen(false)} />
+      
+      {/* Animated Particles Background */}
+      <AnimatedParticles />
       
       {/* Animated Background */}
       <div className="absolute inset-0">
