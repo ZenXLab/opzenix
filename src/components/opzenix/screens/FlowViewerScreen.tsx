@@ -430,6 +430,57 @@ function AuditPanel({ nodeId, auditItems }: { nodeId: string; auditItems: any[] 
         <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
         <p className="text-sm">No audit entries for this node</p>
       </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {filteredItems.map((item, idx) => (
+        <div key={item.id || idx} className="p-3 rounded-lg border border-border bg-muted/20">
+          <div className="flex items-center justify-between mb-1">
+            <Badge variant="secondary" className="text-[10px] capitalize">{item.action}</Badge>
+            <span className="text-[10px] text-muted-foreground">
+              {new Date(item.created_at).toLocaleString()}
+            </span>
+          </div>
+          <p className="text-xs text-foreground">{item.resource_type}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EvidencePanel({ node }: { node: any }) {
+  // Mock evidence data - would come from CI evidence table
+  const evidence = [
+    { id: '1', type: 'test_results', name: 'Unit Tests', status: 'passed', coverage: '87%' },
+    { id: '2', type: 'security_scan', name: 'SAST Scan', status: 'passed', issues: 0 },
+    { id: '3', type: 'build_artifact', name: 'Docker Image', status: 'available', digest: 'sha256:abc123...' },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">CI/CD evidence for compliance</p>
+      {evidence.map((item) => (
+        <div key={item.id} className="p-3 rounded-lg border border-border bg-muted/20">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm font-medium text-foreground">{item.name}</span>
+            <Badge 
+              variant="outline" 
+              className={cn(
+                'text-[10px]',
+                item.status === 'passed' || item.status === 'available' 
+                  ? 'border-sec-safe text-sec-safe' 
+                  : 'border-sec-danger text-sec-danger'
+              )}
+            >
+              {item.status}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground capitalize">{item.type.replace('_', ' ')}</p>
+        </div>
+      ))}
+    </div>
   );
 }
 
