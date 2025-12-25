@@ -382,32 +382,106 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<{ id: string; data: OpzenixNodeData } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLive, setIsLive] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   // Load and layout flow
-  useEffect(() => {
-    const loadFlow = async () => {
-      setLoading(true);
-      try {
-        const { nodes: flowNodes, edges: flowEdges } = executionId 
-          ? await generateFlowFromExecution(executionId)
-          : await generateDefaultFlow();
-        
-        const layoutedNodes = await applyElkLayout(flowNodes, flowEdges);
-        setNodes(layoutedNodes);
-        setEdges(flowEdges.map(edge => ({
-          ...edge,
-          style: { stroke: 'hsl(220 15% 30%)', strokeWidth: 2 },
-          animated: false,
-        })));
-      } catch (error) {
-        console.error('Failed to load flow:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadFlow();
+  const loadFlow = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    try {
+      const { nodes: flowNodes, edges: flowEdges } = executionId 
+        ? await generateFlowFromExecution(executionId)
+        : await generateDefaultFlow();
+      
+      const layoutedNodes = await applyElkLayout(flowNodes, flowEdges);
+      setNodes(layoutedNodes);
+      setEdges(flowEdges.map(edge => ({
+        ...edge,
+        style: { stroke: 'hsl(220 15% 30%)', strokeWidth: 2 },
+        animated: false,
+      })));
+      setLastUpdate(new Date());
+    } catch (error) {
+      console.error('[OPZENIX] Failed to load flow:', error);
+    } finally {
+      if (showLoading) setLoading(false);
+    }
   }, [executionId, setNodes, setEdges]);
+
+  // Initial load
+  useEffect(() => {
+    loadFlow();
+  }, [loadFlow]);
+
+  // Real-time subscriptions for live updates
+  useEffect(() => {
+    console.log('[OPZENIX] Setting up real-time subscriptions...');
+    
+    const channel = supabase
+      .channel('opzenix-flow-realtime')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'executions',
+        filter: executionId ? `id=eq.${executionId}` : undefined,
+      }, (payload) => {
+        console.log('[OPZENIX] Execution update:', payload);
+        loadFlow(false);
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'ci_evidence',
+        filter: executionId ? `execution_id=eq.${executionId}` : undefined,
+      }, (payload) => {
+        console.log('[OPZENIX] CI Evidence update:', payload);
+        loadFlow(false);
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'approval_requests',
+        filter: executionId ? `execution_id=eq.${executionId}` : undefined,
+      }, (payload) => {
+        console.log('[OPZENIX] Approval update:', payload);
+        loadFlow(false);
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'approval_votes',
+      }, (payload) => {
+        console.log('[OPZENIX] Approval vote update:', payload);
+        loadFlow(false);
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'deployments',
+        filter: executionId ? `execution_id=eq.${executionId}` : undefined,
+      }, (payload) => {
+        console.log('[OPZENIX] Deployment update:', payload);
+        loadFlow(false);
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'artifacts',
+        filter: executionId ? `execution_id=eq.${executionId}` : undefined,
+      }, (payload) => {
+        console.log('[OPZENIX] Artifact update:', payload);
+        loadFlow(false);
+      })
+      .subscribe((status) => {
+        console.log('[OPZENIX] Realtime subscription status:', status);
+        setIsLive(status === 'SUBSCRIBED');
+      });
+
+    return () => {
+      console.log('[OPZENIX] Cleaning up real-time subscriptions');
+      supabase.removeChannel(channel);
+    };
+  }, [executionId, loadFlow]);
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     const data = node.data as unknown as OpzenixNodeData;
@@ -489,6 +563,17 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
 
         {/* Flow Legend */}
         <div className="absolute top-4 left-4 z-10 flex items-center gap-4 px-3 py-2 bg-card/90 backdrop-blur border border-border rounded-lg">
+          {/* Live Indicator */}
+          <div className="flex items-center gap-1.5 pr-3 border-r border-border">
+            <div className={cn(
+              'w-2 h-2 rounded-full',
+              isLive ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'
+            )} />
+            <span className="text-xs font-medium text-muted-foreground">
+              {isLive ? 'LIVE' : 'OFFLINE'}
+            </span>
+          </div>
+          
           <span className="text-xs font-medium text-muted-foreground">Status:</span>
           {[
             { label: 'Passed', color: 'bg-emerald-500' },
@@ -503,8 +588,13 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
           ))}
         </div>
 
-        {/* MVP Status Badge */}
-        <div className="absolute top-4 right-4 z-10">
+        {/* MVP Status Badge + Last Update */}
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+          {lastUpdate && (
+            <span className="text-[10px] text-muted-foreground bg-card/90 backdrop-blur px-2 py-1 rounded border border-border">
+              Updated: {lastUpdate.toLocaleTimeString()}
+            </span>
+          )}
           <Badge variant="outline" className="border-amber-500/50 text-amber-400 bg-card/90 backdrop-blur">
             MVP 1.0.0 LOCKED
           </Badge>
@@ -513,7 +603,7 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
         {/* Hint */}
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
           <div className="px-3 py-1.5 bg-card/90 backdrop-blur border border-border rounded-lg text-xs text-muted-foreground">
-            Click any node to view audit details
+            Click any node to view audit details • Real-time updates enabled
           </div>
         </div>
       </div>
