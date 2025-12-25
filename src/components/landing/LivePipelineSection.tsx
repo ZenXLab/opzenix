@@ -45,35 +45,47 @@ const LivePipelineSection = () => {
   useEffect(() => {
     if (!isInView) return;
     
-    // Simulate failure and recovery
+    let isMounted = true;
+    
+    // Simulate failure and recovery with lighter animations
     const timeline = [
-      { delay: 2000, action: () => {
+      { delay: 1500, action: () => {
+        if (!isMounted) return;
         setNodes(prev => prev.map(n => 
           n.id === 'cd-staging' ? { ...n, data: { ...n.data, status: 'failed' } } : n
         ));
-        setActiveLog('Error: Container health check failed - timeout after 30s');
+        setActiveLog('Error: Health check timeout');
         setPhase('failed');
       }},
-      { delay: 4000, action: () => setShowRecovery(true) },
-      { delay: 6000, action: () => {
+      { delay: 3000, action: () => {
+        if (!isMounted) return;
+        setShowRecovery(true);
+      }},
+      { delay: 4500, action: () => {
+        if (!isMounted) return;
         setNodes(prev => prev.map(n => 
           n.id === 'cd-staging' ? { ...n, data: { ...n.data, status: 'running' } } : n
         ));
-        setActiveLog('Restoring from checkpoint... Rolling back to v2.0.3');
+        setActiveLog('Rolling back to checkpoint...');
         setShowRecovery(false);
         setPhase('recovering');
       }},
-      { delay: 8000, action: () => {
+      { delay: 6000, action: () => {
+        if (!isMounted) return;
         setNodes(prev => prev.map(n => 
           n.id === 'cd-staging' ? { ...n, data: { ...n.data, status: 'success' } } : n
         ));
-        setActiveLog('Deployment successful - health checks passing');
+        setActiveLog('Deployment successful');
         setPhase('success');
       }},
     ];
 
     const timeouts = timeline.map(({ delay, action }) => setTimeout(action, delay));
-    return () => timeouts.forEach(clearTimeout);
+    
+    return () => {
+      isMounted = false;
+      timeouts.forEach(clearTimeout);
+    };
   }, [isInView]);
 
   return (
