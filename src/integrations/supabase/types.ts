@@ -264,6 +264,62 @@ export type Database = {
           },
         ]
       }
+      ci_evidence: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          details: Json | null
+          duration_ms: number | null
+          evidence_url: string | null
+          execution_id: string
+          id: string
+          started_at: string | null
+          status: string
+          step_name: string
+          step_order: number
+          step_type: string
+          summary: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          details?: Json | null
+          duration_ms?: number | null
+          evidence_url?: string | null
+          execution_id: string
+          id?: string
+          started_at?: string | null
+          status?: string
+          step_name: string
+          step_order?: number
+          step_type: string
+          summary?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          details?: Json | null
+          duration_ms?: number | null
+          evidence_url?: string | null
+          execution_id?: string
+          id?: string
+          started_at?: string | null
+          status?: string
+          step_name?: string
+          step_order?: number
+          step_type?: string
+          summary?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ci_evidence_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       connection_health_events: {
         Row: {
           checked_at: string
@@ -1121,6 +1177,50 @@ export type Database = {
           },
         ]
       }
+      sbom_entries: {
+        Row: {
+          artifact_id: string
+          created_at: string
+          dependencies_count: number
+          format: string
+          generator: string
+          id: string
+          license_summary: Json | null
+          packages: Json | null
+          sbom_url: string | null
+        }
+        Insert: {
+          artifact_id: string
+          created_at?: string
+          dependencies_count?: number
+          format?: string
+          generator?: string
+          id?: string
+          license_summary?: Json | null
+          packages?: Json | null
+          sbom_url?: string | null
+        }
+        Update: {
+          artifact_id?: string
+          created_at?: string
+          dependencies_count?: number
+          format?: string
+          generator?: string
+          id?: string
+          license_summary?: Json | null
+          packages?: Json | null
+          sbom_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sbom_entries_artifact_id_fkey"
+            columns: ["artifact_id"]
+            isOneToOne: false
+            referencedRelation: "artifacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       secret_references: {
         Row: {
           created_at: string
@@ -1236,6 +1336,62 @@ export type Database = {
           },
         ]
       }
+      test_results: {
+        Row: {
+          coverage_percent: number | null
+          created_at: string
+          details: Json | null
+          duration_ms: number | null
+          execution_id: string
+          failed: number
+          id: string
+          passed: number
+          report_url: string | null
+          skipped: number
+          suite_name: string
+          test_type: string
+          total_tests: number
+        }
+        Insert: {
+          coverage_percent?: number | null
+          created_at?: string
+          details?: Json | null
+          duration_ms?: number | null
+          execution_id: string
+          failed?: number
+          id?: string
+          passed?: number
+          report_url?: string | null
+          skipped?: number
+          suite_name: string
+          test_type?: string
+          total_tests?: number
+        }
+        Update: {
+          coverage_percent?: number | null
+          created_at?: string
+          details?: Json | null
+          duration_ms?: number | null
+          execution_id?: string
+          failed?: number
+          id?: string
+          passed?: number
+          report_url?: string | null
+          skipped?: number
+          suite_name?: string
+          test_type?: string
+          total_tests?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_results_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_preferences: {
         Row: {
           created_at: string
@@ -1283,6 +1439,62 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      vulnerability_scans: {
+        Row: {
+          artifact_id: string
+          critical: number
+          cve_details: Json | null
+          high: number
+          id: string
+          low: number
+          medium: number
+          scan_report_url: string | null
+          scan_status: string
+          scan_type: string
+          scanned_at: string
+          scanner: string
+          total_issues: number
+        }
+        Insert: {
+          artifact_id: string
+          critical?: number
+          cve_details?: Json | null
+          high?: number
+          id?: string
+          low?: number
+          medium?: number
+          scan_report_url?: string | null
+          scan_status?: string
+          scan_type?: string
+          scanned_at?: string
+          scanner?: string
+          total_issues?: number
+        }
+        Update: {
+          artifact_id?: string
+          critical?: number
+          cve_details?: Json | null
+          high?: number
+          id?: string
+          low?: number
+          medium?: number
+          scan_report_url?: string | null
+          scan_status?: string
+          scan_type?: string
+          scanned_at?: string
+          scanner?: string
+          total_issues?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vulnerability_scans_artifact_id_fkey"
+            columns: ["artifact_id"]
+            isOneToOne: false
+            referencedRelation: "artifacts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       widget_metrics: {
         Row: {
