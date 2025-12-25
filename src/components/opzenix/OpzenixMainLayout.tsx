@@ -12,13 +12,15 @@ import ConnectionsHubPanel from '@/components/admin/ConnectionsHubPanel';
 import { AnimatedPipelineView } from '@/components/pipeline/AnimatedPipelineView';
 import { AdminOnboardingWizard } from '@/components/onboarding/AdminOnboardingWizard';
 import { VaultManagementPanel } from '@/components/vault/VaultManagementPanel';
+import { ArtifactsRegistryPanel } from '@/components/artifacts/ArtifactsRegistryPanel';
+import { SecurityCenterPanel } from '@/components/security/SecurityCenterPanel';
 import { supabase } from '@/integrations/supabase/client';
 
 // ============================================
 // 🏗️ OPZENIX MAIN LAYOUT (Enterprise Grade)
 // ============================================
 
-type Screen = 'dashboard' | 'ci-flow' | 'cd-flow' | 'full-flow' | 'connections' | 'admin-settings' | 'pipelines' | 'ci-pipeline' | 'cd-pipeline' | 'vault';
+type Screen = 'dashboard' | 'ci-flow' | 'cd-flow' | 'full-flow' | 'connections' | 'admin-settings' | 'pipelines' | 'ci-pipeline' | 'cd-pipeline' | 'vault' | 'artifacts' | 'security';
 type Environment = 'dev' | 'uat' | 'staging' | 'preprod' | 'prod';
 
 interface OpzenixMainLayoutProps {
@@ -187,6 +189,16 @@ export const OpzenixMainLayout = ({ onOpenSettings, onOpenProfile }: OpzenixMain
             {currentScreen === 'vault' && (
               <motion.div key="vault" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
                 <VaultManagementPanel onBack={() => setCurrentScreen('dashboard')} />
+              </motion.div>
+            )}
+            {currentScreen === 'artifacts' && (
+              <motion.div key="artifacts" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
+                <ArtifactsRegistryPanel onBack={() => setCurrentScreen('dashboard')} />
+              </motion.div>
+            )}
+            {currentScreen === 'security' && (
+              <motion.div key="security" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
+                <SecurityCenterPanel onBack={() => setCurrentScreen('dashboard')} />
               </motion.div>
             )}
           </AnimatePresence>

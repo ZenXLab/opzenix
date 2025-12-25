@@ -57,7 +57,7 @@ import OpzenixLogo from '@/components/brand/OpzenixLogo';
 // 🧭 OPZENIX LEFT NAVIGATION (Enterprise Grade)
 // ============================================
 
-type Screen = 'dashboard' | 'ci-flow' | 'cd-flow' | 'full-flow' | 'connections' | 'admin-settings' | 'pipelines' | 'ci-pipeline' | 'cd-pipeline' | 'vault';
+type Screen = 'dashboard' | 'ci-flow' | 'cd-flow' | 'full-flow' | 'connections' | 'admin-settings' | 'pipelines' | 'ci-pipeline' | 'cd-pipeline' | 'vault' | 'artifacts' | 'security';
 type Environment = 'dev' | 'uat' | 'staging' | 'preprod' | 'prod';
 
 interface OpzenixLeftNavProps {
@@ -118,6 +118,12 @@ export function OpzenixLeftNav({
         return;
       case 'team':
         onNavigate('admin-settings');
+        return;
+      case 'artifacts':
+        onNavigate('artifacts');
+        return;
+      case 'security':
+        onNavigate('security');
         return;
       default:
         // For other tools, show the dialog
