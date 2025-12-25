@@ -13,10 +13,16 @@ import {
   History,
   GitBranch,
   Lock,
+  GitMerge,
+  Clock,
+  Shield,
+  Layers,
+  ListChecks,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -27,7 +33,7 @@ interface ControlTowerNavProps {
 }
 
 // Navigation Items - ORDER IS IMPORTANT per manifesto
-const navItems = [
+const coreNavItems = [
   { 
     id: 'control-tower', 
     label: 'Control Tower', 
@@ -54,6 +60,9 @@ const navItems = [
     icon: History, 
     description: 'Deployment history per environment'
   },
+];
+
+const governanceNavItems = [
   { 
     id: 'environments', 
     label: 'Environments', 
@@ -85,6 +94,36 @@ const navItems = [
     description: 'Pending governance gates',
     badge: 'count'
   },
+];
+
+const cdFlowNavItems = [
+  {
+    id: 'argo-flow',
+    label: 'Argo CD Flow',
+    icon: GitMerge,
+    description: 'End-to-end CD flow graph'
+  },
+  {
+    id: 'deployment-strategy',
+    label: 'Deployment Strategy',
+    icon: Layers,
+    description: 'Rolling/Canary/Blue-Green'
+  },
+  {
+    id: 'audit-timeline',
+    label: 'Audit Timeline',
+    icon: Clock,
+    description: 'Immutable action timeline'
+  },
+  {
+    id: 'rbac',
+    label: 'RBAC Matrix',
+    icon: Shield,
+    description: 'Role-based permissions'
+  },
+];
+
+const systemNavItems = [
   { 
     id: 'audit-log', 
     label: 'Audit Log', 
@@ -96,6 +135,12 @@ const navItems = [
     label: 'System Health', 
     icon: Activity, 
     description: 'Infrastructure status'
+  },
+  {
+    id: 'mvp-checklist',
+    label: 'MVP Checklist',
+    icon: ListChecks,
+    description: 'MVP 1.0.0 readiness'
   },
 ];
 
@@ -181,61 +226,44 @@ const ControlTowerNav = ({
         </div>
 
         {/* Navigation Items */}
-        <nav className="flex-1 p-2 space-y-1">
+        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+          {/* Core Section */}
           {!collapsed && (
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-3 mb-3 font-medium">
-              Navigation
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-3 mb-2 font-medium">
+              Core
             </p>
           )}
+          {renderNavSection(coreNavItems)}
           
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeSection === item.id;
-            const badgeValue = getBadgeContent(item.badge);
-            const showLiveDot = item.badge === 'live' && activeExecutionsCount > 0;
-            
-            const buttonContent = (
-              <button
-                onClick={() => handleNavClick(item.id)}
-                className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all',
-                  isActive 
-                    ? 'bg-primary/10 text-primary font-medium shadow-sm border border-primary/20'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary',
-                  collapsed && 'justify-center px-2'
-                )}
-              >
-                <div className="relative">
-                  <Icon className={cn('w-4 h-4 shrink-0', isActive && 'text-primary')} />
-                  {showLiveDot && (
-                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-sec-safe animate-pulse" />
-                  )}
-                </div>
-                {!collapsed && (
-                  <>
-                    <span className="flex-1 text-left text-xs">{item.label}</span>
-                    {badgeValue !== null && (
-                      <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{badgeValue}</Badge>
-                    )}
-                  </>
-                )}
-              </button>
-            );
+          {!collapsed && <Separator className="my-2" />}
+          
+          {/* Governance Section */}
+          {!collapsed && (
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-3 my-2 font-medium">
+              Governance
+            </p>
+          )}
+          {renderNavSection(governanceNavItems)}
 
-            if (collapsed) {
-              return (
-                <Tooltip key={item.id}>
-                  <TooltipTrigger asChild>{buttonContent}</TooltipTrigger>
-                  <TooltipContent side="right" className="max-w-[200px]">
-                    <p className="font-medium">{item.label}</p>
-                    <p className="text-xs text-muted-foreground">{item.description}</p>
-                  </TooltipContent>
-                </Tooltip>
-              );
-            }
+          {!collapsed && <Separator className="my-2" />}
 
-            return <div key={item.id}>{buttonContent}</div>;
-          })}
+          {/* CD Flow Section */}
+          {!collapsed && (
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-3 my-2 font-medium">
+              CD Flow
+            </p>
+          )}
+          {renderNavSection(cdFlowNavItems)}
+
+          {!collapsed && <Separator className="my-2" />}
+
+          {/* System Section */}
+          {!collapsed && (
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground px-3 my-2 font-medium">
+              System
+            </p>
+          )}
+          {renderNavSection(systemNavItems)}
         </nav>
 
         {/* Version Footer */}
@@ -249,6 +277,57 @@ const ControlTowerNav = ({
       </motion.aside>
     </TooltipProvider>
   );
+
+  function renderNavSection(items: typeof coreNavItems) {
+    return items.map((item) => {
+      const Icon = item.icon;
+      const isActive = activeSection === item.id;
+      const badgeValue = getBadgeContent(item.badge);
+      const showLiveDot = item.badge === 'live' && activeExecutionsCount > 0;
+      
+      const buttonContent = (
+        <button
+          onClick={() => handleNavClick(item.id)}
+          className={cn(
+            'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all',
+            isActive 
+              ? 'bg-primary/10 text-primary font-medium shadow-sm border border-primary/20'
+              : 'text-muted-foreground hover:text-foreground hover:bg-secondary',
+            collapsed && 'justify-center px-2'
+          )}
+        >
+          <div className="relative">
+            <Icon className={cn('w-4 h-4 shrink-0', isActive && 'text-primary')} />
+            {showLiveDot && (
+              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-sec-safe animate-pulse" />
+            )}
+          </div>
+          {!collapsed && (
+            <>
+              <span className="flex-1 text-left text-xs">{item.label}</span>
+              {badgeValue !== null && (
+                <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">{badgeValue}</Badge>
+              )}
+            </>
+          )}
+        </button>
+      );
+
+      if (collapsed) {
+        return (
+          <Tooltip key={item.id}>
+            <TooltipTrigger asChild>{buttonContent}</TooltipTrigger>
+            <TooltipContent side="right" className="max-w-[200px]">
+              <p className="font-medium">{item.label}</p>
+              <p className="text-xs text-muted-foreground">{item.description}</p>
+            </TooltipContent>
+          </Tooltip>
+        );
+      }
+
+      return <div key={item.id}>{buttonContent}</div>;
+    });
+  }
 };
 
 export default ControlTowerNav;
