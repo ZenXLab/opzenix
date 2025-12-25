@@ -55,3 +55,11 @@ verify_jwt = false
 verify_jwt = false
 [functions.github-api]
 verify_jwt = false
+[functions.parse-test-results]
+verify_jwt = false
+[functions.trivy-scan]
+verify_jwt = false
+[functions.generate-sbom]
+verify_jwt = false
+[functions.record-ci-evidence]
+verify_jwt = false
