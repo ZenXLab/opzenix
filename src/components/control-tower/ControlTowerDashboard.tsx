@@ -35,7 +35,7 @@ import LastApprovalIndicator from './LastApprovalIndicator';
 import EmptyStateGuidance from './EmptyStateGuidance';
 import { ConnectionGatingBanner } from './ConnectionGatingBanner';
 import { VersionHistoryWidget } from './VersionHistoryWidget';
-import { OpzenixFlowMap } from '@/components/flow/OpzenixFlowMap';
+import { OpzenixEnterpriseFlowView } from '@/components/flow/OpzenixEnterpriseFlowView';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -548,12 +548,8 @@ const ControlTowerDashboard = ({
           </CardHeader>
           <CardContent className="p-0">
             <div className="h-[500px] w-full">
-              <OpzenixFlowMap 
-                executionId={featuredExecution?.id} 
-                environment={featuredExecution?.environment || 'prod'}
-                onNodeSelect={(nodeId, data) => {
-                  console.log('[OPZENIX] Node selected:', nodeId, data);
-                }}
+              <OpzenixEnterpriseFlowView 
+                executionId={featuredExecution?.id}
               />
             </div>
           </CardContent>
