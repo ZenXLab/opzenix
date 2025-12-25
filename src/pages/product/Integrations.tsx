@@ -41,7 +41,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Azure DevOps',
     category: 'Source Control',
     description: 'Connect Azure DevOps repositories and pipelines for enterprise Microsoft ecosystem integration.',
-    icon: <Cloud className="w-8 h-8" />,
     status: 'available',
     features: ['Azure Repos', 'Azure Pipelines', 'Service connections', 'Work item linking']
   },
@@ -50,7 +49,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Bitbucket',
     category: 'Source Control',
     description: 'Atlassian Bitbucket integration for teams using the Atlassian ecosystem.',
-    icon: <GitBranch className="w-8 h-8" />,
     status: 'beta',
     features: ['Cloud & Server', 'Pipeline triggers', 'PR webhooks', 'Branch permissions']
   },
@@ -59,7 +57,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Kubernetes',
     category: 'Infrastructure',
     description: 'Deploy to any Kubernetes cluster including AKS, EKS, GKE, and on-premises clusters.',
-    icon: <Container className="w-8 h-8" />,
     status: 'available',
     features: ['Multi-cluster support', 'Helm charts', 'Kustomize', 'Rollback support'],
     docsUrl: '/docs/setup-guides/kubernetes'
@@ -69,7 +66,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Amazon Web Services',
     category: 'Cloud Providers',
     description: 'Deploy to AWS services including ECS, EKS, Lambda, and EC2 with IAM role integration.',
-    icon: <Cloud className="w-8 h-8" />,
     status: 'available',
     features: ['ECS/EKS deployment', 'Lambda functions', 'S3 artifacts', 'IAM integration']
   },
@@ -78,7 +74,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Microsoft Azure',
     category: 'Cloud Providers',
     description: 'Native Azure integration for AKS, Container Apps, App Service, and Azure Functions.',
-    icon: <Cloud className="w-8 h-8" />,
     status: 'available',
     features: ['AKS clusters', 'Container Apps', 'App Service', 'Azure Functions']
   },
@@ -87,7 +82,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Google Cloud Platform',
     category: 'Cloud Providers',
     description: 'Deploy to GKE, Cloud Run, Cloud Functions, and Compute Engine with service account auth.',
-    icon: <Cloud className="w-8 h-8" />,
     status: 'available',
     features: ['GKE clusters', 'Cloud Run', 'Cloud Functions', 'Workload Identity']
   },
@@ -96,7 +90,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Docker Hub',
     category: 'Container Registry',
     description: 'Push and pull container images from Docker Hub with automated scanning.',
-    icon: <Container className="w-8 h-8" />,
     status: 'available',
     features: ['Image push/pull', 'Vulnerability scanning', 'Tag management', 'Webhook triggers']
   },
@@ -105,7 +98,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Azure Container Registry',
     category: 'Container Registry',
     description: 'Enterprise container registry with geo-replication and integrated security scanning.',
-    icon: <Container className="w-8 h-8" />,
     status: 'available',
     features: ['Geo-replication', 'Security scanning', 'Managed identity', 'Image signing'],
     docsUrl: '/docs/setup-guides/container-registry'
@@ -115,7 +107,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Amazon ECR',
     category: 'Container Registry',
     description: 'AWS Elastic Container Registry integration with IAM authentication.',
-    icon: <Container className="w-8 h-8" />,
     status: 'available',
     features: ['IAM authentication', 'Image scanning', 'Lifecycle policies', 'Cross-region replication']
   },
@@ -124,7 +115,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Google Container Registry',
     category: 'Container Registry',
     description: 'Google Artifact Registry integration for container images and packages.',
-    icon: <Container className="w-8 h-8" />,
     status: 'available',
     features: ['Artifact Registry', 'Vulnerability scanning', 'Binary authorization', 'Regional storage']
   },
@@ -133,7 +123,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'HashiCorp Vault',
     category: 'Secrets Management',
     description: 'Enterprise secrets management with dynamic credentials and encryption as a service.',
-    icon: <Lock className="w-8 h-8" />,
     status: 'available',
     features: ['Dynamic secrets', 'PKI management', 'Transit encryption', 'Policy management'],
     docsUrl: '/docs/setup-guides/vault'
@@ -143,7 +132,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Azure Key Vault',
     category: 'Secrets Management',
     description: 'Microsoft Azure Key Vault for secrets, keys, and certificates management.',
-    icon: <Lock className="w-8 h-8" />,
     status: 'available',
     features: ['Secrets storage', 'Key management', 'Certificate management', 'Managed identity']
   },
@@ -152,7 +140,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'AWS Secrets Manager',
     category: 'Secrets Management',
     description: 'AWS native secrets management with automatic rotation and fine-grained access control.',
-    icon: <Lock className="w-8 h-8" />,
     status: 'available',
     features: ['Secret rotation', 'IAM policies', 'Cross-account access', 'Audit logging']
   },
@@ -161,7 +148,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Prometheus',
     category: 'Observability',
     description: 'Export deployment metrics and alerts to Prometheus for monitoring and alerting.',
-    icon: <Activity className="w-8 h-8" />,
     status: 'available',
     features: ['Metrics export', 'Custom dashboards', 'Alert rules', 'ServiceMonitor']
   },
@@ -170,7 +156,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'OpenTelemetry',
     category: 'Observability',
     description: 'Full OpenTelemetry support for traces, metrics, and logs with OTLP export.',
-    icon: <Activity className="w-8 h-8" />,
     status: 'available',
     features: ['Distributed tracing', 'Metrics collection', 'Log correlation', 'OTLP export'],
     docsUrl: '/docs/setup-guides/opentelemetry'
@@ -180,7 +165,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Datadog',
     category: 'Observability',
     description: 'Send deployment events and metrics to Datadog for unified observability.',
-    icon: <Activity className="w-8 h-8" />,
     status: 'available',
     features: ['Deployment tracking', 'APM correlation', 'Log integration', 'Dashboard widgets']
   },
@@ -189,7 +173,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Grafana',
     category: 'Observability',
     description: 'Visualize deployment metrics and create custom dashboards with Grafana integration.',
-    icon: <Layers className="w-8 h-8" />,
     status: 'available',
     features: ['Custom dashboards', 'Alerting', 'Annotations', 'Data source integration']
   },
@@ -198,7 +181,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Splunk',
     category: 'Observability',
     description: 'Enterprise log aggregation and SIEM integration with Splunk.',
-    icon: <Database className="w-8 h-8" />,
     status: 'beta',
     features: ['Log forwarding', 'HEC integration', 'Custom indexes', 'Alert actions']
   },
@@ -207,7 +189,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Slack',
     category: 'Notifications',
     description: 'Real-time deployment notifications and approval workflows via Slack.',
-    icon: <Terminal className="w-8 h-8" />,
     status: 'available',
     features: ['Deployment alerts', 'Approval buttons', 'Thread updates', 'Channel routing']
   },
@@ -216,7 +197,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Microsoft Teams',
     category: 'Notifications',
     description: 'Deployment notifications and interactive approval cards for Microsoft Teams.',
-    icon: <Terminal className="w-8 h-8" />,
     status: 'available',
     features: ['Adaptive cards', 'Approval workflows', 'Channel notifications', 'Bot commands']
   },
@@ -225,7 +205,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'PagerDuty',
     category: 'Notifications',
     description: 'Incident management integration for deployment failures and rollback alerts.',
-    icon: <Shield className="w-8 h-8" />,
     status: 'available',
     features: ['Incident creation', 'Escalation policies', 'On-call routing', 'Change events']
   },
@@ -234,7 +213,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Terraform',
     category: 'Infrastructure as Code',
     description: 'Infrastructure provisioning with Terraform state management and plan approvals.',
-    icon: <Cpu className="w-8 h-8" />,
     status: 'available',
     features: ['State management', 'Plan approvals', 'Drift detection', 'Module registry']
   },
@@ -243,7 +221,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Argo CD',
     category: 'GitOps',
     description: 'GitOps continuous delivery with Argo CD sync status and application health.',
-    icon: <GitBranch className="w-8 h-8" />,
     status: 'available',
     features: ['Sync status', 'Health monitoring', 'Rollback triggers', 'App-of-apps']
   },
@@ -252,7 +229,6 @@ const INTEGRATIONS: Integration[] = [
     name: 'Flux CD',
     category: 'GitOps',
     description: 'CNCF Flux integration for GitOps workflows with Kustomize and Helm support.',
-    icon: <GitBranch className="w-8 h-8" />,
     status: 'beta',
     features: ['Source sync', 'Kustomize support', 'Helm controller', 'Image automation']
   }
