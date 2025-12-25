@@ -36,6 +36,7 @@ import EmptyStateGuidance from './EmptyStateGuidance';
 import { ConnectionGatingBanner } from './ConnectionGatingBanner';
 import { VersionHistoryWidget } from './VersionHistoryWidget';
 import { ArgoFlowGraph } from './ArgoFlowGraph';
+import { OpzenixFlowMap } from '@/components/flow/OpzenixFlowMap';
 import {
   AlertDialog,
   AlertDialogAction,
