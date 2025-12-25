@@ -212,6 +212,25 @@ export function EnhancedOnboardingWizard({ open, onClose, onComplete }: Enhanced
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // RBAC: Ensure user has a role (auto-assign admin if first time)
+      const { data: existingRole } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!existingRole) {
+        // First-time user: assign admin role
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({ user_id: user.id, role: 'admin' });
+        
+        if (roleError) {
+          console.error('Failed to assign role:', roleError);
+          // Continue anyway - the INSERT policy should handle this
+        }
+      }
+
       // Create organization if doesn't exist
       let orgId: string | null = null;
       const selectedOrg = organizations.find(o => o.login === selectedRepo?.owner);
@@ -267,7 +286,10 @@ export function EnhancedOnboardingWizard({ open, onClose, onComplete }: Enhanced
         .select('id')
         .single();
 
-      if (projectError) throw projectError;
+      if (projectError) {
+        console.error('Project creation error:', projectError);
+        throw new Error(projectError.message || 'Failed to create project');
+      }
 
       // Create GitHub integration
       await supabase.from('github_integrations').insert({
@@ -280,28 +302,36 @@ export function EnhancedOnboardingWizard({ open, onClose, onComplete }: Enhanced
       // Create initial version
       if (project) {
         // Get latest commit
-        const { data: commitData } = await supabase.functions.invoke('github-api', {
-          body: {
-            action: 'get-commit',
-            token: (await supabase.from('github_tokens').select('encrypted_token').eq('user_id', user.id).single()).data?.encrypted_token,
-            owner: selectedRepo?.owner,
-            repo: selectedRepo?.name,
-            branch: selectedBranch
-          }
-        });
+        const { data: tokenData } = await supabase
+          .from('github_tokens')
+          .select('encrypted_token')
+          .eq('user_id', user.id)
+          .single();
 
-        if (commitData?.sha) {
-          await supabase.from('deployment_versions').insert({
-            project_id: project.id,
-            version_tag: 'v0.1.0',
-            branch: selectedBranch,
-            commit_sha: commitData.sha,
-            commit_message: commitData.message,
-            commit_author: commitData.author,
-            commit_timestamp: commitData.date,
-            environment: 'development',
-            is_current: true
+        if (tokenData?.encrypted_token) {
+          const { data: commitData } = await supabase.functions.invoke('github-api', {
+            body: {
+              action: 'get-commit',
+              token: tokenData.encrypted_token,
+              owner: selectedRepo?.owner,
+              repo: selectedRepo?.name,
+              branch: selectedBranch
+            }
           });
+
+          if (commitData?.sha) {
+            await supabase.from('deployment_versions').insert({
+              project_id: project.id,
+              version_tag: 'v0.1.0',
+              branch: selectedBranch,
+              commit_sha: commitData.sha,
+              commit_message: commitData.message,
+              commit_author: commitData.author,
+              commit_timestamp: commitData.date,
+              environment: 'development',
+              is_current: true
+            });
+          }
         }
       }
 
@@ -352,10 +382,24 @@ export function EnhancedOnboardingWizard({ open, onClose, onComplete }: Enhanced
         }
       });
 
+      // Log audit event
+      await supabase.from('audit_logs').insert({
+        user_id: user.id,
+        action: 'project_created',
+        resource_type: 'project',
+        resource_id: project?.id,
+        details: {
+          project_name: projectName,
+          repository: selectedRepo?.fullName,
+          environments: selectedEnvironments,
+          detected_stack: { language, framework, buildTool }
+        }
+      });
+
       toast.success('Project created successfully!');
     } catch (error) {
       console.error('Error creating project:', error);
-      toast.error('Failed to create project');
+      toast.error(error instanceof Error ? error.message : 'Failed to create project');
     } finally {
       setIsLoading(false);
     }

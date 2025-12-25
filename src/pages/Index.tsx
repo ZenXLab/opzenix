@@ -36,6 +36,11 @@ import { ComplianceAuditPanel } from '@/components/compliance/ComplianceAuditPan
 import { VaultAdapterPanel } from '@/components/vault/VaultAdapterPanel';
 import { AzureIntegrationPanel } from '@/components/azure/AzureIntegrationPanel';
 import ExecutionBuilderPanel from '@/components/control-tower/ExecutionBuilderPanel';
+import { ArgoFlowGraph } from '@/components/control-tower/ArgoFlowGraph';
+import { AuditTimeline } from '@/components/control-tower/AuditTimeline';
+import { RBACVisualization } from '@/components/control-tower/RBACVisualization';
+import { DeploymentStrategyVisualization } from '@/components/control-tower/DeploymentStrategyVisualization';
+import { MVPChecklistPanel } from '@/components/control-tower/MVPChecklistPanel';
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useUserPreferences } from '@/hooks/useUserPreferences';
@@ -180,6 +185,36 @@ const Index = () => {
         return <ApprovalsPanel />;
       case 'audit-log':
         return <AuditLogPanel />;
+      case 'audit-timeline':
+        return (
+          <div className="h-full overflow-auto p-6">
+            <AuditTimeline executionId={selectedExecutionId || undefined} />
+          </div>
+        );
+      case 'argo-flow':
+        return (
+          <div className="h-full overflow-auto p-6">
+            <ArgoFlowGraph executionId={selectedExecutionId || undefined} environment="development" />
+          </div>
+        );
+      case 'rbac':
+        return (
+          <div className="h-full overflow-auto p-6">
+            <RBACVisualization />
+          </div>
+        );
+      case 'deployment-strategy':
+        return (
+          <div className="h-full overflow-auto p-6">
+            <DeploymentStrategyVisualization environment="staging" />
+          </div>
+        );
+      case 'mvp-checklist':
+        return (
+          <div className="h-full overflow-auto p-6">
+            <MVPChecklistPanel />
+          </div>
+        );
       case 'health':
         return <SystemHealthPanel />;
       default:
