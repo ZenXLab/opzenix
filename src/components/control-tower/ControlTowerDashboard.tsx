@@ -35,7 +35,6 @@ import LastApprovalIndicator from './LastApprovalIndicator';
 import EmptyStateGuidance from './EmptyStateGuidance';
 import { ConnectionGatingBanner } from './ConnectionGatingBanner';
 import { VersionHistoryWidget } from './VersionHistoryWidget';
-import { ArgoFlowGraph } from './ArgoFlowGraph';
 import { OpzenixFlowMap } from '@/components/flow/OpzenixFlowMap';
 import {
   AlertDialog,
@@ -527,15 +526,16 @@ const ControlTowerDashboard = ({
           </CardContent>
         </Card>
 
-        {/* ArgoFlowGraph - Featured Pipeline View */}
-        {featuredExecution && (
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Rocket className="w-4 h-4 text-primary" />
-                  <CardTitle className="text-base">CD Flow Visualization</CardTitle>
-                </div>
+        {/* OPZENIX Flow Map - Enterprise Pipeline Visualization */}
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Rocket className="w-4 h-4 text-primary" />
+                <CardTitle className="text-base">OPZENIX Flow Map</CardTitle>
+                <Badge variant="outline" className="text-[10px] h-4">MVP 1.0.0 LOCKED</Badge>
+              </div>
+              {featuredExecution && (
                 <Button 
                   variant="ghost" 
                   size="sm"
@@ -543,20 +543,21 @@ const ControlTowerDashboard = ({
                 >
                   Full View <ArrowRight className="w-3.5 h-3.5 ml-1" />
                 </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <ArgoFlowGraph 
-                executionId={featuredExecution.id} 
-                environment={featuredExecution.environment}
-                onStageClick={(stageId) => {
-                  console.log('Stage clicked:', stageId);
-                  onViewExecution?.(featuredExecution.id);
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="h-[500px] w-full">
+              <OpzenixFlowMap 
+                executionId={featuredExecution?.id} 
+                environment={featuredExecution?.environment || 'prod'}
+                onNodeSelect={(nodeId, data) => {
+                  console.log('[OPZENIX] Node selected:', nodeId, data);
                 }}
               />
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Version History & Rollback Widget */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
