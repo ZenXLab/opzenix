@@ -8,7 +8,6 @@ import {
   Rocket,
   Layers,
   ArrowLeft,
-  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +18,7 @@ import OpzenixFlowSidebar, { EnvironmentId, FlowViewMode, ENVIRONMENT_DISPLAY_NA
 import WidgetDashboard from '@/components/control-tower/WidgetDashboard';
 import { OpzenixFlowMap } from '@/components/flow/OpzenixFlowMap';
 import { RBACActionsPanel, RBACRoleMatrix } from '@/components/flow/OpzenixRBACActions';
+import InspectorPanelDrawer, { InspectorData } from './InspectorPanelDrawer';
 import { useRBACPermissions, type Environment as RBACEnvironment } from '@/hooks/useRBACPermissions';
 import { cn } from '@/lib/utils';
 
@@ -42,9 +42,30 @@ export const OpzenixMainLayout = ({ onOpenSettings, onOpenProfile }: OpzenixMain
   const [activeFlowMode, setActiveFlowMode] = useState<FlowViewMode | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showRBACMatrix, setShowRBACMatrix] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [inspectorData, setInspectorData] = useState<InspectorData | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 
   // RBAC
   const { dbRole, isAdmin } = useRBACPermissions();
+
+  // Handle node selection for inspector
+  const handleNodeSelect = useCallback((nodeId: string, data: any) => {
+    setSelectedNodeId(nodeId);
+    setInspectorData({
+      id: nodeId,
+      context: 'node',
+      type: data?.type || 'Unknown',
+      environment: activeEnvironment || 'dev',
+      status: data?.state || 'pending',
+      timestamp: new Date().toLocaleString(),
+      summary: `${data?.label || 'Node'} execution in ${activeEnvironment?.toUpperCase()} environment`,
+      approvalRequired: true,
+      isImmutable: true,
+      source: 'GitHub Actions',
+    });
+    setInspectorOpen(true);
+  }, [activeEnvironment]);
 
   // Handle environment/flow selection
   const handleSelectEnvironment = useCallback((env: EnvironmentId, mode: FlowViewMode) => {
