@@ -1,14 +1,11 @@
 import { useState, useEffect } from 'react';
 import { 
-  Activity, 
   ChevronDown,
   Bell,
   Settings,
   User,
-  Shield,
   Building2,
   FolderKanban,
-  Globe,
   LogOut,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -26,6 +23,7 @@ import {
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import OpzenixLogo from '@/components/brand/OpzenixLogo';
 
 interface ControlTowerTopBarProps {
   onOpenSettings?: () => void;
@@ -45,12 +43,6 @@ interface Project {
   github_repo_name: string | null;
 }
 
-interface EnvironmentConfig {
-  id: string;
-  name: string;
-  environment: string;
-}
-
 const ControlTowerTopBar = ({ 
   onOpenSettings,
   onOpenApprovals,
@@ -62,18 +54,14 @@ const ControlTowerTopBar = ({
   const [activeOrg, setActiveOrg] = useState<string>('Opzenix Corp');
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProject, setActiveProject] = useState<string>('platform-core');
-  const [environments, setEnvironments] = useState<EnvironmentConfig[]>([]);
-  const [activeEnvironment, setActiveEnvironment] = useState<string>('production');
   const [profile, setProfile] = useState<{ full_name: string | null; avatar_url: string | null; email: string | null; company: string | null } | null>(null);
   const [userRole, setUserRole] = useState<string>('viewer');
 
-  // Fetch user profile and company
   useEffect(() => {
     const fetchProfileAndData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch profile
       const { data: profileData } = await supabase
         .from('profiles')
         .select('full_name, avatar_url, email, company')
@@ -82,13 +70,11 @@ const ControlTowerTopBar = ({
       
       if (profileData) {
         setProfile(profileData);
-        // If user has company, use it as org name
         if (profileData.company) {
           setActiveOrg(profileData.company);
         }
       }
 
-      // Fetch user role
       const { data: roleData } = await supabase
         .from('user_roles')
         .select('role')
@@ -99,7 +85,6 @@ const ControlTowerTopBar = ({
         setUserRole(roleData.role);
       }
 
-      // Fetch organizations user belongs to
       const { data: orgMembers } = await supabase
         .from('organization_members')
         .select('organization_id')
@@ -118,7 +103,6 @@ const ControlTowerTopBar = ({
         }
       }
 
-      // Fetch projects
       const { data: projectsData } = await supabase
         .from('projects')
         .select('id, name, github_repo_name')
@@ -130,42 +114,11 @@ const ControlTowerTopBar = ({
         setProjects(projectsData);
         setActiveProject(projectsData[0].github_repo_name || projectsData[0].name);
       }
-
-      // Fetch environments based on role
-      const { data: envData } = await supabase
-        .from('environment_configs')
-        .select('id, name, environment')
-        .eq('is_active', true)
-        .order('name');
-
-      if (envData && envData.length > 0) {
-        // Filter environments based on role (RBAC)
-        let filteredEnvs = envData;
-        if (roleData?.role === 'viewer') {
-          // Viewers can only see dev environments
-          filteredEnvs = envData.filter(e => 
-            e.environment.toLowerCase().includes('dev') || 
-            e.environment.toLowerCase().includes('development')
-          );
-        } else if (roleData?.role === 'operator') {
-          // Operators can see dev and staging
-          filteredEnvs = envData.filter(e => 
-            !e.environment.toLowerCase().includes('prod')
-          );
-        }
-        // Admins can see all
-
-        setEnvironments(filteredEnvs);
-        if (filteredEnvs.length > 0) {
-          setActiveEnvironment(filteredEnvs[0].environment);
-        }
-      }
     };
 
     fetchProfileAndData();
   }, []);
 
-  // Fetch pending approvals count
   useEffect(() => {
     const fetchApprovals = async () => {
       const { count } = await supabase
@@ -176,7 +129,6 @@ const ControlTowerTopBar = ({
     };
     fetchApprovals();
 
-    // Subscribe to changes
     const channel = supabase
       .channel('approvals-count')
       .on('postgres_changes', {
@@ -200,40 +152,15 @@ const ControlTowerTopBar = ({
     }
   };
 
-  // Default environments if none configured
-  const defaultEnvironments = [
-    { id: 'dev', name: 'Development', environment: 'development' },
-    { id: 'staging', name: 'Staging', environment: 'staging' },
-    { id: 'prod', name: 'Production', environment: 'production' },
-  ];
-
-  const displayEnvironments = environments.length > 0 ? environments : defaultEnvironments;
-  const currentEnv = displayEnvironments.find(e => e.environment === activeEnvironment) || displayEnvironments[0];
-
-  const getEnvColor = (env: string) => {
-    const envLower = env.toLowerCase();
-    if (envLower.includes('prod')) return 'bg-sec-critical';
-    if (envLower.includes('stag') || envLower.includes('uat')) return 'bg-sec-warning';
-    return 'bg-sec-safe';
-  };
-
   const displayName = profile?.full_name || profile?.email?.split('@')[0] || 'Operator';
   const initials = displayName.charAt(0).toUpperCase();
 
   return (
-    <header className="h-12 border-b border-border bg-background flex items-center justify-between px-4 shrink-0">
-      {/* Left - Branding + Context Selectors */}
+    <header className="h-14 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-4 shrink-0">
+      {/* Left - Logo + Context Selectors */}
       <div className="flex items-center gap-4">
-        {/* Logo */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-sm">
-            <Shield className="w-4 h-4 text-primary-foreground" />
-          </div>
-          <div className="hidden md:block">
-            <span className="text-sm font-bold tracking-tight text-foreground">OPZENIX</span>
-            <span className="text-[10px] ml-1.5 px-1.5 py-0.5 rounded bg-primary/10 text-primary font-medium">MVP 1.0</span>
-          </div>
-        </div>
+        {/* Logo - Opzenix Branding */}
+        <OpzenixLogo size="sm" showText={true} animate={false} />
 
         <div className="h-6 w-px bg-border hidden md:block" />
 
@@ -242,11 +169,11 @@ const ControlTowerTopBar = ({
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="h-8 gap-2 text-xs hidden lg:flex">
               <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="font-medium">{activeOrg}</span>
+              <span className="font-medium max-w-[120px] truncate">{activeOrg}</span>
               <ChevronDown className="w-3 h-3 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
+          <DropdownMenuContent align="start" className="bg-popover border border-border">
             <DropdownMenuLabel className="text-xs">Organization</DropdownMenuLabel>
             {organizations.length > 0 ? (
               organizations.map(org => (
@@ -268,11 +195,11 @@ const ControlTowerTopBar = ({
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="h-8 gap-2 text-xs hidden md:flex">
               <FolderKanban className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="font-medium">{activeProject}</span>
+              <span className="font-medium max-w-[100px] truncate">{activeProject}</span>
               <ChevronDown className="w-3 h-3 text-muted-foreground" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
+          <DropdownMenuContent align="start" className="bg-popover border border-border">
             <DropdownMenuLabel className="text-xs">Project</DropdownMenuLabel>
             {projects.length > 0 ? (
               projects.map(project => (
@@ -291,39 +218,11 @@ const ControlTowerTopBar = ({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-
-        {/* Environment Selector - Always Visible */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 gap-2 text-xs">
-              <Globe className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className={cn('w-2 h-2 rounded-full', getEnvColor(currentEnv?.environment || 'development'))} />
-              <span className="font-medium">{currentEnv?.name || 'Development'}</span>
-              <ChevronDown className="w-3 h-3 text-muted-foreground" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuLabel className="text-xs">Environment (Role: {userRole})</DropdownMenuLabel>
-            {displayEnvironments.map((env) => (
-              <DropdownMenuItem 
-                key={env.id}
-                onClick={() => setActiveEnvironment(env.environment)}
-                className="gap-2"
-              >
-                <span className={cn('w-2 h-2 rounded-full', getEnvColor(env.environment))} />
-                {env.name}
-                {activeEnvironment === env.environment && (
-                  <Badge variant="secondary" className="ml-auto text-[9px] h-4">Active</Badge>
-                )}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
 
       {/* Right - Notifications & User */}
       <div className="flex items-center gap-2">
-        {/* Pending Approvals - Critical Action */}
+        {/* Pending Approvals Badge */}
         {pendingApprovals > 0 && (
           <Button 
             variant="outline" 
@@ -331,7 +230,7 @@ const ControlTowerTopBar = ({
             className="h-8 gap-2 text-xs border-sec-warning/50 text-sec-warning hover:bg-sec-warning/10"
             onClick={onOpenApprovals}
           >
-            <Activity className="w-3.5 h-3.5" />
+            <span className="w-2 h-2 rounded-full bg-sec-warning animate-pulse" />
             <span>{pendingApprovals} Pending</span>
           </Button>
         )}
@@ -344,7 +243,7 @@ const ControlTowerTopBar = ({
         >
           <Bell className="w-4 h-4 text-muted-foreground" />
           {pendingApprovals > 0 && (
-            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-sec-critical animate-pulse" />
+            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-sec-danger animate-pulse" />
           )}
         </Button>
 
@@ -375,7 +274,7 @@ const ControlTowerTopBar = ({
               <ChevronDown className="w-3 h-3 text-muted-foreground hidden sm:block" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-56 bg-popover border border-border">
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium leading-none">{displayName}</p>
@@ -393,7 +292,7 @@ const ControlTowerTopBar = ({
               <Settings className="w-3.5 h-3.5" /> Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2 text-sec-critical" onClick={handleSignOut}>
+            <DropdownMenuItem className="gap-2 text-sec-danger" onClick={handleSignOut}>
               <LogOut className="w-3.5 h-3.5" /> Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
