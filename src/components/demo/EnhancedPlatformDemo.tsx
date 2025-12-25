@@ -168,16 +168,23 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
 
     if (currentPhase === 'execution') {
       resetPipeline();
+      addLog('info', 'Initializing pipeline execution...', 'system');
+      
       const runPipeline = async () => {
         const durations = ['1.2s', '45.8s', '32.4s', '12.1s', '28.3s', '2.1s', '15.7s'];
         const nodeLabels = ['Git Push', 'Build', 'Test', 'Security', 'Staging', 'Approval', 'Production'];
+        const runTimes = [800, 1400, 1400, 1400, 1400, 1000, 1400]; // Time each node runs (ms)
+        
+        await new Promise(r => setTimeout(r, 500));
+        addLog('success', 'Execution started', 'system');
         
         // Run through all nodes with smooth animation
         for (let i = 0; i < 7; i++) {
-          await new Promise(r => setTimeout(r, 600));
+          // Wait before starting node
+          await new Promise(r => setTimeout(r, 300));
           setCurrentNodeIndex(i);
           
-          // Set current node to running
+          // Set current node to running, previous to success
           setPipelineNodes(nodes => 
             nodes.map((n, idx) => ({
               ...n,
@@ -185,9 +192,10 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
               duration: idx < i ? durations[idx] : '0s'
             }))
           );
-          addLog('info', `Running ${nodeLabels[i]}...`, nodeLabels[i].toLowerCase().replace(' ', '-'));
+          addLog('info', `▶ Executing ${nodeLabels[i]}...`, nodeLabels[i].toLowerCase().replace(' ', '-'));
           
-          await new Promise(r => setTimeout(r, 400));
+          // Let node run for its duration
+          await new Promise(r => setTimeout(r, runTimes[i]));
           
           // Complete current node
           setPipelineNodes(nodes =>
@@ -197,11 +205,15 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
               duration: idx <= i ? durations[idx] : '0s'
             }))
           );
-          addLog('success', `${nodeLabels[i]} completed in ${durations[i]}`, nodeLabels[i].toLowerCase().replace(' ', '-'));
+          addLog('success', `✓ ${nodeLabels[i]} completed in ${durations[i]}`, nodeLabels[i].toLowerCase().replace(' ', '-'));
+          
+          // Brief pause between nodes
+          await new Promise(r => setTimeout(r, 200));
         }
         
         // Final success message
-        addLog('success', 'Pipeline execution completed successfully!');
+        await new Promise(r => setTimeout(r, 400));
+        addLog('success', '🎉 Pipeline execution completed successfully!', 'system');
       };
       runPipeline();
     }
@@ -748,44 +760,121 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
 
                         <Card className="bg-muted/20 border">
                           <CardContent className="p-6">
-                            <div className="flex items-center justify-between gap-1 overflow-x-auto pb-2">
-                              {pipelineNodes.map((node, i) => (
-                                <React.Fragment key={node.id}>
+                            <div className="relative">
+                              {/* Progress line background */}
+                              <div className="absolute top-6 left-0 right-0 h-1 bg-border/30 rounded-full" 
+                                   style={{ marginLeft: '36px', marginRight: '36px' }} />
+                              
+                              {/* Animated progress line */}
+                              <motion.div 
+                                className="absolute top-6 left-0 h-1 bg-gradient-to-r from-primary via-chart-1 to-sec-safe rounded-full"
+                                style={{ marginLeft: '36px' }}
+                                initial={{ width: 0 }}
+                                animate={{ 
+                                  width: `calc(${(currentNodeIndex + 1) / pipelineNodes.length * 100}% - 72px)` 
+                                }}
+                                transition={{ duration: 0.6, ease: "easeInOut" }}
+                              />
+                              
+                              <div className="flex items-center justify-between gap-2 relative">
+                                {pipelineNodes.map((node, i) => (
                                   <motion.div
-                                    animate={node.status === 'running' ? { scale: [1, 1.05, 1] } : {}}
-                                    transition={{ duration: 0.5, repeat: node.status === 'running' ? Infinity : 0 }}
-                                    className="flex flex-col items-center min-w-[70px]"
+                                    key={node.id}
+                                    animate={node.status === 'running' ? { 
+                                      scale: [1, 1.1, 1],
+                                      y: [0, -4, 0]
+                                    } : {}}
+                                    transition={{ 
+                                      duration: 0.8, 
+                                      repeat: node.status === 'running' ? Infinity : 0,
+                                      ease: "easeInOut"
+                                    }}
+                                    className="flex flex-col items-center min-w-[72px] relative z-10"
                                   >
-                                    <div className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-colors ${getNodeStatusColor(node.status)}`}>
-                                      {node.status === 'running' ? (
+                                    {/* Node circle with enhanced styling */}
+                                    <motion.div 
+                                      className={`w-14 h-14 rounded-2xl border-3 flex items-center justify-center transition-all duration-300 shadow-lg ${getNodeStatusColor(node.status)}`}
+                                      animate={node.status === 'running' ? {
+                                        boxShadow: [
+                                          '0 0 0 0 rgba(99, 102, 241, 0.4)',
+                                          '0 0 0 8px rgba(99, 102, 241, 0)',
+                                        ]
+                                      } : {}}
+                                      transition={{ duration: 1.5, repeat: node.status === 'running' ? Infinity : 0 }}
+                                    >
+                                      <AnimatePresence mode="wait">
+                                        {node.status === 'running' ? (
+                                          <motion.div
+                                            key="running"
+                                            initial={{ opacity: 0, rotate: 0 }}
+                                            animate={{ opacity: 1, rotate: 360 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ rotate: { duration: 1.2, repeat: Infinity, ease: "linear" } }}
+                                          >
+                                            <RefreshCw className="w-5 h-5" />
+                                          </motion.div>
+                                        ) : node.status === 'success' ? (
+                                          <motion.div
+                                            key="success"
+                                            initial={{ scale: 0, rotate: -180 }}
+                                            animate={{ scale: 1, rotate: 0 }}
+                                            transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                                          >
+                                            <CheckCircle2 className="w-5 h-5" />
+                                          </motion.div>
+                                        ) : node.status === 'failed' ? (
+                                          <motion.div
+                                            key="failed"
+                                            initial={{ scale: 0 }}
+                                            animate={{ scale: [1, 1.2, 1] }}
+                                            transition={{ duration: 0.4 }}
+                                          >
+                                            <XCircle className="w-5 h-5" />
+                                          </motion.div>
+                                        ) : (
+                                          <motion.div
+                                            key="idle"
+                                            initial={{ opacity: 0.5 }}
+                                            animate={{ opacity: 0.7 }}
+                                          >
+                                            {node.icon}
+                                          </motion.div>
+                                        )}
+                                      </AnimatePresence>
+                                    </motion.div>
+                                    
+                                    {/* Node label */}
+                                    <motion.span 
+                                      className={`text-xs mt-2 font-medium text-center ${
+                                        node.status === 'success' ? 'text-sec-safe' :
+                                        node.status === 'running' ? 'text-primary' :
+                                        node.status === 'failed' ? 'text-sec-critical' :
+                                        'text-muted-foreground'
+                                      }`}
+                                      animate={node.status === 'running' ? {
+                                        opacity: [1, 0.7, 1]
+                                      } : {}}
+                                      transition={{ duration: 1, repeat: node.status === 'running' ? Infinity : 0 }}
+                                    >
+                                      {node.label}
+                                    </motion.span>
+                                    
+                                    {/* Duration badge */}
+                                    <AnimatePresence>
+                                      {node.status === 'success' && node.duration !== '0s' && (
                                         <motion.div
-                                          animate={{ rotate: 360 }}
-                                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                          initial={{ opacity: 0, y: -5 }}
+                                          animate={{ opacity: 1, y: 0 }}
+                                          exit={{ opacity: 0 }}
+                                          className="mt-1 px-2 py-0.5 bg-sec-safe/10 rounded-full"
                                         >
-                                          <RefreshCw className="w-4 h-4" />
+                                          <span className="text-xs text-sec-safe font-mono">{node.duration}</span>
                                         </motion.div>
-                                      ) : node.status === 'success' ? (
-                                        <CheckCircle2 className="w-4 h-4" />
-                                      ) : node.status === 'failed' ? (
-                                        <XCircle className="w-4 h-4" />
-                                      ) : (
-                                        node.icon
                                       )}
-                                    </div>
-                                    <span className="text-xs mt-1 text-muted-foreground">{node.label}</span>
-                                    {node.status === 'success' && (
-                                      <span className="text-xs text-sec-safe">{node.duration}</span>
-                                    )}
+                                    </AnimatePresence>
                                   </motion.div>
-                                  {i < pipelineNodes.length - 1 && (
-                                    <div className={`flex-shrink-0 w-8 h-0.5 transition-colors ${
-                                      pipelineNodes[i].status === 'success' && pipelineNodes[i + 1].status !== 'idle' ? 'bg-sec-safe' : 
-                                      pipelineNodes[i].status === 'failed' ? 'bg-sec-critical' :
-                                      'bg-border'
-                                    }`} />
-                                  )}
-                                </React.Fragment>
-                              ))}
+                                ))}
+                              </div>
                             </div>
                           </CardContent>
                         </Card>
