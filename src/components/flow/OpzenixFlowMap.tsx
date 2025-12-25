@@ -10,6 +10,7 @@ import {
   Edge,
   ConnectionMode,
   BackgroundVariant,
+  Panel,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import ELK from 'elkjs/lib/elk.bundled.js';
@@ -19,6 +20,27 @@ import { OpzenixInspectorPanel } from './OpzenixInspectorPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Activity } from 'lucide-react';
+
+// ============================================
+// 🔒 ENVIRONMENT SWIMLANES (LOCKED ORDER)
+// Dev → UAT → Staging → PreProd → Prod
+// No drag & drop. No reordering.
+// ============================================
+
+const ENVIRONMENT_LANES = [
+  { id: 'ci', label: 'CI Pipeline', order: 0 },
+  { id: 'Dev', label: 'Development', order: 1 },
+  { id: 'UAT', label: 'User Acceptance Testing', order: 2 },
+  { id: 'Staging', label: 'Staging', order: 3 },
+  { id: 'PreProd', label: 'Pre-Production', order: 4 },
+  { id: 'Prod', label: 'Production', order: 5 },
+] as const;
+
+type EnvironmentLane = typeof ENVIRONMENT_LANES[number]['id'];
+
+const LANE_HEIGHT = 140;
+const LANE_PADDING = 20;
 
 // ============================================
 // 🔒 ELK LAYOUT CONFIG PRESETS (DETERMINISTIC) - LOCKED
@@ -35,7 +57,7 @@ const elkOptions = {
   'elk.direction': 'RIGHT',
   'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
   'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
-  'elk.layered.spacing.nodeNodeBetweenLayers': '80',
+  'elk.layered.spacing.nodeNodeBetweenLayers': '100',
   'elk.spacing.nodeNode': '60',
   'elk.spacing.edgeNode': '40',
   'elk.layered.edgeRouting': 'ORTHOGONAL',
@@ -55,14 +77,28 @@ const stateEdgeColors: Record<OpzenixNodeState, string> = {
   LOCKED: '#334155',
 };
 
+// Lane background colors (subtle)
+const laneColors: Record<EnvironmentLane, string> = {
+  ci: 'rgba(59, 130, 246, 0.05)',      // Blue tint
+  Dev: 'rgba(34, 197, 94, 0.05)',       // Green tint
+  UAT: 'rgba(168, 85, 247, 0.05)',      // Purple tint
+  Staging: 'rgba(249, 115, 22, 0.05)',  // Orange tint
+  PreProd: 'rgba(236, 72, 153, 0.05)',  // Pink tint
+  Prod: 'rgba(239, 68, 68, 0.05)',      // Red tint
+};
+
 interface OpzenixFlowMapProps {
   executionId?: string;
   environment?: string;
   onNodeSelect?: (nodeId: string, data: OpzenixNodeData) => void;
 }
 
+interface FlowNodeWithLane extends Node {
+  data: OpzenixNodeData & { lane?: EnvironmentLane };
+}
+
 // Generate flow nodes from real execution data (NO HARDCODED DATA)
-const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: Node[]; edges: Edge[] }> => {
+const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: FlowNodeWithLane[]; edges: Edge[] }> => {
   // Fetch execution data
   const { data: execution } = await supabase
     .from('executions')
@@ -99,12 +135,29 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
     .select('*')
     .eq('execution_id', executionId);
 
-  const nodes: Node[] = [];
+  const nodes: FlowNodeWithLane[] = [];
   const edges: Edge[] = [];
 
   const executionMeta = execution.metadata as Record<string, unknown> | null;
 
-  // Source node (from real execution data)
+  // Map environment to lane
+  const mapEnvToLane = (env: string): EnvironmentLane => {
+    const envMap: Record<string, EnvironmentLane> = {
+      'development': 'Dev',
+      'dev': 'Dev',
+      'uat': 'UAT',
+      'staging': 'Staging',
+      'preprod': 'PreProd',
+      'pre-prod': 'PreProd',
+      'production': 'Prod',
+      'prod': 'Prod',
+    };
+    return envMap[env?.toLowerCase()] || 'Dev';
+  };
+
+  const executionLane = mapEnvToLane(execution.environment);
+
+  // Source node (CI Lane)
   nodes.push({
     id: 'source',
     type: 'source.git',
@@ -118,10 +171,11 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
       commitSha: execution.commit_hash || '',
       author: executionMeta?.author as string || '',
       timestamp: new Date(execution.started_at).toLocaleString(),
-    } as OpzenixNodeData,
+      lane: 'ci',
+    } as OpzenixNodeData & { lane: EnvironmentLane },
   });
 
-  // CI Stage nodes from evidence (REAL DATA ONLY)
+  // CI Stage nodes from evidence (CI Lane)
   let lastNodeId = 'source';
   const ciNodeMap: Record<string, OpzenixNodeType> = {
     'sast': 'ci.sast',
@@ -160,7 +214,8 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
           description: evidence.summary || `${evidence.step_type} analysis`,
           duration: evidence.duration_ms ? `${(evidence.duration_ms / 1000).toFixed(1)}s` : undefined,
           reportUrl: evidence.evidence_url,
-        } as OpzenixNodeData,
+          lane: 'ci',
+        } as OpzenixNodeData & { lane: EnvironmentLane },
       });
 
       edges.push({
@@ -173,7 +228,7 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
     });
   }
 
-  // Artifact node (if exists)
+  // Artifact node (CI Lane - shared)
   const artifact = artifacts?.[0];
   if (artifact) {
     nodes.push({
@@ -190,13 +245,14 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
         tag: artifact.image_tag || '',
         digest: artifact.image_digest,
         signed: true,
-      } as OpzenixNodeData,
+        lane: 'ci',
+      } as OpzenixNodeData & { lane: EnvironmentLane },
     });
     edges.push({ id: `e-${lastNodeId}-artifact`, source: lastNodeId, target: 'artifact', type: 'smoothstep' });
     lastNodeId = 'artifact';
   }
 
-  // Security gate
+  // Security gate (Environment Lane)
   nodes.push({
     id: 'security-gate',
     type: 'security.gate',
@@ -208,11 +264,12 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
       description: execution.governance_status === 'blocked' ? execution.blocked_reason : 'Policy enforcement passed',
       severityThreshold: 'Critical: 0, High: 0',
       blockedReason: execution.blocked_reason || undefined,
-    } as OpzenixNodeData,
+      lane: executionLane,
+    } as OpzenixNodeData & { lane: EnvironmentLane },
   });
   edges.push({ id: `e-${lastNodeId}-security`, source: lastNodeId, target: 'security-gate', type: 'smoothstep' });
 
-  // Approval gate (if exists)
+  // Approval gate (Environment Lane)
   const approval = approvals?.[0];
   if (approval) {
     const approvalState: OpzenixNodeState = 
@@ -224,7 +281,7 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
       type: 'approval.gate',
       position: { x: 0, y: 0 },
       data: {
-        label: approval.title || 'Approval Gate',
+        label: approval.title || `${executionLane} Approval Gate`,
         nodeType: 'approval.gate' as OpzenixNodeType,
         state: approvalState,
         environment: execution.environment,
@@ -232,12 +289,13 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
         currentApprovers: approval.current_approvals,
         pendingApprovals: approval.required_approvals - approval.current_approvals,
         description: approval.description || undefined,
-      } as OpzenixNodeData,
+        lane: executionLane,
+      } as OpzenixNodeData & { lane: EnvironmentLane },
     });
     edges.push({ id: 'e-security-approval', source: 'security-gate', target: 'approval-gate', type: 'smoothstep' });
   }
 
-  // Deployment (if exists)
+  // Deployment (Environment Lane)
   const deployment = deployments?.[0];
   if (deployment) {
     const cdState: OpzenixNodeState = 
@@ -253,23 +311,27 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
         label: 'Argo CD Sync',
         nodeType: 'cd.argo' as OpzenixNodeType,
         state: cdState,
-        appName: `opzenix-${deployment.environment}`,
+        appName: `opzenix-${executionLane.toLowerCase()}`,
         gitRevision: execution.commit_hash || '',
-        syncMode: deployment.environment === 'production' ? 'manual' : 'auto',
+        syncMode: executionLane === 'Prod' ? 'manual' : 'auto',
         syncResult: cdState === 'PASSED' ? 'Synced' : cdState === 'RUNNING' ? 'Syncing...' : undefined,
-      } as OpzenixNodeData,
+        lane: executionLane,
+      } as OpzenixNodeData & { lane: EnvironmentLane },
     });
     
     const sourceNode = approval ? 'approval-gate' : 'security-gate';
     edges.push({ id: `e-${sourceNode}-cd`, source: sourceNode, target: 'cd-argo', type: 'smoothstep' });
 
     // Deploy strategy
-    const strategyMap: Record<string, OpzenixNodeType> = {
-      'development': 'deploy.rolling',
-      'staging': 'deploy.canary',
-      'production': 'deploy.bluegreen',
+    const strategyMap: Record<EnvironmentLane, OpzenixNodeType> = {
+      'ci': 'deploy.rolling',
+      'Dev': 'deploy.rolling',
+      'UAT': 'deploy.rolling',
+      'Staging': 'deploy.canary',
+      'PreProd': 'deploy.canary',
+      'Prod': 'deploy.bluegreen',
     };
-    const strategyType = strategyMap[deployment.environment] || 'deploy.rolling';
+    const strategyType = strategyMap[executionLane];
     
     nodes.push({
       id: 'deploy-strategy',
@@ -280,7 +342,8 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
                strategyType === 'deploy.canary' ? 'Canary Deploy' : 'Rolling Update',
         nodeType: strategyType,
         state: cdState,
-      } as OpzenixNodeData,
+        lane: executionLane,
+      } as OpzenixNodeData & { lane: EnvironmentLane },
     });
     edges.push({ id: 'e-cd-deploy', source: 'cd-argo', target: 'deploy-strategy', type: 'smoothstep' });
 
@@ -293,15 +356,17 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
         label: 'Kubernetes',
         nodeType: 'runtime.k8s' as OpzenixNodeType,
         state: cdState,
-        namespace: `opzenix-${deployment.environment}`,
+        namespace: `opzenix-${executionLane.toLowerCase()}`,
         deployment: 'opzenix-api',
-        replicas: 4,
-        readyReplicas: cdState === 'PASSED' ? 4 : cdState === 'RUNNING' ? 2 : 0,
-      } as OpzenixNodeData,
+        replicas: executionLane === 'Prod' ? 6 : executionLane === 'PreProd' ? 4 : 2,
+        readyReplicas: cdState === 'PASSED' ? (executionLane === 'Prod' ? 6 : executionLane === 'PreProd' ? 4 : 2) : 0,
+        lane: executionLane,
+      } as OpzenixNodeData & { lane: EnvironmentLane },
     });
     edges.push({ id: 'e-deploy-runtime', source: 'deploy-strategy', target: 'runtime-k8s', type: 'smoothstep' });
 
     // Audit record
+    const isComplete = execution.status === 'success' || execution.status === 'failed';
     nodes.push({
       id: 'audit-record',
       type: 'audit.record',
@@ -309,10 +374,11 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
       data: {
         label: 'Audit Record',
         nodeType: 'audit.record' as OpzenixNodeType,
-        state: cdState === 'PASSED' ? 'LOCKED' : 'PENDING' as OpzenixNodeState,
+        state: isComplete ? 'LOCKED' : 'PENDING' as OpzenixNodeState,
         description: 'Immutable deployment record',
         digest: `sha256:${execution.id.slice(0, 32)}`,
-      } as OpzenixNodeData,
+        lane: executionLane,
+      } as OpzenixNodeData & { lane: EnvironmentLane },
     });
     edges.push({ id: 'e-runtime-audit', source: 'runtime-k8s', target: 'audit-record', type: 'smoothstep' });
   }
@@ -320,10 +386,36 @@ const generateFlowFromExecution = async (executionId: string): Promise<{ nodes: 
   return { nodes, edges };
 };
 
-// Apply ELK layout to nodes (DETERMINISTIC)
-const applyElkLayout = async (nodes: Node[], edges: Edge[]): Promise<Node[]> => {
+// Apply ELK layout with swimlanes (DETERMINISTIC)
+const applyElkLayoutWithSwimlanes = async (nodes: FlowNodeWithLane[], edges: Edge[]): Promise<FlowNodeWithLane[]> => {
   if (nodes.length === 0) return [];
 
+  // Group nodes by lane
+  const nodesByLane: Record<EnvironmentLane, FlowNodeWithLane[]> = {
+    ci: [],
+    Dev: [],
+    UAT: [],
+    Staging: [],
+    PreProd: [],
+    Prod: [],
+  };
+
+  nodes.forEach(node => {
+    const lane = (node.data as OpzenixNodeData & { lane?: EnvironmentLane }).lane || 'ci';
+    nodesByLane[lane].push(node);
+  });
+
+  // Calculate lane Y positions
+  const laneYPositions: Record<EnvironmentLane, number> = {
+    ci: LANE_PADDING,
+    Dev: LANE_PADDING + LANE_HEIGHT,
+    UAT: LANE_PADDING + LANE_HEIGHT * 2,
+    Staging: LANE_PADDING + LANE_HEIGHT * 3,
+    PreProd: LANE_PADDING + LANE_HEIGHT * 4,
+    Prod: LANE_PADDING + LANE_HEIGHT * 5,
+  };
+
+  // Apply ELK layout
   const graph = {
     id: 'root',
     layoutOptions: elkOptions,
@@ -341,16 +433,54 @@ const applyElkLayout = async (nodes: Node[], edges: Edge[]): Promise<Node[]> => 
 
   const layoutedGraph = await elk.layout(graph);
 
+  // Apply positions with lane Y offsets
   return nodes.map((node) => {
     const layoutedNode = layoutedGraph.children?.find((n) => n.id === node.id);
+    const lane = (node.data as OpzenixNodeData & { lane?: EnvironmentLane }).lane || 'ci';
+    const laneY = laneYPositions[lane];
+    
     return {
       ...node,
       position: {
-        x: layoutedNode?.x || 0,
-        y: layoutedNode?.y || 0,
+        x: (layoutedNode?.x || 0) + LANE_PADDING,
+        y: laneY + (LANE_HEIGHT - 100) / 2, // Center vertically in lane
       },
     };
   });
+};
+
+// Swimlane Background Component
+const SwimlaneBackground = ({ activeLanes }: { activeLanes: Set<EnvironmentLane> }) => {
+  return (
+    <div className="absolute inset-0 pointer-events-none">
+      {ENVIRONMENT_LANES.map((lane, index) => {
+        const isActive = activeLanes.has(lane.id);
+        return (
+          <div
+            key={lane.id}
+            className={cn(
+              "absolute left-0 right-0 border-b transition-all duration-300",
+              isActive ? "border-border/50" : "border-border/20"
+            )}
+            style={{
+              top: LANE_PADDING + LANE_HEIGHT * index,
+              height: LANE_HEIGHT,
+              backgroundColor: isActive ? laneColors[lane.id] : 'transparent',
+            }}
+          >
+            <div className={cn(
+              "absolute left-3 top-3 px-2 py-1 rounded text-xs font-medium transition-all duration-300",
+              isActive 
+                ? "bg-background/80 text-foreground border border-border" 
+                : "text-muted-foreground/50"
+            )}>
+              {lane.label}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 };
 
 export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect }: OpzenixFlowMapProps) => {
@@ -361,12 +491,13 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
   const [isLive, setIsLive] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [hasData, setHasData] = useState(false);
+  const [activeLanes, setActiveLanes] = useState<Set<EnvironmentLane>>(new Set());
 
   // Load flow from real data only
   const loadFlow = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      let flowData: { nodes: Node[]; edges: Edge[] } = { nodes: [], edges: [] };
+      let flowData: { nodes: FlowNodeWithLane[]; edges: Edge[] } = { nodes: [], edges: [] };
 
       if (executionId) {
         flowData = await generateFlowFromExecution(executionId);
@@ -384,14 +515,23 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
       }
 
       if (flowData.nodes.length > 0) {
-        const layoutedNodes = await applyElkLayout(flowData.nodes, flowData.edges);
+        const layoutedNodes = await applyElkLayoutWithSwimlanes(flowData.nodes, flowData.edges);
         setNodes(layoutedNodes);
         setEdges(flowData.edges);
         setHasData(true);
+        
+        // Track active lanes
+        const lanes = new Set<EnvironmentLane>();
+        flowData.nodes.forEach(node => {
+          const lane = (node.data as OpzenixNodeData & { lane?: EnvironmentLane }).lane;
+          if (lane) lanes.add(lane);
+        });
+        setActiveLanes(lanes);
       } else {
         setNodes([]);
         setEdges([]);
         setHasData(false);
+        setActiveLanes(new Set());
       }
       
       setLastUpdate(new Date());
@@ -524,6 +664,9 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
   return (
     <div className="w-full h-full flex">
       <div className="flex-1 relative">
+        {/* Swimlane backgrounds */}
+        <SwimlaneBackground activeLanes={activeLanes} />
+        
         <ReactFlow
           nodes={nodes.map(n => ({ ...n, selected: n.id === selectedNode?.id }))}
           edges={styledEdges}
@@ -534,7 +677,7 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
           nodeTypes={opzenixNodeTypes}
           connectionMode={ConnectionMode.Loose}
           fitView
-          fitViewOptions={{ padding: 0.15 }}
+          fitViewOptions={{ padding: 0.1 }}
           minZoom={0.2}
           maxZoom={1.5}
           defaultEdgeOptions={{ type: 'smoothstep' }}
@@ -550,6 +693,32 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
             }}
             maskColor="hsl(220 25% 7% / 0.8)"
           />
+          
+          {/* Lane Legend Panel */}
+          <Panel position="top-right" className="!top-16 !right-4">
+            <div className="px-3 py-2 bg-card/90 backdrop-blur border border-border rounded-lg">
+              <div className="text-xs font-medium text-muted-foreground mb-2">Environment Lanes</div>
+              <div className="space-y-1">
+                {ENVIRONMENT_LANES.map(lane => (
+                  <div key={lane.id} className="flex items-center gap-2">
+                    <div 
+                      className={cn(
+                        "w-2 h-2 rounded-full",
+                        activeLanes.has(lane.id) ? "ring-1 ring-offset-1 ring-offset-card" : "opacity-40"
+                      )}
+                      style={{ backgroundColor: laneColors[lane.id].replace('0.05', '0.8') }}
+                    />
+                    <span className={cn(
+                      "text-xs",
+                      activeLanes.has(lane.id) ? "text-foreground" : "text-muted-foreground/50"
+                    )}>
+                      {lane.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Panel>
         </ReactFlow>
 
         {/* Flow Legend (LOCKED COLORS) */}
@@ -595,7 +764,7 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
         {/* Hint */}
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
           <div className="px-3 py-1.5 bg-card/90 backdrop-blur border border-border rounded-lg text-xs text-muted-foreground">
-            Click any node to view audit details • Real-time updates enabled
+            Click any node to view audit details • Swimlanes: Dev → UAT → Staging → PreProd → Prod
           </div>
         </div>
       </div>
@@ -611,8 +780,5 @@ export const OpzenixFlowMap = ({ executionId, environment = 'prod', onNodeSelect
     </div>
   );
 };
-
-// Import for empty state icon
-import { Activity } from 'lucide-react';
 
 export default OpzenixFlowMap;
