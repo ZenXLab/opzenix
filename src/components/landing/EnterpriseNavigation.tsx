@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import OpzenixLogo from '@/components/brand/OpzenixLogo';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
+import { SettingsModal } from '@/components/settings/SettingsModal';
 
 interface NavItem {
   label: string;
@@ -217,7 +218,8 @@ export function EnterpriseNavigation() {
           </nav>
 
           {/* CTA Buttons */}
-          <div className="hidden lg:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-2">
+            <SettingsModal />
             <ThemeToggle />
             <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
               Sign In

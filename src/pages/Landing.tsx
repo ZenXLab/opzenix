@@ -14,6 +14,8 @@ import AudienceSection from '@/components/landing/AudienceSection';
 import UseCasesSection from '@/components/landing/UseCasesSection';
 import FinalCTASection from '@/components/landing/FinalCTASection';
 import FooterSection from '@/components/landing/FooterSection';
+import { ScrollToTop } from '@/components/layout/ScrollToTop';
+import { OpzenixChatbot } from '@/components/chatbot/OpzenixChatbot';
 
 const Landing = () => {
   return (
@@ -34,6 +36,8 @@ const Landing = () => {
         <UseCasesSection />
         <FinalCTASection />
         <FooterSection />
+        <ScrollToTop />
+        <OpzenixChatbot />
       </div>
     </ReactFlowProvider>
   );
