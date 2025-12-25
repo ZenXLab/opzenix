@@ -7,13 +7,16 @@ import OpzenixRightPanel from './OpzenixRightPanel';
 import OpzenixDashboard from './OpzenixDashboard';
 import FlowViewerScreen, { ActionContext } from './screens/FlowViewerScreen';
 import ActionPanelModal from './screens/ActionPanelModal';
+import AdminSettingsPanel from '@/components/admin/AdminSettingsPanel';
+import ConnectionsHubPanel from '@/components/admin/ConnectionsHubPanel';
+import RealtimePipelineView from '@/components/pipeline/RealtimePipelineView';
 import { supabase } from '@/integrations/supabase/client';
 
 // ============================================
 // 🏗️ OPZENIX MAIN LAYOUT (Enterprise Grade)
 // ============================================
 
-type Screen = 'dashboard' | 'ci-flow' | 'cd-flow' | 'full-flow';
+type Screen = 'dashboard' | 'ci-flow' | 'cd-flow' | 'full-flow' | 'connections' | 'admin-settings' | 'pipelines';
 type Environment = 'dev' | 'uat' | 'staging' | 'preprod' | 'prod';
 
 interface OpzenixMainLayoutProps {
@@ -84,11 +87,16 @@ export const OpzenixMainLayout = ({ onOpenSettings, onOpenProfile }: OpzenixMain
         {/* Main Content */}
         <main className="flex-1 overflow-hidden">
           <AnimatePresence mode="wait">
-            {currentScreen === 'dashboard' ? (
+            {currentScreen === 'dashboard' && (
               <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-                <OpzenixDashboard onNavigateToFlow={handleNavigateToFlow} currentEnvironment={currentEnvironment} />
+                <OpzenixDashboard 
+                  onNavigateToFlow={handleNavigateToFlow} 
+                  currentEnvironment={currentEnvironment}
+                  onNavigate={handleNavigate}
+                />
               </motion.div>
-            ) : (
+            )}
+            {(currentScreen === 'ci-flow' || currentScreen === 'cd-flow' || currentScreen === 'full-flow') && (
               <motion.div key="flow" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
                 <FlowViewerScreen
                   environment={currentEnvironment}
@@ -96,6 +104,21 @@ export const OpzenixMainLayout = ({ onOpenSettings, onOpenProfile }: OpzenixMain
                   onBack={() => setCurrentScreen('dashboard')}
                   onRequestAction={handleRequestAction}
                 />
+              </motion.div>
+            )}
+            {currentScreen === 'connections' && (
+              <motion.div key="connections" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
+                <ConnectionsHubPanel onBack={() => setCurrentScreen('dashboard')} />
+              </motion.div>
+            )}
+            {currentScreen === 'admin-settings' && (
+              <motion.div key="admin-settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
+                <AdminSettingsPanel onBack={() => setCurrentScreen('dashboard')} />
+              </motion.div>
+            )}
+            {currentScreen === 'pipelines' && (
+              <motion.div key="pipelines" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
+                <RealtimePipelineView onBack={() => setCurrentScreen('dashboard')} />
               </motion.div>
             )}
           </AnimatePresence>
