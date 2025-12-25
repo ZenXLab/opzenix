@@ -24,6 +24,7 @@ import AlertsPanel from '@/components/alerts/AlertsPanel';
 import TelemetryPanel from '@/components/telemetry/TelemetryPanel';
 import ExecutionHistoryPanel from '@/components/execution/ExecutionHistoryPanel';
 import { ExecutionDetailPanel } from '@/components/execution/ExecutionDetailPanel';
+import { ExecutionDetailView } from '@/components/control-tower/ExecutionDetailView';
 import PipelineTemplatesGallery from '@/components/templates/PipelineTemplatesGallery';
 import { EnhancedOnboardingWizard } from '@/components/onboarding/EnhancedOnboardingWizard';
 import { ValidationChecklist } from '@/components/validation/ValidationChecklist';
@@ -146,7 +147,16 @@ const Index = () => {
           />
         );
       case 'executions':
-        return (
+        return selectedExecutionId ? (
+          <ExecutionDetailView 
+            executionId={selectedExecutionId}
+            environment="development"
+            onBack={() => {
+              setSelectedExecutionId(null);
+              setActiveSection('control-tower');
+            }}
+          />
+        ) : (
           <ExecutionFlowView 
             executionId={selectedExecutionId || undefined}
             onOpenApproval={handleOpenApproval}
