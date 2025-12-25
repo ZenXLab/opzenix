@@ -1,6 +1,5 @@
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
-import { useTheme } from '@/hooks/useTheme';
 
 interface OpzenixLogoProps {
   className?: string;
@@ -17,8 +16,6 @@ const OpzenixLogo = ({
   variant = 'default',
   animate = true
 }: OpzenixLogoProps) => {
-  const { theme } = useTheme();
-  
   const sizes = {
     sm: { icon: 'w-7 h-7', text: 'text-sm', gap: 'gap-1.5', subtext: 'text-[8px]' },
     md: { icon: 'w-9 h-9', text: 'text-lg', gap: 'gap-2', subtext: 'text-[9px]' },
@@ -32,18 +29,13 @@ const OpzenixLogo = ({
     dark: 'text-slate-900',
   };
 
-  // In light mode use deep black/dark colors, in dark mode use blue
-  const gradientClass = theme === 'light' 
-    ? 'bg-gradient-to-br from-zinc-800 via-zinc-900 to-zinc-950 shadow-lg shadow-zinc-500/30'
-    : 'bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 shadow-lg shadow-blue-500/30';
-
   return (
     <div className={cn('flex items-center', sizes[size].gap, className)}>
       {/* Unique DevOps + Security Logo - Infinity Shield Concept */}
       <div className={cn(
         sizes[size].icon,
         'relative rounded-xl overflow-hidden flex items-center justify-center',
-        gradientClass
+        'bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 shadow-lg shadow-blue-500/30'
       )}>
         <svg 
           viewBox="0 0 48 48" 

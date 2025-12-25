@@ -61,12 +61,25 @@ serve(async (req) => {
     const audioBuffer = await response.arrayBuffer();
     console.log('TTS audio generated successfully, size:', audioBuffer.byteLength);
 
-    return new Response(audioBuffer, {
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'audio/mpeg',
-      },
-    });
+    // Encode to base64 for JSON response
+    const uint8Array = new Uint8Array(audioBuffer);
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.subarray(i, Math.min(i + chunkSize, uint8Array.length));
+      binary += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    const base64Audio = btoa(binary);
+
+    return new Response(
+      JSON.stringify({ audioContent: base64Audio }),
+      {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   } catch (error) {
     console.error('TTS error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
