@@ -26,7 +26,8 @@ interface TerraformWorkspace {
 }
 
 interface TerraformStateWidgetProps {
-  onRemove?: () => void;
+  id?: string;
+  onRemove?: (id: string) => void;
 }
 
 export const TerraformStateWidget = ({ onRemove }: TerraformStateWidgetProps) => {

@@ -25,7 +25,8 @@ interface ComplianceFramework {
 }
 
 interface ComplianceDashboardWidgetProps {
-  onRemove?: () => void;
+  id?: string;
+  onRemove?: (id: string) => void;
 }
 
 export const ComplianceDashboardWidget = ({ onRemove }: ComplianceDashboardWidgetProps) => {
