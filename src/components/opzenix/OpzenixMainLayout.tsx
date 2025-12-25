@@ -11,13 +11,14 @@ import AdminSettingsPanel from '@/components/admin/AdminSettingsPanel';
 import ConnectionsHubPanel from '@/components/admin/ConnectionsHubPanel';
 import { AnimatedPipelineView } from '@/components/pipeline/AnimatedPipelineView';
 import { AdminOnboardingWizard } from '@/components/onboarding/AdminOnboardingWizard';
+import { VaultManagementPanel } from '@/components/vault/VaultManagementPanel';
 import { supabase } from '@/integrations/supabase/client';
 
 // ============================================
 // 🏗️ OPZENIX MAIN LAYOUT (Enterprise Grade)
 // ============================================
 
-type Screen = 'dashboard' | 'ci-flow' | 'cd-flow' | 'full-flow' | 'connections' | 'admin-settings' | 'pipelines' | 'ci-pipeline' | 'cd-pipeline';
+type Screen = 'dashboard' | 'ci-flow' | 'cd-flow' | 'full-flow' | 'connections' | 'admin-settings' | 'pipelines' | 'ci-pipeline' | 'cd-pipeline' | 'vault';
 type Environment = 'dev' | 'uat' | 'staging' | 'preprod' | 'prod';
 
 interface OpzenixMainLayoutProps {
@@ -181,6 +182,11 @@ export const OpzenixMainLayout = ({ onOpenSettings, onOpenProfile }: OpzenixMain
             {currentScreen === 'pipelines' && (
               <motion.div key="pipelines" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full overflow-auto p-6">
                 <AnimatedPipelineView pipelineType="full" onBack={() => setCurrentScreen('dashboard')} />
+              </motion.div>
+            )}
+            {currentScreen === 'vault' && (
+              <motion.div key="vault" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
+                <VaultManagementPanel onBack={() => setCurrentScreen('dashboard')} />
               </motion.div>
             )}
           </AnimatePresence>
