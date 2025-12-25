@@ -57,7 +57,7 @@ import OpzenixLogo from '@/components/brand/OpzenixLogo';
 // 🧭 OPZENIX LEFT NAVIGATION (Enterprise Grade)
 // ============================================
 
-type Screen = 'dashboard' | 'ci-flow' | 'cd-flow' | 'full-flow' | 'connections' | 'admin-settings' | 'pipelines' | 'ci-pipeline' | 'cd-pipeline';
+type Screen = 'dashboard' | 'ci-flow' | 'cd-flow' | 'full-flow' | 'connections' | 'admin-settings' | 'pipelines' | 'ci-pipeline' | 'cd-pipeline' | 'vault';
 type Environment = 'dev' | 'uat' | 'staging' | 'preprod' | 'prod';
 
 interface OpzenixLeftNavProps {
@@ -108,6 +108,11 @@ export function OpzenixLeftNav({
 
   const handleToolClick = (toolId: string) => {
     if (!featureToggles[toolId] && !isAdmin) return;
+    // Navigate to vault screen for secrets
+    if (toolId === 'secrets') {
+      onNavigate('vault');
+      return;
+    }
     setSelectedTool(toolId);
     setToolDialogOpen(true);
   };
