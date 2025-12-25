@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ControlTowerTopBar from '@/components/control-tower/ControlTowerTopBar';
 import ControlTowerStatusBar from '@/components/control-tower/ControlTowerStatusBar';
@@ -9,14 +9,15 @@ import FlowViewerScreen, { ActionContext } from './screens/FlowViewerScreen';
 import ActionPanelModal from './screens/ActionPanelModal';
 import AdminSettingsPanel from '@/components/admin/AdminSettingsPanel';
 import ConnectionsHubPanel from '@/components/admin/ConnectionsHubPanel';
-import RealtimePipelineView from '@/components/pipeline/RealtimePipelineView';
+import { AnimatedPipelineView } from '@/components/pipeline/AnimatedPipelineView';
+import { AdminOnboardingWizard } from '@/components/onboarding/AdminOnboardingWizard';
 import { supabase } from '@/integrations/supabase/client';
 
 // ============================================
 // 🏗️ OPZENIX MAIN LAYOUT (Enterprise Grade)
 // ============================================
 
-type Screen = 'dashboard' | 'ci-flow' | 'cd-flow' | 'full-flow' | 'connections' | 'admin-settings' | 'pipelines';
+type Screen = 'dashboard' | 'ci-flow' | 'cd-flow' | 'full-flow' | 'connections' | 'admin-settings' | 'pipelines' | 'ci-pipeline' | 'cd-pipeline';
 type Environment = 'dev' | 'uat' | 'staging' | 'preprod' | 'prod';
 
 interface OpzenixMainLayoutProps {
@@ -28,9 +29,50 @@ export const OpzenixMainLayout = ({ onOpenSettings, onOpenProfile }: OpzenixMain
   const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
   const [currentEnvironment, setCurrentEnvironment] = useState<Environment>('dev');
   const [leftNavCollapsed, setLeftNavCollapsed] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [actionContext, setActionContext] = useState<ActionContext | null>(null);
+
+  // Check if first-time admin
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: prefs } = await supabase
+            .from('user_preferences')
+            .select('onboarding_state')
+            .eq('user_id', user.id)
+            .single();
+          
+          const onboardingState = prefs?.onboarding_state as Record<string, boolean> | null;
+          if (!onboardingState?.completed) {
+            setShowOnboarding(true);
+          }
+        }
+      } catch (error) {
+        // If no preferences exist, show onboarding
+        setShowOnboarding(true);
+      }
+    };
+    checkOnboardingStatus();
+  }, []);
+
+  const handleOnboardingComplete = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('user_preferences').upsert({
+          user_id: user.id,
+          onboarding_state: { completed: true, completedAt: new Date().toISOString() },
+        });
+      }
+    } catch (error) {
+      console.error('Failed to save onboarding state:', error);
+    }
+    setShowOnboarding(false);
+  };
 
   const handleNavigate = useCallback((screen: Screen, env?: Environment) => {
     setCurrentScreen(screen);
@@ -68,6 +110,16 @@ export const OpzenixMainLayout = ({ onOpenSettings, onOpenProfile }: OpzenixMain
     if (currentScreen === 'cd-flow') return 'cd';
     return 'ci+cd';
   };
+
+  // Show onboarding wizard
+  if (showOnboarding) {
+    return (
+      <AdminOnboardingWizard 
+        onComplete={handleOnboardingComplete} 
+        onSkip={() => setShowOnboarding(false)} 
+      />
+    );
+  }
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">
@@ -116,9 +168,19 @@ export const OpzenixMainLayout = ({ onOpenSettings, onOpenProfile }: OpzenixMain
                 <AdminSettingsPanel onBack={() => setCurrentScreen('dashboard')} />
               </motion.div>
             )}
+            {currentScreen === 'ci-pipeline' && (
+              <motion.div key="ci-pipeline" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full overflow-auto p-6">
+                <AnimatedPipelineView pipelineType="ci" onBack={() => setCurrentScreen('dashboard')} />
+              </motion.div>
+            )}
+            {currentScreen === 'cd-pipeline' && (
+              <motion.div key="cd-pipeline" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full overflow-auto p-6">
+                <AnimatedPipelineView pipelineType="cd" onBack={() => setCurrentScreen('dashboard')} />
+              </motion.div>
+            )}
             {currentScreen === 'pipelines' && (
-              <motion.div key="pipelines" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full">
-                <RealtimePipelineView onBack={() => setCurrentScreen('dashboard')} />
+              <motion.div key="pipelines" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-full overflow-auto p-6">
+                <AnimatedPipelineView pipelineType="full" onBack={() => setCurrentScreen('dashboard')} />
               </motion.div>
             )}
           </AnimatePresence>

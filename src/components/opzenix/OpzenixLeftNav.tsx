@@ -57,7 +57,7 @@ import OpzenixLogo from '@/components/brand/OpzenixLogo';
 // 🧭 OPZENIX LEFT NAVIGATION (Enterprise Grade)
 // ============================================
 
-type Screen = 'dashboard' | 'ci-flow' | 'cd-flow' | 'full-flow' | 'connections' | 'admin-settings' | 'pipelines';
+type Screen = 'dashboard' | 'ci-flow' | 'cd-flow' | 'full-flow' | 'connections' | 'admin-settings' | 'pipelines' | 'ci-pipeline' | 'cd-pipeline';
 type Environment = 'dev' | 'uat' | 'staging' | 'preprod' | 'prod';
 
 interface OpzenixLeftNavProps {
