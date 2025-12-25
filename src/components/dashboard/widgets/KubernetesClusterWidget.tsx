@@ -28,7 +28,8 @@ interface ClusterData {
 }
 
 interface KubernetesClusterWidgetProps {
-  onRemove?: () => void;
+  id?: string;
+  onRemove?: (id: string) => void;
 }
 
 export const KubernetesClusterWidget = ({ onRemove }: KubernetesClusterWidgetProps) => {

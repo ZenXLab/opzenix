@@ -49,6 +49,9 @@ import { ArtifactsRegistryWidget } from '@/components/dashboard/widgets/Artifact
 import KubernetesClusterWidget from '@/components/dashboard/widgets/KubernetesClusterWidget';
 import TerraformStateWidget from '@/components/dashboard/widgets/TerraformStateWidget';
 import ComplianceDashboardWidget from '@/components/dashboard/widgets/ComplianceDashboardWidget';
+import SecretVaultWidget from '@/components/dashboard/widgets/SecretVaultWidget';
+import CICDPipelineWidget from '@/components/dashboard/widgets/CICDPipelineWidget';
+import IncidentManagementWidget from '@/components/dashboard/widgets/IncidentManagementWidget';
 import EnhancedWidgetPicker from '@/components/dashboard/EnhancedWidgetPicker';
 import DraggableWidget from '@/components/dashboard/DraggableWidget';
 import { ArtifactTraceabilityPanel } from '@/components/artifacts/ArtifactTraceabilityPanel';
@@ -79,11 +82,12 @@ type WidgetType = 'deployments' | 'audit' | 'metrics' | 'api' | 'pipelines' | 'l
   | 'prompt-library' | 'token-usage' | 'guardrails' | 'latency-monitor'
   | 'anomaly-detection' | 'incident-prediction' | 'smart-alerts'
   | 'cloud-resources' | 'k8s-clusters' | 'terraform-state'
-  | 'vulnerability-scan' | 'compliance' | 'secrets-audit'
+  | 'vulnerability-scan' | 'compliance' | 'secrets-audit' | 'secret-vault'
   | 'traces' | 'build-metrics' | 'test-coverage'
   | 'cpu-usage' | 'memory-usage' | 'network-io' | 'disk-usage'
   | 'active-connections' | 'request-latency' | 'error-rate'
-  | 'artifacts' | 'notifications' | 'sla-monitor';
+  | 'artifacts' | 'notifications' | 'sla-monitor'
+  | 'cicd-pipeline' | 'incident-management';
 
 const WidgetDashboard = ({
   onOpenPipelineEditor,
@@ -242,6 +246,12 @@ const WidgetDashboard = ({
         return <TerraformStateWidget {...commonProps} />;
       case 'compliance':
         return <ComplianceDashboardWidget {...commonProps} />;
+      case 'secret-vault':
+        return <SecretVaultWidget {...commonProps} />;
+      case 'cicd-pipeline':
+        return <CICDPipelineWidget {...commonProps} />;
+      case 'incident-management':
+        return <IncidentManagementWidget {...commonProps} />;
       case 'actions':
         return (
           <QuickActionsWidget
