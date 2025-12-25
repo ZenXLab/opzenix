@@ -35,8 +35,8 @@ const OpzenixLogo = ({
       <div className={cn(
         sizes[size].icon,
         'relative rounded-xl overflow-hidden flex items-center justify-center',
-        'bg-gradient-to-br from-primary via-primary to-chart-1',
-        'shadow-lg shadow-primary/30'
+        'bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700',
+        'shadow-lg shadow-blue-500/30'
       )}>
         <svg 
           viewBox="0 0 48 48" 

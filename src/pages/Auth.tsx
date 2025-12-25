@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   Mail, Lock, Eye, EyeOff, ArrowRight, 
-  Loader2, CheckCircle2, AlertCircle, Rocket,
+  Loader2, CheckCircle2, AlertCircle,
   Building2, User
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { SocialLoginButtons } from '@/components/auth/SocialLoginButtons';
+import OpzenixLogo from '@/components/brand/OpzenixLogo';
 
 // Validation schemas
 const emailSchema = z.string().email('Please enter a valid email address');
@@ -144,12 +145,7 @@ const Auth = () => {
       {/* Left side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary/10 via-primary/5 to-background p-12 flex-col justify-between">
         <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary rounded-lg">
-              <Rocket className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <span className="text-2xl font-bold">Opzenix</span>
-          </div>
+          <OpzenixLogo size="lg" animate={false} />
         </div>
         
         <div className="space-y-8">
@@ -200,11 +196,8 @@ const Auth = () => {
           className="w-full max-w-md"
         >
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
-            <div className="p-2 bg-primary rounded-lg">
-              <Rocket className="h-6 w-6 text-primary-foreground" />
-            </div>
-            <span className="text-2xl font-bold">Opzenix</span>
+          <div className="lg:hidden flex justify-center mb-8">
+            <OpzenixLogo size="lg" animate={false} />
           </div>
           
           <Card className="border-border/50 shadow-lg">
