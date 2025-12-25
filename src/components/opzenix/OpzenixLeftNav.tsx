@@ -108,13 +108,22 @@ export function OpzenixLeftNav({
 
   const handleToolClick = (toolId: string) => {
     if (!featureToggles[toolId] && !isAdmin) return;
-    // Navigate to vault screen for secrets
-    if (toolId === 'secrets') {
-      onNavigate('vault');
-      return;
+    // Navigate to dedicated screens for tools that have them
+    switch (toolId) {
+      case 'secrets':
+        onNavigate('vault');
+        return;
+      case 'audit':
+        onNavigate('admin-settings');
+        return;
+      case 'team':
+        onNavigate('admin-settings');
+        return;
+      default:
+        // For other tools, show the dialog
+        setSelectedTool(toolId);
+        setToolDialogOpen(true);
     }
-    setSelectedTool(toolId);
-    setToolDialogOpen(true);
   };
 
   const toggleFeature = (toolId: string) => {
