@@ -55,8 +55,8 @@ const DEMO_PHASES: { id: DemoPhase; title: string; description: string; duration
   { id: 'intro', title: 'Welcome to Opzenix', description: 'Enterprise CI/CD Control Plane', duration: 3000 },
   { id: 'github', title: 'Step 1: Connect GitHub', description: 'One-click repository integration', duration: 5000 },
   { id: 'pipeline', title: 'Step 2: Build Pipeline', description: 'Visual drag-and-drop flow creation', duration: 5000 },
-  { id: 'execution', title: 'Step 3: Execute Pipeline', description: 'Watch your pipeline run in real-time', duration: 12000 },
-  { id: 'analytics', title: 'Step 4: Monitor & Observe', description: 'Deep observability with OpenTelemetry', duration: 6000 },
+  { id: 'execution', title: 'Step 3: Execute Pipeline', description: 'Watch your pipeline run in real-time', duration: 8000 },
+  { id: 'analytics', title: 'Step 4: Monitor & Observe', description: 'Deep observability with OpenTelemetry', duration: 5000 },
   { id: 'failure', title: 'Step 5: Failure Detected', description: 'Intelligent failure handling', duration: 4000 },
   { id: 'rollback', title: 'Step 6: Recovery', description: 'Resume from checkpoint instantly', duration: 5000 },
   { id: 'ai', title: 'Step 7: AI Analysis', description: 'Opzenix AI explains root cause', duration: 5000 },
@@ -108,7 +108,7 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
 
   const addLog = useCallback((level: LogEntry['level'], message: string, node?: string) => {
     const timestamp = new Date().toLocaleTimeString();
-    setLogs(prev => [...prev.slice(-20), { timestamp, level, message, node }]);
+    setLogs(prev => [...prev.slice(-7), { timestamp, level, message, node }]); // Keep only last 8 logs
   }, []);
 
   const resetPipeline = useCallback(() => {
@@ -141,50 +141,39 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
 
     // Phase-specific animations
     if (currentPhase === 'dashboard') {
-      setTimeout(() => addLog('info', 'Loading Control Tower dashboard...'), 300);
-      setTimeout(() => addLog('success', 'Real-time metrics connected'), 800);
-      setTimeout(() => addLog('info', 'Fetching deployment history...'), 1500);
-      setTimeout(() => addLog('success', '1,247 deployments loaded'), 2200);
-      setTimeout(() => addLog('info', 'Environment status: All healthy'), 3000);
-      setTimeout(() => addLog('success', 'System health: 99.9% uptime'), 4000);
+      setTimeout(() => addLog('success', 'Control Tower connected'), 500);
+      setTimeout(() => addLog('info', '1,247 deployments loaded'), 1500);
+      setTimeout(() => addLog('success', 'System health: 99.9% uptime'), 3000);
     }
 
     if (currentPhase === 'github') {
-      setTimeout(() => addLog('info', 'Initializing GitHub OAuth...'), 500);
-      setTimeout(() => addLog('info', 'Authenticating via GitHub App...'), 1200);
-      setTimeout(() => addLog('success', 'GitHub App installed successfully'), 2000);
-      setTimeout(() => addLog('info', 'Scanning repositories...'), 2800);
-      setTimeout(() => addLog('success', 'Found 12 repositories'), 3500);
-      setTimeout(() => addLog('info', 'Selected: acme-corp/payment-service'), 4200);
+      setTimeout(() => addLog('info', 'Authenticating via GitHub App...'), 500);
+      setTimeout(() => addLog('success', 'GitHub App installed'), 1500);
+      setTimeout(() => addLog('success', 'Repository: acme-corp/payment-service'), 3000);
     }
 
     if (currentPhase === 'pipeline') {
-      setTimeout(() => addLog('info', 'Loading pipeline template...'), 500);
-      setTimeout(() => addLog('success', 'Template: Enterprise CI/CD with Approvals'), 1200);
-      setTimeout(() => addLog('info', 'Adding governance gates...'), 2000);
-      setTimeout(() => addLog('success', 'Production approval workflow configured'), 2800);
-      setTimeout(() => addLog('info', 'Environment locks enabled for prod'), 3500);
+      setTimeout(() => addLog('success', 'Template: Enterprise CI/CD'), 700);
+      setTimeout(() => addLog('success', 'Approval gates configured'), 1800);
+      setTimeout(() => addLog('success', 'Environment locks enabled'), 2800);
     }
 
     if (currentPhase === 'execution') {
       resetPipeline();
-      addLog('info', 'Initializing pipeline execution...', 'system');
       
       const runPipeline = async () => {
-        const durations = ['1.2s', '45.8s', '32.4s', '12.1s', '28.3s', '2.1s', '15.7s'];
+        const durations = ['1.2s', '45s', '32s', '12s', '28s', '2s', '16s'];
         const nodeLabels = ['Git Push', 'Build', 'Test', 'Security', 'Staging', 'Approval', 'Production'];
-        const runTimes = [800, 1400, 1400, 1400, 1400, 1000, 1400]; // Time each node runs (ms)
+        const runTimes = [600, 1000, 1000, 1000, 1000, 700, 1000]; // Faster execution
         
-        await new Promise(r => setTimeout(r, 500));
-        addLog('success', 'Execution started', 'system');
+        addLog('info', '▶ Starting pipeline execution');
         
-        // Run through all nodes with smooth animation
+        // Run through all nodes
         for (let i = 0; i < 7; i++) {
-          // Wait before starting node
-          await new Promise(r => setTimeout(r, 300));
+          await new Promise(r => setTimeout(r, 200));
           setCurrentNodeIndex(i);
           
-          // Set current node to running, previous to success
+          // Set to running
           setPipelineNodes(nodes => 
             nodes.map((n, idx) => ({
               ...n,
@@ -192,12 +181,15 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
               duration: idx < i ? durations[idx] : '0s'
             }))
           );
-          addLog('info', `▶ Executing ${nodeLabels[i]}...`, nodeLabels[i].toLowerCase().replace(' ', '-'));
           
-          // Let node run for its duration
+          // Only log key stages
+          if (i === 1 || i === 3 || i === 6) {
+            addLog('info', `Running ${nodeLabels[i]}...`);
+          }
+          
           await new Promise(r => setTimeout(r, runTimes[i]));
           
-          // Complete current node
+          // Complete node
           setPipelineNodes(nodes =>
             nodes.map((n, idx) => ({
               ...n,
@@ -205,26 +197,23 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
               duration: idx <= i ? durations[idx] : '0s'
             }))
           );
-          addLog('success', `✓ ${nodeLabels[i]} completed in ${durations[i]}`, nodeLabels[i].toLowerCase().replace(' ', '-'));
           
-          // Brief pause between nodes
-          await new Promise(r => setTimeout(r, 200));
+          // Only log key completions
+          if (i === 3 || i === 6) {
+            addLog('success', `✓ ${nodeLabels[i]} completed`);
+          }
         }
         
-        // Final success message
-        await new Promise(r => setTimeout(r, 400));
-        addLog('success', '🎉 Pipeline execution completed successfully!', 'system');
+        addLog('success', '🎉 Pipeline completed!');
       };
+      
       runPipeline();
     }
 
     if (currentPhase === 'analytics') {
-      setTimeout(() => addLog('info', 'Streaming OpenTelemetry traces...'), 500);
-      setTimeout(() => addLog('info', 'Trace ID: abc123-def456-ghi789'), 1000);
-      setTimeout(() => addLog('info', 'Collecting span data...'), 1500);
-      setTimeout(() => addLog('success', 'Performance metrics captured'), 2500);
-      setTimeout(() => addLog('info', 'Exporting to Prometheus & Grafana'), 3200);
-      setTimeout(() => addLog('success', 'Dashboards updated in real-time'), 4000);
+      setTimeout(() => addLog('info', 'OpenTelemetry traces streaming'), 700);
+      setTimeout(() => addLog('success', 'Metrics captured'), 2000);
+      setTimeout(() => addLog('success', 'Dashboards updated'), 3500);
     }
 
     if (currentPhase === 'failure') {
@@ -235,16 +224,14 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
         }))
       );
       setCurrentNodeIndex(3);
-      setTimeout(() => addLog('error', 'Security scan detected vulnerabilities', 'security'), 500);
-      setTimeout(() => addLog('warning', 'Pipeline paused at Security stage'), 1200);
-      setTimeout(() => addLog('info', 'Checkpoint created: post-test'), 2000);
-      setTimeout(() => addLog('info', 'AI analysis triggered automatically...'), 2800);
+      setTimeout(() => addLog('error', '❌ Security scan failed'), 500);
+      setTimeout(() => addLog('warning', 'Pipeline paused'), 1500);
+      setTimeout(() => addLog('info', 'Checkpoint created'), 2500);
     }
 
     if (currentPhase === 'rollback') {
-      setTimeout(() => addLog('info', 'Loading available checkpoints...'), 500);
-      setTimeout(() => addLog('success', 'Checkpoint found: post-test (3 min ago)'), 1200);
-      setTimeout(() => addLog('info', 'Restoring pipeline state...'), 2000);
+      setTimeout(() => addLog('info', 'Loading checkpoints...'), 500);
+      setTimeout(() => addLog('success', 'Checkpoint found'), 1200);
       setTimeout(() => {
         setPipelineNodes(nodes =>
           nodes.map((n, idx) => ({
@@ -252,36 +239,31 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
             status: idx < 3 ? 'success' : idx === 3 ? 'running' : 'pending'
           }))
         );
-        addLog('success', 'Resumed from checkpoint');
-      }, 2800);
-      setTimeout(() => addLog('info', 'Retrying with patched configuration...'), 3500);
+        addLog('success', '✓ Resumed from checkpoint');
+      }, 2200);
       setTimeout(() => {
         setPipelineNodes(nodes => nodes.map((n, idx) => ({ 
           ...n, 
           status: idx <= 5 ? 'success' : 'running' 
         })));
-        addLog('success', 'Security scan passed!');
-      }, 4200);
+        addLog('success', '✓ Security scan passed');
+      }, 3500);
     }
 
     if (currentPhase === 'ai') {
-      setTimeout(() => addLog('info', 'Opzenix AI analyzing failure pattern...'), 500);
-      setTimeout(() => addLog('info', 'Scanning 847 similar incidents...'), 1200);
-      setTimeout(() => addLog('success', 'Root cause identified: CVE-2024-1234'), 2000);
-      setTimeout(() => addLog('info', 'Suggested fix: Upgrade lodash to 4.17.21'), 2800);
-      setTimeout(() => addLog('success', 'Auto-remediation PR created: #1247'), 3800);
+      setTimeout(() => addLog('info', '🤖 AI analyzing failure...'), 500);
+      setTimeout(() => addLog('success', 'Root cause: CVE-2024-1234'), 1800);
+      setTimeout(() => addLog('success', 'Auto-fix PR created #1247'), 3200);
     }
 
     if (currentPhase === 'governance') {
-      setTimeout(() => addLog('info', 'Loading governance policies...'), 500);
-      setTimeout(() => addLog('success', 'RBAC: Admin, Operator, Viewer roles active'), 1200);
-      setTimeout(() => addLog('info', 'Approval request sent to @jane.smith'), 2000);
-      setTimeout(() => addLog('success', 'Production deployment approved'), 2800);
-      setTimeout(() => addLog('info', 'Audit log entry created: DEPLOY_PROD_APPROVED'), 3500);
+      setTimeout(() => addLog('success', 'RBAC policies active'), 700);
+      setTimeout(() => addLog('info', 'Approval request sent'), 1800);
+      setTimeout(() => addLog('success', 'Deployment approved'), 2800);
       setTimeout(() => {
         setPipelineNodes(nodes => nodes.map(n => ({ ...n, status: 'success' })));
-        addLog('success', 'Production deployment successful!');
-      }, 4200);
+        addLog('success', '✅ Production deployed');
+      }, 3800);
     }
 
     const timer = setTimeout(() => {
