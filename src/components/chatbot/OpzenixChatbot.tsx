@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   MessageCircle, X, Send, Loader2, Volume2, VolumeX, 
-  User, Mic, MicOff, Square, Minus
+  User, Mic, MicOff, Square, Minus, Zap, BookOpen, DollarSign, Rocket, HelpCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import OpzenixLogo from '@/components/brand/OpzenixLogo';
+import { Link } from 'react-router-dom';
 
 // Type declarations for Web Speech API
 interface SpeechRecognitionEvent {
@@ -66,10 +67,19 @@ declare global {
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  inputMethod?: 'text' | 'voice';
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/opzenix-chat`;
 const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`;
+
+// Quick action buttons configuration
+const QUICK_ACTIONS = [
+  { icon: Rocket, label: 'Get Started', question: 'How do I get started with Opzenix?' },
+  { icon: DollarSign, label: 'Pricing', question: 'What are the pricing plans for Opzenix?' },
+  { icon: BookOpen, label: 'Features', question: 'What are the key features of Opzenix?' },
+  { icon: HelpCircle, label: 'Support', question: 'How can I get support for Opzenix?' },
+];
 
 // Mini Opzenix logo for chat avatar
 function ChatLogo({ className }: { className?: string }) {
@@ -124,6 +134,117 @@ function TypingIndicator() {
   );
 }
 
+// Rich text renderer for markdown-like formatting
+function RichTextMessage({ content, isUser }: { content: string; isUser: boolean }) {
+  // Parse and render rich text with bold, underline, links, and colors
+  const renderRichText = (text: string) => {
+    const parts: React.ReactNode[] = [];
+    let remaining = text;
+    let key = 0;
+
+    // Process the text for markdown-like patterns
+    while (remaining.length > 0) {
+      // Check for links [text](url)
+      const linkMatch = remaining.match(/\[([^\]]+)\]\(([^)]+)\)/);
+      // Check for bold **text**
+      const boldMatch = remaining.match(/\*\*([^*]+)\*\*/);
+      // Check for underline __text__
+      const underlineMatch = remaining.match(/__([^_]+)__/);
+      // Check for colored text {{color:text}}
+      const colorMatch = remaining.match(/\{\{(blue|green|orange|purple|red):([^}]+)\}\}/);
+
+      // Find the earliest match
+      const matches = [
+        linkMatch ? { type: 'link', match: linkMatch, index: remaining.indexOf(linkMatch[0]) } : null,
+        boldMatch ? { type: 'bold', match: boldMatch, index: remaining.indexOf(boldMatch[0]) } : null,
+        underlineMatch ? { type: 'underline', match: underlineMatch, index: remaining.indexOf(underlineMatch[0]) } : null,
+        colorMatch ? { type: 'color', match: colorMatch, index: remaining.indexOf(colorMatch[0]) } : null,
+      ].filter(Boolean).sort((a, b) => (a?.index ?? 0) - (b?.index ?? 0));
+
+      if (matches.length > 0 && matches[0]) {
+        const earliest = matches[0];
+        const beforeText = remaining.slice(0, earliest.index);
+        
+        if (beforeText) {
+          parts.push(<span key={key++}>{beforeText}</span>);
+        }
+
+        if (earliest.type === 'link' && earliest.match) {
+          const isExternal = earliest.match[2].startsWith('http');
+          if (isExternal) {
+            parts.push(
+              <a 
+                key={key++} 
+                href={earliest.match[2]} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-500 hover:text-blue-600 underline font-medium"
+              >
+                {earliest.match[1]}
+              </a>
+            );
+          } else {
+            parts.push(
+              <Link 
+                key={key++} 
+                to={earliest.match[2]}
+                className="text-blue-500 hover:text-blue-600 underline font-medium"
+              >
+                {earliest.match[1]}
+              </Link>
+            );
+          }
+          remaining = remaining.slice(earliest.index + earliest.match[0].length);
+        } else if (earliest.type === 'bold' && earliest.match) {
+          parts.push(
+            <strong key={key++} className="font-bold">
+              {earliest.match[1]}
+            </strong>
+          );
+          remaining = remaining.slice(earliest.index + earliest.match[0].length);
+        } else if (earliest.type === 'underline' && earliest.match) {
+          parts.push(
+            <span key={key++} className="underline decoration-2">
+              {earliest.match[1]}
+            </span>
+          );
+          remaining = remaining.slice(earliest.index + earliest.match[0].length);
+        } else if (earliest.type === 'color' && earliest.match) {
+          const colorClasses: Record<string, string> = {
+            blue: 'text-blue-500 font-semibold',
+            green: 'text-green-500 font-semibold',
+            orange: 'text-orange-500 font-semibold',
+            purple: 'text-purple-500 font-semibold',
+            red: 'text-red-500 font-semibold',
+          };
+          parts.push(
+            <span key={key++} className={colorClasses[earliest.match[1]] || ''}>
+              {earliest.match[2]}
+            </span>
+          );
+          remaining = remaining.slice(earliest.index + earliest.match[0].length);
+        }
+      } else {
+        parts.push(<span key={key++}>{remaining}</span>);
+        break;
+      }
+    }
+
+    return parts;
+  };
+
+  return (
+    <div className={cn(
+      'rounded-2xl px-4 py-2.5 max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap',
+      isUser
+        ? 'bg-primary text-primary-foreground rounded-tr-sm'
+        : 'bg-muted rounded-tl-sm'
+    )}>
+      {renderRichText(content)}
+    </div>
+  );
+}
+
 export function OpzenixChatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -131,7 +252,7 @@ export function OpzenixChatbot() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: "Hello! I'm Maya, the Lead Solutions Architect at Opzenix. 🛡️ I'm here to guide you through our CI/CD platform, answer your questions, and help you get started. What would you like to explore today?",
+      content: "Hello! I'm **Maya**, the Lead Solutions Architect at {{blue:Opzenix}}. 🛡️\n\nI'm here to guide you through our CI/CD platform. You can:\n\n• Type your questions below\n• Click a quick action button\n• **Speak** and I'll respond with voice!\n\nWhat would you like to explore today?",
     },
   ]);
   const [input, setInput] = useState('');
@@ -139,9 +260,12 @@ export function OpzenixChatbot() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [isListening, setIsListening] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const autoSendTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastInputMethodRef = useRef<'text' | 'voice'>('text');
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -149,12 +273,19 @@ export function OpzenixChatbot() {
     }
   }, [messages]);
 
-  // Initialize speech recognition
+  // Hide quick actions after first user message
+  useEffect(() => {
+    if (messages.some(m => m.role === 'user')) {
+      setShowQuickActions(false);
+    }
+  }, [messages]);
+
+  // Initialize speech recognition with auto-send
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
+      recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-US';
 
@@ -163,9 +294,23 @@ export function OpzenixChatbot() {
           .map((result) => result[0].transcript)
           .join('');
         setInput(transcript);
+        lastInputMethodRef.current = 'voice';
         
-        if (event.results[0].isFinal) {
-          setIsListening(false);
+        // Clear any existing auto-send timer
+        if (autoSendTimerRef.current) {
+          clearTimeout(autoSendTimerRef.current);
+        }
+
+        // Check if the speech is final
+        const lastResult = event.results[event.results.length - 1];
+        if (lastResult && lastResult.isFinal) {
+          // Auto-send after 1.5 seconds of silence
+          autoSendTimerRef.current = setTimeout(() => {
+            if (transcript.trim()) {
+              sendMessageWithMethod(transcript.trim(), 'voice');
+              setInput('');
+            }
+          }, 1500);
         }
       };
 
@@ -178,7 +323,14 @@ export function OpzenixChatbot() {
       };
 
       recognitionRef.current.onend = () => {
-        setIsListening(false);
+        // Restart if still in listening mode (for continuous listening)
+        if (isListening && recognitionRef.current) {
+          try {
+            recognitionRef.current.start();
+          } catch {
+            setIsListening(false);
+          }
+        }
       };
     }
 
@@ -186,14 +338,18 @@ export function OpzenixChatbot() {
       if (recognitionRef.current) {
         recognitionRef.current.abort();
       }
+      if (autoSendTimerRef.current) {
+        clearTimeout(autoSendTimerRef.current);
+      }
     };
-  }, []);
+  }, [isListening]);
 
   const startListening = useCallback(() => {
     if (recognitionRef.current && !isListening) {
       try {
         recognitionRef.current.start();
         setIsListening(true);
+        lastInputMethodRef.current = 'voice';
       } catch (error) {
         console.error('Failed to start speech recognition:', error);
       }
@@ -204,11 +360,21 @@ export function OpzenixChatbot() {
     if (recognitionRef.current && isListening) {
       recognitionRef.current.stop();
       setIsListening(false);
+      if (autoSendTimerRef.current) {
+        clearTimeout(autoSendTimerRef.current);
+      }
     }
   }, [isListening]);
 
   const playAudio = async (text: string) => {
     if (!voiceEnabled) return;
+    
+    // Strip markdown formatting for TTS
+    const cleanText = text
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/__([^_]+)__/g, '$1')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/\{\{[^:]+:([^}]+)\}\}/g, '$1');
     
     try {
       setIsSpeaking(true);
@@ -219,7 +385,7 @@ export function OpzenixChatbot() {
           'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text: cleanText }),
       });
 
       if (!response.ok) {
@@ -265,16 +431,17 @@ export function OpzenixChatbot() {
     setMessages([
       {
         role: 'assistant',
-        content: "Hello! I'm Maya, the Lead Solutions Architect at Opzenix. 🛡️ I'm here to guide you through our CI/CD platform, answer your questions, and help you get started. What would you like to explore today?",
+        content: "Hello! I'm **Maya**, the Lead Solutions Architect at {{blue:Opzenix}}. 🛡️\n\nI'm here to guide you through our CI/CD platform. You can:\n\n• Type your questions below\n• Click a quick action button\n• **Speak** and I'll respond with voice!\n\nWhat would you like to explore today?",
       },
     ]);
+    setShowQuickActions(true);
     setShowCloseDialog(false);
   };
 
-  const sendMessage = async () => {
-    if (!input.trim() || isLoading) return;
+  const sendMessageWithMethod = async (messageText: string, method: 'text' | 'voice') => {
+    if (!messageText.trim() || isLoading) return;
 
-    const userMessage: Message = { role: 'user', content: input.trim() };
+    const userMessage: Message = { role: 'user', content: messageText.trim(), inputMethod: method };
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
@@ -347,10 +514,10 @@ export function OpzenixChatbot() {
         }
       }
 
-      // Play audio for the response
-      if (assistantContent && voiceEnabled) {
-        // Only speak the first 500 chars to keep it reasonable
-        const textToSpeak = assistantContent.slice(0, 500);
+      // Play audio for the response only if user asked via voice (speech-to-speech)
+      if (assistantContent && voiceEnabled && method === 'voice') {
+        // Speak the response for voice input
+        const textToSpeak = assistantContent.slice(0, 600);
         playAudio(textToSpeak);
       }
     } catch (error) {
@@ -365,6 +532,16 @@ export function OpzenixChatbot() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const sendMessage = async () => {
+    lastInputMethodRef.current = 'text';
+    await sendMessageWithMethod(input, 'text');
+  };
+
+  const handleQuickAction = (question: string) => {
+    lastInputMethodRef.current = 'text';
+    sendMessageWithMethod(question, 'text');
   };
 
   const hasSpeechRecognition = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
@@ -437,9 +614,9 @@ export function OpzenixChatbot() {
             initial={{ opacity: 0, y: 100, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 100, scale: 0.9 }}
-            className="fixed bottom-6 right-6 z-50 w-[400px] max-w-[calc(100vw-3rem)]"
+            className="fixed bottom-6 right-6 z-50 w-[420px] max-w-[calc(100vw-3rem)]"
           >
-            <div className="bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[520px]">
+            <div className="bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[560px]">
               {/* Header */}
               <div className="bg-gradient-to-r from-blue-500 to-blue-700 p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -512,20 +689,37 @@ export function OpzenixChatbot() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ duration: 0.5 }}
-                        className={cn(
-                          'rounded-2xl px-4 py-2.5 max-w-[85%] text-sm leading-relaxed',
-                          msg.role === 'user'
-                            ? 'bg-primary text-primary-foreground rounded-tr-sm'
-                            : 'bg-muted rounded-tl-sm'
-                        )}
                       >
-                        {msg.content}
+                        <RichTextMessage content={msg.content} isUser={msg.role === 'user'} />
                       </motion.div>
                     </motion.div>
                   ))}
                   {isLoading && <TypingIndicator />}
                 </div>
               </ScrollArea>
+
+              {/* Quick Actions */}
+              {showQuickActions && !isLoading && (
+                <div className="px-4 py-2 border-t border-border bg-muted/30">
+                  <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                    <Zap className="h-3 w-3" /> Quick actions
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {QUICK_ACTIONS.map((action) => (
+                      <Button
+                        key={action.label}
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1.5 hover:bg-blue-500/10 hover:border-blue-500/50"
+                        onClick={() => handleQuickAction(action.question)}
+                      >
+                        <action.icon className="h-3 w-3" />
+                        {action.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Speaking Indicator */}
               {isSpeaking && (
@@ -547,7 +741,7 @@ export function OpzenixChatbot() {
               {isListening && (
                 <div className="px-4 py-2 bg-red-500/10 border-t border-border flex items-center gap-2 text-xs text-muted-foreground">
                   <Mic className="h-3 w-3 animate-pulse text-red-500" />
-                  Listening... Speak now
+                  <span>Listening... (auto-sends after you stop speaking)</span>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -570,7 +764,10 @@ export function OpzenixChatbot() {
                 >
                   <Input
                     value={input}
-                    onChange={(e) => setInput(e.target.value)}
+                    onChange={(e) => {
+                      setInput(e.target.value);
+                      lastInputMethodRef.current = 'text';
+                    }}
                     placeholder="Ask Maya about Opzenix..."
                     disabled={isLoading}
                     className="flex-1"
@@ -582,7 +779,7 @@ export function OpzenixChatbot() {
                       variant={isListening ? 'destructive' : 'outline'}
                       onClick={isListening ? stopListening : startListening}
                       disabled={isLoading}
-                      title={isListening ? 'Stop listening' : 'Start voice input'}
+                      title={isListening ? 'Stop listening' : 'Start voice input (auto-sends)'}
                     >
                       {isListening ? (
                         <MicOff className="h-4 w-4" />
