@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
+import { toast } from 'sonner';
 
 type Execution = Tables<'executions'>;
 type Deployment = Tables<'deployments'>;
@@ -45,6 +46,35 @@ export const useControlTowerRealtime = () => {
     lastUpdated: null
   });
 
+  // Delete execution and all related data
+  const deleteExecution = useCallback(async (executionId: string) => {
+    try {
+      // Delete related records first (cascade should handle most, but being explicit)
+      await Promise.all([
+        supabase.from('ci_evidence').delete().eq('execution_id', executionId),
+        supabase.from('approval_requests').delete().eq('execution_id', executionId),
+        supabase.from('test_results').delete().eq('execution_id', executionId),
+        supabase.from('execution_nodes').delete().eq('execution_id', executionId),
+        supabase.from('execution_logs').delete().eq('execution_id', executionId),
+        supabase.from('checkpoints').delete().eq('execution_id', executionId),
+        supabase.from('deployments').delete().eq('execution_id', executionId),
+        supabase.from('artifacts').delete().eq('execution_id', executionId),
+      ]);
+
+      // Delete the execution itself
+      const { error } = await supabase.from('executions').delete().eq('id', executionId);
+      
+      if (error) throw error;
+      
+      toast.success('Execution deleted', { description: 'Pipeline data removed from your workspace' });
+      return true;
+    } catch (err: any) {
+      console.error('[useControlTowerRealtime] Delete error:', err);
+      toast.error('Failed to delete execution', { description: err.message });
+      return false;
+    }
+  }, []);
+
   // Fetch all data
   const fetchData = useCallback(async () => {
     console.log('[useControlTowerRealtime] Fetching data...');
@@ -60,7 +90,7 @@ export const useControlTowerRealtime = () => {
           .from('executions')
           .select('*')
           .order('started_at', { ascending: false })
-          .limit(50),
+          .limit(10), // Only show recent ones
         supabase
           .from('deployments')
           .select('*')
@@ -260,6 +290,7 @@ export const useControlTowerRealtime = () => {
 
   return {
     ...state,
-    refetch: fetchData
+    refetch: fetchData,
+    deleteExecution
   };
 };

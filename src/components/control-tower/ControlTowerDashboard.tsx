@@ -17,7 +17,9 @@ import {
   WifiOff,
   Loader2,
   Container,
-  Radio
+  Radio,
+  Trash2,
+  Rocket
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,6 +35,18 @@ import LastApprovalIndicator from './LastApprovalIndicator';
 import EmptyStateGuidance from './EmptyStateGuidance';
 import { ConnectionGatingBanner } from './ConnectionGatingBanner';
 import { VersionHistoryWidget } from './VersionHistoryWidget';
+import { ArgoFlowGraph } from './ArgoFlowGraph';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface ControlTowerDashboardProps {
   onViewExecution?: (executionId: string) => void;
@@ -78,14 +92,26 @@ const ControlTowerDashboard = ({
     triggerHealthCheck 
   } = useConnectionsRealtime();
   const { 
-    activeExecutions: executions, 
+    activeExecutions: executions,
+    executions: allExecutions,
     pendingApprovals,
     loading: executionsLoading, 
-    isConnected: realtimeConnected 
+    isConnected: realtimeConnected,
+    deleteExecution
   } = useControlTowerRealtime();
 
   const [environments, setEnvironments] = useState<EnvironmentOverview[]>([]);
   const [envLoading, setEnvLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Get the featured execution (first running or most recent)
+  const featuredExecution = executions[0] || allExecutions[0];
+
+  const handleDeleteExecution = async (executionId: string) => {
+    setDeletingId(executionId);
+    await deleteExecution(executionId);
+    setDeletingId(null);
+  };
 
   // Fetch environments with last deployment status
   useEffect(() => {
@@ -369,15 +395,15 @@ const ControlTowerDashboard = ({
           </Card>
         </div>
 
-        {/* Active Executions */}
+        {/* Active Executions with Delete */}
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Play className="w-4 h-4 text-chart-1" />
-                <CardTitle className="text-base">Active Executions</CardTitle>
-                {executions.length > 0 && (
-                  <Badge variant="secondary" className="text-[10px]">{executions.length} active</Badge>
+                <CardTitle className="text-base">Test Pipeline</CardTitle>
+                {allExecutions.length > 0 && (
+                  <Badge variant="secondary" className="text-[10px]">{allExecutions.length} execution(s)</Badge>
                 )}
               </div>
               <Button variant="ghost" size="sm">
@@ -390,28 +416,31 @@ const ControlTowerDashboard = ({
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>
-            ) : executions.length === 0 ? (
+            ) : allExecutions.length === 0 ? (
               <EmptyStateGuidance type="executions" onAction={onOpenConnections} />
             ) : (
               <div className="space-y-3">
-                {executions.map((exec) => (
+                {allExecutions.slice(0, 3).map((exec) => (
                   <motion.div
                     key={exec.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer"
-                    onClick={() => onViewExecution?.(exec.id)}
+                    className="flex items-center gap-4 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
                   >
                     {/* Status Indicator */}
                     <div className={cn(
                       'w-2 h-8 rounded-full',
                       exec.status === 'running' && 'bg-chart-1 animate-pulse',
                       exec.status === 'paused' && 'bg-sec-warning animate-pulse',
-                      exec.status === 'failed' && 'bg-sec-critical'
+                      exec.status === 'failed' && 'bg-sec-critical',
+                      exec.status === 'success' && 'bg-sec-safe'
                     )} />
 
                     {/* Execution Info */}
-                    <div className="flex-1 min-w-0">
+                    <div 
+                      className="flex-1 min-w-0 cursor-pointer"
+                      onClick={() => onViewExecution?.(exec.id)}
+                    >
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-sm font-medium truncate">{exec.name}</span>
                         <Badge variant={exec.status === 'running' ? 'default' : 'secondary'} className="text-[10px] h-4 capitalize">
@@ -419,8 +448,6 @@ const ControlTowerDashboard = ({
                         </Badge>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <span>{exec.name.split('/')[0] || 'platform-core'}</span>
-                        <span>•</span>
                         <span>{exec.branch || 'main'}</span>
                         <span>•</span>
                         <span className="capitalize">{exec.environment}</span>
@@ -443,16 +470,92 @@ const ControlTowerDashboard = ({
                     </div>
 
                     {/* Actions */}
-                    <Button variant="ghost" size="sm" className="gap-1.5">
-                      <Eye className="w-3.5 h-3.5" />
-                      View Flow
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="gap-1.5"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewExecution?.(exec.id);
+                        }}
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        View
+                      </Button>
+                      
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-sec-critical"
+                            onClick={(e) => e.stopPropagation()}
+                            disabled={deletingId === exec.id}
+                          >
+                            {deletingId === exec.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Pipeline Execution?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently remove "{exec.name}" and all related CI evidence, approvals, and artifacts. This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction 
+                              className="bg-sec-critical hover:bg-sec-critical/90"
+                              onClick={() => handleDeleteExecution(exec.id)}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </motion.div>
                 ))}
               </div>
             )}
           </CardContent>
         </Card>
+
+        {/* ArgoFlowGraph - Featured Pipeline View */}
+        {featuredExecution && (
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Rocket className="w-4 h-4 text-primary" />
+                  <CardTitle className="text-base">CD Flow Visualization</CardTitle>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => onViewExecution?.(featuredExecution.id)}
+                >
+                  Full View <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ArgoFlowGraph 
+                executionId={featuredExecution.id} 
+                environment={featuredExecution.environment}
+                onStageClick={(stageId) => {
+                  console.log('Stage clicked:', stageId);
+                  onViewExecution?.(featuredExecution.id);
+                }}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Version History & Rollback Widget */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
