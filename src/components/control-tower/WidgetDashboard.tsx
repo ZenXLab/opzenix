@@ -46,6 +46,9 @@ import LogStreamWidget from '@/components/dashboard/widgets/LogStreamWidget';
 import QuickActionsWidget from '@/components/dashboard/widgets/QuickActionsWidget';
 import { SystemHealthWidget } from '@/components/dashboard/widgets/SystemHealthWidget';
 import { ArtifactsRegistryWidget } from '@/components/dashboard/widgets/ArtifactsRegistryWidget';
+import KubernetesClusterWidget from '@/components/dashboard/widgets/KubernetesClusterWidget';
+import TerraformStateWidget from '@/components/dashboard/widgets/TerraformStateWidget';
+import ComplianceDashboardWidget from '@/components/dashboard/widgets/ComplianceDashboardWidget';
 import EnhancedWidgetPicker from '@/components/dashboard/EnhancedWidgetPicker';
 import DraggableWidget from '@/components/dashboard/DraggableWidget';
 import { ArtifactTraceabilityPanel } from '@/components/artifacts/ArtifactTraceabilityPanel';
@@ -233,6 +236,12 @@ const WidgetDashboard = ({
         return <SystemHealthWidget onRemove={() => handleRemoveWidget(widget.id)} />;
       case 'artifacts':
         return <ArtifactsRegistryWidget {...commonProps} onViewTraceability={(id) => setTraceabilityArtifactId(id)} />;
+      case 'k8s-clusters':
+        return <KubernetesClusterWidget {...commonProps} />;
+      case 'terraform-state':
+        return <TerraformStateWidget {...commonProps} />;
+      case 'compliance':
+        return <ComplianceDashboardWidget {...commonProps} />;
       case 'actions':
         return (
           <QuickActionsWidget
