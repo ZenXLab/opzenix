@@ -16,6 +16,7 @@ interface Integration {
   status: 'available' | 'coming-soon' | 'beta';
   features: string[];
   docsUrl?: string;
+  brandColor?: string;
 }
 
 const INTEGRATIONS: Integration[] = [
@@ -26,7 +27,8 @@ const INTEGRATIONS: Integration[] = [
     description: 'Native GitHub App integration with webhooks, branch protection sync, and PR status checks.',
     status: 'available',
     features: ['GitHub App installation', 'Webhook events', 'PR status checks', 'Branch protection sync'],
-    docsUrl: '/docs/setup-guides/github-app'
+    docsUrl: '/docs/setup-guides/github-app',
+    brandColor: '#24292e'
   },
   {
     id: 'gitlab',
@@ -34,7 +36,8 @@ const INTEGRATIONS: Integration[] = [
     category: 'Source Control',
     description: 'Full GitLab integration supporting self-hosted and SaaS instances with CI/CD pipeline triggers.',
     status: 'available',
-    features: ['OAuth integration', 'Pipeline triggers', 'Merge request gates', 'Self-hosted support']
+    features: ['OAuth integration', 'Pipeline triggers', 'Merge request gates', 'Self-hosted support'],
+    brandColor: '#FC6D26'
   },
   {
     id: 'azure-devops',
@@ -42,7 +45,8 @@ const INTEGRATIONS: Integration[] = [
     category: 'Source Control',
     description: 'Connect Azure DevOps repositories and pipelines for enterprise Microsoft ecosystem integration.',
     status: 'available',
-    features: ['Azure Repos', 'Azure Pipelines', 'Service connections', 'Work item linking']
+    features: ['Azure Repos', 'Azure Pipelines', 'Service connections', 'Work item linking'],
+    brandColor: '#0078D7'
   },
   {
     id: 'bitbucket',
@@ -50,7 +54,8 @@ const INTEGRATIONS: Integration[] = [
     category: 'Source Control',
     description: 'Atlassian Bitbucket integration for teams using the Atlassian ecosystem.',
     status: 'beta',
-    features: ['Cloud & Server', 'Pipeline triggers', 'PR webhooks', 'Branch permissions']
+    features: ['Cloud & Server', 'Pipeline triggers', 'PR webhooks', 'Branch permissions'],
+    brandColor: '#2684FF'
   },
   {
     id: 'kubernetes',
@@ -59,7 +64,8 @@ const INTEGRATIONS: Integration[] = [
     description: 'Deploy to any Kubernetes cluster including AKS, EKS, GKE, and on-premises clusters.',
     status: 'available',
     features: ['Multi-cluster support', 'Helm charts', 'Kustomize', 'Rollback support'],
-    docsUrl: '/docs/setup-guides/kubernetes'
+    docsUrl: '/docs/setup-guides/kubernetes',
+    brandColor: '#326CE5'
   },
   {
     id: 'aws',
@@ -67,7 +73,8 @@ const INTEGRATIONS: Integration[] = [
     category: 'Cloud Providers',
     description: 'Deploy to AWS services including ECS, EKS, Lambda, and EC2 with IAM role integration.',
     status: 'available',
-    features: ['ECS/EKS deployment', 'Lambda functions', 'S3 artifacts', 'IAM integration']
+    features: ['ECS/EKS deployment', 'Lambda functions', 'S3 artifacts', 'IAM integration'],
+    brandColor: '#FF9900'
   },
   {
     id: 'azure',
@@ -75,7 +82,8 @@ const INTEGRATIONS: Integration[] = [
     category: 'Cloud Providers',
     description: 'Native Azure integration for AKS, Container Apps, App Service, and Azure Functions.',
     status: 'available',
-    features: ['AKS clusters', 'Container Apps', 'App Service', 'Azure Functions']
+    features: ['AKS clusters', 'Container Apps', 'App Service', 'Azure Functions'],
+    brandColor: '#0089D6'
   },
   {
     id: 'gcp',
@@ -83,7 +91,8 @@ const INTEGRATIONS: Integration[] = [
     category: 'Cloud Providers',
     description: 'Deploy to GKE, Cloud Run, Cloud Functions, and Compute Engine with service account auth.',
     status: 'available',
-    features: ['GKE clusters', 'Cloud Run', 'Cloud Functions', 'Workload Identity']
+    features: ['GKE clusters', 'Cloud Run', 'Cloud Functions', 'Workload Identity'],
+    brandColor: '#4285F4'
   },
   {
     id: 'docker-hub',
@@ -91,32 +100,8 @@ const INTEGRATIONS: Integration[] = [
     category: 'Container Registry',
     description: 'Push and pull container images from Docker Hub with automated scanning.',
     status: 'available',
-    features: ['Image push/pull', 'Vulnerability scanning', 'Tag management', 'Webhook triggers']
-  },
-  {
-    id: 'acr',
-    name: 'Azure Container Registry',
-    category: 'Container Registry',
-    description: 'Enterprise container registry with geo-replication and integrated security scanning.',
-    status: 'available',
-    features: ['Geo-replication', 'Security scanning', 'Managed identity', 'Image signing'],
-    docsUrl: '/docs/setup-guides/container-registry'
-  },
-  {
-    id: 'ecr',
-    name: 'Amazon ECR',
-    category: 'Container Registry',
-    description: 'AWS Elastic Container Registry integration with IAM authentication.',
-    status: 'available',
-    features: ['IAM authentication', 'Image scanning', 'Lifecycle policies', 'Cross-region replication']
-  },
-  {
-    id: 'gcr',
-    name: 'Google Container Registry',
-    category: 'Container Registry',
-    description: 'Google Artifact Registry integration for container images and packages.',
-    status: 'available',
-    features: ['Artifact Registry', 'Vulnerability scanning', 'Binary authorization', 'Regional storage']
+    features: ['Image push/pull', 'Vulnerability scanning', 'Tag management', 'Webhook triggers'],
+    brandColor: '#2496ED'
   },
   {
     id: 'hashicorp-vault',
@@ -125,23 +110,8 @@ const INTEGRATIONS: Integration[] = [
     description: 'Enterprise secrets management with dynamic credentials and encryption as a service.',
     status: 'available',
     features: ['Dynamic secrets', 'PKI management', 'Transit encryption', 'Policy management'],
-    docsUrl: '/docs/setup-guides/vault'
-  },
-  {
-    id: 'azure-key-vault',
-    name: 'Azure Key Vault',
-    category: 'Secrets Management',
-    description: 'Microsoft Azure Key Vault for secrets, keys, and certificates management.',
-    status: 'available',
-    features: ['Secrets storage', 'Key management', 'Certificate management', 'Managed identity']
-  },
-  {
-    id: 'aws-secrets-manager',
-    name: 'AWS Secrets Manager',
-    category: 'Secrets Management',
-    description: 'AWS native secrets management with automatic rotation and fine-grained access control.',
-    status: 'available',
-    features: ['Secret rotation', 'IAM policies', 'Cross-account access', 'Audit logging']
+    docsUrl: '/docs/setup-guides/vault',
+    brandColor: '#000000'
   },
   {
     id: 'prometheus',
@@ -149,7 +119,8 @@ const INTEGRATIONS: Integration[] = [
     category: 'Observability',
     description: 'Export deployment metrics and alerts to Prometheus for monitoring and alerting.',
     status: 'available',
-    features: ['Metrics export', 'Custom dashboards', 'Alert rules', 'ServiceMonitor']
+    features: ['Metrics export', 'Custom dashboards', 'Alert rules', 'ServiceMonitor'],
+    brandColor: '#E6522C'
   },
   {
     id: 'opentelemetry',
@@ -158,7 +129,8 @@ const INTEGRATIONS: Integration[] = [
     description: 'Full OpenTelemetry support for traces, metrics, and logs with OTLP export.',
     status: 'available',
     features: ['Distributed tracing', 'Metrics collection', 'Log correlation', 'OTLP export'],
-    docsUrl: '/docs/setup-guides/opentelemetry'
+    docsUrl: '/docs/setup-guides/opentelemetry',
+    brandColor: '#425CC7'
   },
   {
     id: 'datadog',
@@ -166,7 +138,8 @@ const INTEGRATIONS: Integration[] = [
     category: 'Observability',
     description: 'Send deployment events and metrics to Datadog for unified observability.',
     status: 'available',
-    features: ['Deployment tracking', 'APM correlation', 'Log integration', 'Dashboard widgets']
+    features: ['Deployment tracking', 'APM correlation', 'Log integration', 'Dashboard widgets'],
+    brandColor: '#632CA6'
   },
   {
     id: 'grafana',
@@ -174,15 +147,8 @@ const INTEGRATIONS: Integration[] = [
     category: 'Observability',
     description: 'Visualize deployment metrics and create custom dashboards with Grafana integration.',
     status: 'available',
-    features: ['Custom dashboards', 'Alerting', 'Annotations', 'Data source integration']
-  },
-  {
-    id: 'splunk',
-    name: 'Splunk',
-    category: 'Observability',
-    description: 'Enterprise log aggregation and SIEM integration with Splunk.',
-    status: 'beta',
-    features: ['Log forwarding', 'HEC integration', 'Custom indexes', 'Alert actions']
+    features: ['Custom dashboards', 'Alerting', 'Annotations', 'Data source integration'],
+    brandColor: '#F46800'
   },
   {
     id: 'slack',
@@ -190,7 +156,8 @@ const INTEGRATIONS: Integration[] = [
     category: 'Notifications',
     description: 'Real-time deployment notifications and approval workflows via Slack.',
     status: 'available',
-    features: ['Deployment alerts', 'Approval buttons', 'Thread updates', 'Channel routing']
+    features: ['Deployment alerts', 'Approval buttons', 'Thread updates', 'Channel routing'],
+    brandColor: '#4A154B'
   },
   {
     id: 'teams',
@@ -198,7 +165,8 @@ const INTEGRATIONS: Integration[] = [
     category: 'Notifications',
     description: 'Deployment notifications and interactive approval cards for Microsoft Teams.',
     status: 'available',
-    features: ['Adaptive cards', 'Approval workflows', 'Channel notifications', 'Bot commands']
+    features: ['Adaptive cards', 'Approval workflows', 'Channel notifications', 'Bot commands'],
+    brandColor: '#6264A7'
   },
   {
     id: 'pagerduty',
@@ -206,7 +174,8 @@ const INTEGRATIONS: Integration[] = [
     category: 'Notifications',
     description: 'Incident management integration for deployment failures and rollback alerts.',
     status: 'available',
-    features: ['Incident creation', 'Escalation policies', 'On-call routing', 'Change events']
+    features: ['Incident creation', 'Escalation policies', 'On-call routing', 'Change events'],
+    brandColor: '#06AC38'
   },
   {
     id: 'terraform',
@@ -214,7 +183,8 @@ const INTEGRATIONS: Integration[] = [
     category: 'Infrastructure as Code',
     description: 'Infrastructure provisioning with Terraform state management and plan approvals.',
     status: 'available',
-    features: ['State management', 'Plan approvals', 'Drift detection', 'Module registry']
+    features: ['State management', 'Plan approvals', 'Drift detection', 'Module registry'],
+    brandColor: '#7B42BC'
   },
   {
     id: 'argocd',
@@ -222,16 +192,9 @@ const INTEGRATIONS: Integration[] = [
     category: 'GitOps',
     description: 'GitOps continuous delivery with Argo CD sync status and application health.',
     status: 'available',
-    features: ['Sync status', 'Health monitoring', 'Rollback triggers', 'App-of-apps']
+    features: ['Sync status', 'Health monitoring', 'Rollback triggers', 'App-of-apps'],
+    brandColor: '#EF7B4D'
   },
-  {
-    id: 'flux',
-    name: 'Flux CD',
-    category: 'GitOps',
-    description: 'CNCF Flux integration for GitOps workflows with Kustomize and Helm support.',
-    status: 'beta',
-    features: ['Source sync', 'Kustomize support', 'Helm controller', 'Image automation']
-  }
 ];
 
 const CATEGORIES = [
@@ -253,8 +216,33 @@ export default function Integrations() {
 
       <main className="pt-16">
         {/* Hero Section */}
-        <section className="py-20 md:py-28 bg-gradient-to-b from-primary/5 via-transparent to-transparent">
-          <div className="max-w-7xl mx-auto px-4 md:px-8">
+        <section className="py-20 md:py-28 bg-gradient-to-b from-primary/5 via-transparent to-transparent relative overflow-hidden">
+          {/* Animated background */}
+          <div className="absolute inset-0">
+            {[...Array(6)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-32 h-32 rounded-full"
+                style={{
+                  background: `radial-gradient(circle, hsl(var(--primary) / 0.1) 0%, transparent 70%)`,
+                  left: `${15 + i * 15}%`,
+                  top: `${20 + (i % 3) * 20}%`,
+                }}
+                animate={{
+                  scale: [1, 1.5, 1],
+                  opacity: [0.3, 0.6, 0.3],
+                }}
+                transition={{
+                  duration: 4 + i,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: i * 0.5,
+                }}
+              />
+            ))}
+          </div>
+
+          <div className="max-w-7xl mx-auto px-4 md:px-8 relative">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -287,7 +275,7 @@ export default function Integrations() {
               </div>
             </motion.div>
 
-            {/* Integration Logos */}
+            {/* Integration Logos Carousel */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
@@ -302,7 +290,11 @@ export default function Integrations() {
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.1 * i }}
-                    className="flex items-center justify-center p-4 bg-card/50 border rounded-xl hover:border-primary/50 transition-colors"
+                    whileHover={{ scale: 1.1, y: -5 }}
+                    className="flex items-center justify-center p-4 bg-card border rounded-xl hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 transition-all cursor-pointer"
+                    style={{
+                      background: `linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--card)) 100%)`,
+                    }}
                   >
                     {LogoComponent && <LogoComponent className="w-8 h-8" />}
                   </motion.div>
@@ -325,62 +317,90 @@ export default function Integrations() {
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  transition={{ delay: categoryIndex * 0.1 }}
+                  transition={{ delay: categoryIndex * 0.05 }}
                   className="mb-16"
                 >
                   <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
-                    <span className="w-8 h-0.5 bg-primary" />
+                    <motion.span 
+                      className="w-8 h-0.5 bg-primary"
+                      initial={{ width: 0 }}
+                      whileInView={{ width: 32 }}
+                      viewport={{ once: true }}
+                    />
                     {category}
                   </h2>
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {categoryIntegrations.map((integration) => {
+                    {categoryIntegrations.map((integration, index) => {
                       const LogoComponent = IntegrationLogoMap[integration.id];
                       return (
-                        <Card 
-                          key={integration.id} 
-                          className="group hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/5"
+                        <motion.div
+                          key={integration.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true }}
+                          transition={{ delay: index * 0.05 }}
+                          whileHover={{ y: -5 }}
                         >
-                          <CardHeader>
-                            <div className="flex items-start justify-between">
-                              <div className="p-3 bg-primary/10 rounded-xl">
-                                {LogoComponent && <LogoComponent className="w-8 h-8" />}
+                          <Card className="group h-full hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 overflow-hidden">
+                            {/* Brand color accent bar */}
+                            <div 
+                              className="h-1 w-full"
+                              style={{ backgroundColor: integration.brandColor || 'hsl(var(--primary))' }}
+                            />
+                            <CardHeader>
+                              <div className="flex items-start justify-between">
+                                <motion.div 
+                                  className="p-3 rounded-xl transition-colors"
+                                  style={{ 
+                                    backgroundColor: `${integration.brandColor}15` || 'hsl(var(--primary) / 0.1)',
+                                  }}
+                                  whileHover={{ scale: 1.1, rotate: 5 }}
+                                >
+                                  {LogoComponent && <LogoComponent className="w-8 h-8" />}
+                                </motion.div>
+                                <Badge 
+                                  variant={
+                                    integration.status === 'available' ? 'default' : 
+                                    integration.status === 'beta' ? 'secondary' : 'outline'
+                                  }
+                                  className={
+                                    integration.status === 'available' ? 'bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30' :
+                                    integration.status === 'beta' ? 'bg-accent/20 text-accent border-accent/30' : ''
+                                  }
+                                >
+                                  {integration.status === 'available' ? 'Available' : 
+                                   integration.status === 'beta' ? 'Beta' : 'Coming Soon'}
+                                </Badge>
                               </div>
-                            <Badge 
-                              variant={
-                                integration.status === 'available' ? 'default' : 
-                                integration.status === 'beta' ? 'secondary' : 'outline'
-                              }
-                              className={
-                                integration.status === 'available' ? 'bg-sec-safe text-sec-safe-foreground' :
-                                integration.status === 'beta' ? 'bg-chart-1 text-primary-foreground' : ''
-                              }
-                            >
-                              {integration.status === 'available' ? 'Available' : 
-                               integration.status === 'beta' ? 'Beta' : 'Coming Soon'}
-                            </Badge>
-                          </div>
-                          <CardTitle className="text-lg mt-4">{integration.name}</CardTitle>
-                          <CardDescription>{integration.description}</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="space-y-2 mb-4">
-                            {integration.features.map((feature) => (
-                              <li key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <CheckCircle2 className="w-4 h-4 text-sec-safe shrink-0" />
-                                {feature}
-                              </li>
-                            ))}
-                          </ul>
-                          {integration.docsUrl && (
-                            <Button variant="ghost" size="sm" className="gap-2 w-full" asChild>
-                              <Link to={integration.docsUrl}>
-                                View Documentation
-                                <ExternalLink className="w-3 h-3" />
-                              </Link>
-                            </Button>
-                          )}
-                        </CardContent>
-                      </Card>
+                              <CardTitle className="text-lg mt-4 group-hover:text-primary transition-colors">
+                                {integration.name}
+                              </CardTitle>
+                              <CardDescription>{integration.description}</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                              <ul className="space-y-2 mb-4">
+                                {integration.features.map((feature) => (
+                                  <motion.li 
+                                    key={feature} 
+                                    className="flex items-center gap-2 text-sm text-muted-foreground"
+                                    whileHover={{ x: 5 }}
+                                  >
+                                    <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                                    {feature}
+                                  </motion.li>
+                                ))}
+                              </ul>
+                              {integration.docsUrl && (
+                                <Button variant="ghost" size="sm" className="gap-2 w-full group-hover:bg-primary/10" asChild>
+                                  <Link to={integration.docsUrl}>
+                                    View Documentation
+                                    <ExternalLink className="w-3 h-3" />
+                                  </Link>
+                                </Button>
+                              )}
+                            </CardContent>
+                          </Card>
+                        </motion.div>
                       );
                     })}
                   </div>
