@@ -59,6 +59,7 @@ export type OpzenixNodeType =
   | 'audit.record';
 
 export interface OpzenixNodeData {
+  [key: string]: unknown;
   label: string;
   nodeType: OpzenixNodeType;
   state: OpzenixNodeState;
