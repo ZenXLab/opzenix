@@ -58,9 +58,9 @@ interface PipelineStage {
   completedAt?: Date;
 }
 
-interface RealtimePipelineViewProps {
+export interface RealtimePipelineViewProps {
   executionId?: string;
-  environment: string;
+  environment?: string;
   mode?: PipelineMode;
   onBack?: () => void;
 }
@@ -89,7 +89,7 @@ const CD_STAGES: Omit<PipelineStage, 'status' | 'duration' | 'logs' | 'startedAt
 
 export function RealtimePipelineView({ 
   executionId, 
-  environment, 
+  environment = 'dev', 
   mode = 'full',
   onBack,
 }: RealtimePipelineViewProps) {

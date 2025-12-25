@@ -48,9 +48,9 @@ import { formatDistanceToNow } from 'date-fns';
 // 🏢 OPZENIX DASHBOARD - Enterprise Control Tower
 // ============================================
 
-interface OpzenixDashboardProps {
+export interface OpzenixDashboardProps {
   onNavigateToFlow: (flowType: 'ci-flow' | 'cd-flow' | 'full-flow', env: string) => void;
-  onNavigateTo?: (section: string) => void;
+  onNavigate?: (screen: 'dashboard' | 'ci-flow' | 'cd-flow' | 'full-flow' | 'connections' | 'admin-settings' | 'pipelines') => void;
   currentEnvironment: string;
 }
 
@@ -62,7 +62,7 @@ const ENVIRONMENT_CONFIG = {
   prod: { label: 'Production', color: 'bg-sec-danger', textColor: 'text-sec-danger' },
 };
 
-export function OpzenixDashboard({ onNavigateToFlow, onNavigateTo, currentEnvironment }: OpzenixDashboardProps) {
+export function OpzenixDashboard({ onNavigateToFlow, onNavigate, currentEnvironment }: OpzenixDashboardProps) {
   const [breakGlassOpen, setBreakGlassOpen] = useState(false);
   const { dbRole, isAdmin, canBreakGlass } = useRBACPermissions();
 
@@ -204,25 +204,25 @@ export function OpzenixDashboard({ onNavigateToFlow, onNavigateTo, currentEnviro
                   icon={Users}
                   label="User Management"
                   description="Manage roles and permissions"
-                  onClick={() => onNavigateTo?.('admin-users')}
+                  onClick={() => onNavigate?.('admin-settings')}
                 />
                 <QuickActionCard
                   icon={Plug}
                   label="Connections"
                   description="Configure integrations"
-                  onClick={() => onNavigateTo?.('connections')}
+                  onClick={() => onNavigate?.('connections')}
                 />
                 <QuickActionCard
                   icon={Lock}
                   label="Environment Locks"
                   description="Control deployments"
-                  onClick={() => onNavigateTo?.('admin-locks')}
+                  onClick={() => onNavigate?.('admin-settings')}
                 />
                 <QuickActionCard
                   icon={Settings2}
                   label="Settings"
                   description="Platform configuration"
-                  onClick={() => onNavigateTo?.('admin-settings')}
+                  onClick={() => onNavigate?.('admin-settings')}
                 />
               </section>
             )}

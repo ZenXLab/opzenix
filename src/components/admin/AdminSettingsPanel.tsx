@@ -18,6 +18,7 @@ import {
   UserCog,
   RefreshCw,
   Search,
+  ArrowLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -120,7 +121,11 @@ const DEFAULT_FEATURES: FeatureToggle[] = [
   { id: 'breakglass', name: 'Break Glass', description: 'Emergency override for production', enabled: true, roles: ['admin'] },
 ];
 
-export function AdminSettingsPanel() {
+interface AdminSettingsPanelProps {
+  onBack?: () => void;
+}
+
+export function AdminSettingsPanel({ onBack }: AdminSettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<TabValue>('users');
   const [users, setUsers] = useState<UserRole[]>([]);
   const [locks, setLocks] = useState<EnvironmentLock[]>([]);
@@ -275,6 +280,11 @@ export function AdminSettingsPanel() {
       <header className="flex-shrink-0 border-b border-border px-6 py-4 bg-card/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
+            {onBack && (
+              <Button variant="ghost" size="icon" onClick={onBack} className="h-9 w-9">
+                <ChevronRight className="w-4 h-4 rotate-180" />
+              </Button>
+            )}
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
               <Settings2 className="w-5 h-5 text-primary" />
             </div>

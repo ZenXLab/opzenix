@@ -138,7 +138,11 @@ const CATEGORIES = [
   { id: 'runtime', label: 'Runtime' },
 ];
 
-export function ConnectionsHubPanel() {
+interface ConnectionsHubPanelProps {
+  onBack?: () => void;
+}
+
+export function ConnectionsHubPanel({ onBack }: ConnectionsHubPanelProps) {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [loading, setLoading] = useState(true);
   const [validatingId, setValidatingId] = useState<string | null>(null);
@@ -162,8 +166,15 @@ export function ConnectionsHubPanel() {
 
       if (error) throw error;
       setConnections((data || []).map(c => ({
-        ...c,
-        status: (c.status as Connection['status']) || 'pending',
+        id: c.id,
+        name: c.name,
+        type: c.type || 'github',
+        status: (c.status === 'connected' || c.status === 'error' || c.status === 'validating' || c.status === 'pending' 
+          ? c.status : 'pending') as Connection['status'],
+        config: (typeof c.config === 'object' && c.config !== null ? c.config : {}) as Record<string, any>,
+        last_validated_at: c.last_validated_at || null,
+        validation_message: c.validation_message || null,
+        created_at: c.created_at,
       })));
     } catch (error) {
       console.error('Error fetching connections:', error);
@@ -286,6 +297,11 @@ export function ConnectionsHubPanel() {
       <header className="flex-shrink-0 border-b border-border px-6 py-4 bg-card/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
+            {onBack && (
+              <Button variant="ghost" size="icon" onClick={onBack} className="h-9 w-9">
+                <ChevronRight className="w-4 h-4 rotate-180" />
+              </Button>
+            )}
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
               <Plug className="w-5 h-5 text-primary" />
             </div>
