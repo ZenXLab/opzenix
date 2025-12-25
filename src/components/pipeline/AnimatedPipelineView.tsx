@@ -1,8 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { 
   Play, 
   Square, 
@@ -17,7 +18,9 @@ import {
   AlertTriangle,
   XCircle,
   Clock,
-  ArrowRight
+  ArrowRight,
+  ArrowLeft,
+  Terminal
 } from 'lucide-react';
 import { usePipelineSimulation, PipelineStage } from '@/hooks/usePipelineSimulation';
 import { cn } from '@/lib/utils';
@@ -79,6 +82,7 @@ const fullStages = [...ciStages, ...cdStages];
 export function AnimatedPipelineView({ pipelineType, onBack }: AnimatedPipelineViewProps) {
   const { execution, currentLogs, startExecution, stopExecution, resetExecution, isRunning } = usePipelineSimulation();
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const [selectedStage, setSelectedStage] = useState<(PipelineStage & { name: string; type: string }) | null>(null);
 
   const stages = pipelineType === 'ci' ? ciStages : pipelineType === 'cd' ? cdStages : fullStages;
 
@@ -92,17 +96,28 @@ export function AnimatedPipelineView({ pipelineType, onBack }: AnimatedPipelineV
     startExecution(stages);
   };
 
+  const handleStageClick = (stage: typeof displayStages[0]) => {
+    setSelectedStage(stage);
+  };
+
   const displayStages = execution?.stages || stages.map(s => ({ ...s, status: 'idle' as const, logs: [] }));
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold">
-            {pipelineType === 'ci' ? 'CI Pipeline' : pipelineType === 'cd' ? 'CD Pipeline' : 'Full Pipeline'}
-          </h2>
-          <p className="text-sm text-muted-foreground">Real-time execution view with live logs</p>
+        <div className="flex items-center gap-3">
+          {onBack && (
+            <Button variant="ghost" size="icon" onClick={onBack}>
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+          )}
+          <div>
+            <h2 className="text-xl font-bold">
+              {pipelineType === 'ci' ? 'CI Pipeline' : pipelineType === 'cd' ? 'CD Pipeline' : 'Full Pipeline'}
+            </h2>
+            <p className="text-sm text-muted-foreground">Click on stages to view details. Real-time execution with live logs.</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {execution && (
@@ -141,13 +156,16 @@ export function AnimatedPipelineView({ pipelineType, onBack }: AnimatedPipelineV
             {displayStages.map((stage, index) => (
               <React.Fragment key={stage.id}>
                 <div className="flex flex-col items-center min-w-[100px]">
-                  <div className={cn(
-                    'w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300',
-                    statusColors[stage.status],
-                    stage.status === 'running' && 'ring-4 ring-primary/30 scale-110'
-                  )}>
+                  <button
+                    onClick={() => handleStageClick(stage)}
+                    className={cn(
+                      'w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300 cursor-pointer hover:scale-105 hover:ring-2 hover:ring-primary/50',
+                      statusColors[stage.status],
+                      stage.status === 'running' && 'ring-4 ring-primary/30 scale-110'
+                    )}
+                  >
                     {stageIcons[stage.type]}
-                  </div>
+                  </button>
                   <span className="mt-2 text-sm font-medium">{stage.name}</span>
                   <div className="flex items-center gap-1 mt-1">
                     {getStatusIcon(stage.status)}
@@ -245,6 +263,69 @@ export function AnimatedPipelineView({ pipelineType, onBack }: AnimatedPipelineV
           ))}
         </div>
       )}
+
+      {/* Stage Detail Dialog */}
+      <Dialog open={!!selectedStage} onOpenChange={() => setSelectedStage(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedStage && stageIcons[selectedStage.type]}
+              {selectedStage?.name} Details
+            </DialogTitle>
+            <DialogDescription>
+              Stage execution details and logs
+            </DialogDescription>
+          </DialogHeader>
+          {selectedStage && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                <span className="text-sm text-muted-foreground">Status</span>
+                <Badge variant="outline" className={cn(
+                  selectedStage.status === 'success' && 'border-green-500 text-green-500',
+                  selectedStage.status === 'failed' && 'border-destructive text-destructive',
+                  selectedStage.status === 'warning' && 'border-yellow-500 text-yellow-500',
+                  selectedStage.status === 'running' && 'border-primary text-primary'
+                )}>
+                  {selectedStage.status.toUpperCase()}
+                </Badge>
+              </div>
+              {selectedStage.duration && (
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <span className="text-sm text-muted-foreground">Duration</span>
+                  <span className="font-mono text-sm">{selectedStage.duration}s</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                <span className="text-sm text-muted-foreground">Type</span>
+                <span className="text-sm capitalize">{selectedStage.type}</span>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Terminal className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Stage Logs</span>
+                </div>
+                <ScrollArea className="h-[150px] rounded border bg-muted/30 p-3">
+                  <div className="font-mono text-xs space-y-1">
+                    {selectedStage.logs && selectedStage.logs.length > 0 ? (
+                      selectedStage.logs.map((log, idx) => (
+                        <div key={idx} className={cn(
+                          log.includes('[WARN]') && 'text-yellow-500',
+                          log.includes('[ERROR]') && 'text-destructive',
+                          log.includes('[INFO]') && 'text-foreground'
+                        )}>
+                          {log}
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground">No logs available. Start the pipeline to see logs.</p>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
