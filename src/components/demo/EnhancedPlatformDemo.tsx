@@ -17,6 +17,7 @@ import {
   TrendingDown, Gauge, Globe, Bell, Package, CheckSquare
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, BarChart, Bar } from 'recharts';
+import { cn } from '@/lib/utils';
 
 interface EnhancedPlatformDemoProps {
   open: boolean;
@@ -163,14 +164,11 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
       
       const runPipeline = async () => {
         const durations = ['1.2s', '45s', '32s', '12s', '28s', '2s', '16s'];
-        const nodeLabels = ['Git Push', 'Build', 'Test', 'Security', 'Staging', 'Approval', 'Production'];
-        const runTimes = [600, 1000, 1000, 1000, 1000, 700, 1000]; // Faster execution
-        
-        addLog('info', '▶ Starting pipeline execution');
+        const runTimes = [600, 900, 900, 900, 900, 700, 900]; // Smooth fast execution
         
         // Run through all nodes
         for (let i = 0; i < 7; i++) {
-          await new Promise(r => setTimeout(r, 200));
+          await new Promise(r => setTimeout(r, 150));
           setCurrentNodeIndex(i);
           
           // Set to running
@@ -182,11 +180,6 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
             }))
           );
           
-          // Only log key stages
-          if (i === 1 || i === 3 || i === 6) {
-            addLog('info', `Running ${nodeLabels[i]}...`);
-          }
-          
           await new Promise(r => setTimeout(r, runTimes[i]));
           
           // Complete node
@@ -197,23 +190,14 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
               duration: idx <= i ? durations[idx] : '0s'
             }))
           );
-          
-          // Only log key completions
-          if (i === 3 || i === 6) {
-            addLog('success', `✓ ${nodeLabels[i]} completed`);
-          }
         }
-        
-        addLog('success', '🎉 Pipeline completed!');
       };
       
       runPipeline();
     }
 
     if (currentPhase === 'analytics') {
-      setTimeout(() => addLog('info', 'OpenTelemetry traces streaming'), 700);
-      setTimeout(() => addLog('success', 'Metrics captured'), 2000);
-      setTimeout(() => addLog('success', 'Dashboards updated'), 3500);
+      // Just visual metrics, no logs
     }
 
     if (currentPhase === 'failure') {
@@ -224,14 +208,9 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
         }))
       );
       setCurrentNodeIndex(3);
-      setTimeout(() => addLog('error', '❌ Security scan failed'), 500);
-      setTimeout(() => addLog('warning', 'Pipeline paused'), 1500);
-      setTimeout(() => addLog('info', 'Checkpoint created'), 2500);
     }
 
     if (currentPhase === 'rollback') {
-      setTimeout(() => addLog('info', 'Loading checkpoints...'), 500);
-      setTimeout(() => addLog('success', 'Checkpoint found'), 1200);
       setTimeout(() => {
         setPipelineNodes(nodes =>
           nodes.map((n, idx) => ({
@@ -239,31 +218,23 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
             status: idx < 3 ? 'success' : idx === 3 ? 'running' : 'pending'
           }))
         );
-        addLog('success', '✓ Resumed from checkpoint');
-      }, 2200);
+      }, 1500);
       setTimeout(() => {
         setPipelineNodes(nodes => nodes.map((n, idx) => ({ 
           ...n, 
           status: idx <= 5 ? 'success' : 'running' 
         })));
-        addLog('success', '✓ Security scan passed');
-      }, 3500);
+      }, 3000);
     }
 
     if (currentPhase === 'ai') {
-      setTimeout(() => addLog('info', '🤖 AI analyzing failure...'), 500);
-      setTimeout(() => addLog('success', 'Root cause: CVE-2024-1234'), 1800);
-      setTimeout(() => addLog('success', 'Auto-fix PR created #1247'), 3200);
+      // Pure visual AI analysis - no logs
     }
 
     if (currentPhase === 'governance') {
-      setTimeout(() => addLog('success', 'RBAC policies active'), 700);
-      setTimeout(() => addLog('info', 'Approval request sent'), 1800);
-      setTimeout(() => addLog('success', 'Deployment approved'), 2800);
       setTimeout(() => {
         setPipelineNodes(nodes => nodes.map(n => ({ ...n, status: 'success' })));
-        addLog('success', '✅ Production deployed');
-      }, 3800);
+      }, 2500);
     }
 
     const timer = setTimeout(() => {
@@ -397,9 +368,19 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
 
         {/* Main Content */}
         <div className="flex-1 overflow-hidden">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-0 h-[550px]">
+          <div className={cn(
+            "grid gap-0 h-[550px]",
+            ['execution', 'analytics', 'failure', 'rollback', 'ai', 'governance'].includes(currentPhase) 
+              ? "grid-cols-1" 
+              : "grid-cols-1 lg:grid-cols-4"
+          )}>
             {/* Main Panel - Demo Visualization */}
-            <div className="lg:col-span-3 border-r overflow-hidden">
+            <div className={cn(
+              "overflow-hidden",
+              ['execution', 'analytics', 'failure', 'rollback', 'ai', 'governance'].includes(currentPhase)
+                ? "" 
+                : "lg:col-span-3 border-r"
+            )}>
               <ScrollArea className="h-full">
                 <div className="p-4">
                   <AnimatePresence mode="wait">
@@ -1171,7 +1152,8 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
               </ScrollArea>
             </div>
 
-            {/* Right Panel - Live Logs */}
+            {/* Right Panel - Live Logs (hidden for execution phases) */}
+            {!['execution', 'analytics', 'failure', 'rollback', 'ai', 'governance'].includes(currentPhase) && (
             <div className="flex flex-col bg-muted/10">
               <div className="p-3 border-b">
                 <div className="flex items-center justify-between">
@@ -1228,6 +1210,7 @@ export function EnhancedPlatformDemo({ open, onClose }: EnhancedPlatformDemoProp
                 </div>
               </div>
             </div>
+            )}
           </div>
         </div>
       </DialogContent>
