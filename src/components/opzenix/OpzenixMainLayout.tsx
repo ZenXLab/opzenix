@@ -1,34 +1,23 @@
 import { useState, useCallback } from 'react';
-import { ReactFlowProvider } from '@xyflow/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  LayoutDashboard,
-  Shield,
-  GitBranch,
-  Rocket,
-  Layers,
-  ArrowLeft,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import ControlTowerTopBar from '@/components/control-tower/ControlTowerTopBar';
 import ControlTowerStatusBar from '@/components/control-tower/ControlTowerStatusBar';
-import OpzenixFlowSidebar, { EnvironmentId, FlowViewMode, ENVIRONMENT_DISPLAY_NAMES } from './OpzenixFlowSidebar';
-import WidgetDashboard from '@/components/control-tower/WidgetDashboard';
-import { OpzenixFlowMap } from '@/components/flow/OpzenixFlowMap';
-import { RBACActionsPanel, RBACRoleMatrix } from '@/components/flow/OpzenixRBACActions';
-import InspectorPanelDrawer, { InspectorData } from './InspectorPanelDrawer';
-import { useRBACPermissions, type Environment as RBACEnvironment } from '@/hooks/useRBACPermissions';
-import { cn } from '@/lib/utils';
+import ControlTowerScreen from './screens/ControlTowerScreen';
+import FlowViewerScreen, { ActionContext } from './screens/FlowViewerScreen';
+import ActionPanelModal from './screens/ActionPanelModal';
+import { supabase } from '@/integrations/supabase/client';
 
 // ============================================
 // 🏗️ OPZENIX MAIN LAYOUT (MVP 1.0.0 LOCKED)
 // ============================================
-// Unified layout with:
-// - Left Sidebar: OPZENIX Flow Maps (Environment Pipeline)
-// - Main Area: Control Tower (Widget Dashboard) OR Flow View
+// STRICT SCREEN SEPARATION:
+// 1. Control Tower (Dashboard Only) - Read-only widgets
+// 2. Flow Viewer (Dedicated Screen) - One mode at a time
+// 3. Action Panel (Modal) - Opens only for approval/deploy
 // ============================================
+
+type Screen = 'control-tower' | 'flow-viewer';
+type FlowMode = 'ci' | 'cd' | 'ci+cd';
 
 interface OpzenixMainLayoutProps {
   onOpenSettings?: () => void;
@@ -36,187 +25,105 @@ interface OpzenixMainLayoutProps {
 }
 
 export const OpzenixMainLayout = ({ onOpenSettings, onOpenProfile }: OpzenixMainLayoutProps) => {
-  // View state
-  const [currentView, setCurrentView] = useState<'dashboard' | 'flow-map'>('dashboard');
-  const [activeEnvironment, setActiveEnvironment] = useState<EnvironmentId | null>(null);
-  const [activeFlowMode, setActiveFlowMode] = useState<FlowViewMode | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [showRBACMatrix, setShowRBACMatrix] = useState(false);
-  const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [inspectorData, setInspectorData] = useState<InspectorData | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  // Screen state - STRICT separation
+  const [currentScreen, setCurrentScreen] = useState<Screen>('control-tower');
+  const [flowEnvironment, setFlowEnvironment] = useState<string>('dev');
+  const [flowMode, setFlowMode] = useState<FlowMode>('ci+cd');
+  
+  // Action modal state
+  const [actionModalOpen, setActionModalOpen] = useState(false);
+  const [actionContext, setActionContext] = useState<ActionContext | null>(null);
 
-  // RBAC
-  const { dbRole, isAdmin } = useRBACPermissions();
-
-  // Handle node selection for inspector
-  const handleNodeSelect = useCallback((nodeId: string, data: any) => {
-    setSelectedNodeId(nodeId);
-    setInspectorData({
-      id: nodeId,
-      context: 'node',
-      type: data?.type || 'Unknown',
-      environment: activeEnvironment || 'dev',
-      status: data?.state || 'pending',
-      timestamp: new Date().toLocaleString(),
-      summary: `${data?.label || 'Node'} execution in ${activeEnvironment?.toUpperCase()} environment`,
-      approvalRequired: true,
-      isImmutable: true,
-      source: 'GitHub Actions',
-    });
-    setInspectorOpen(true);
-  }, [activeEnvironment]);
-
-  // Handle environment/flow selection
-  const handleSelectEnvironment = useCallback((env: EnvironmentId, mode: FlowViewMode) => {
-    setActiveEnvironment(env);
-    setActiveFlowMode(mode);
-    setCurrentView('flow-map');
+  // Navigate to Flow Viewer
+  const handleNavigateToFlow = useCallback((environment: string, mode: FlowMode) => {
+    setFlowEnvironment(environment);
+    setFlowMode(mode);
+    setCurrentScreen('flow-viewer');
   }, []);
 
-  // Go back to dashboard
-  const handleBackToDashboard = useCallback(() => {
-    setCurrentView('dashboard');
-    setActiveEnvironment(null);
-    setActiveFlowMode(null);
+  // Navigate back to Control Tower
+  const handleBackToControlTower = useCallback(() => {
+    setCurrentScreen('control-tower');
   }, []);
 
-  // Get flow mode icon
-  const getFlowModeIcon = (mode: FlowViewMode | null) => {
-    switch (mode) {
-      case 'ci':
-        return GitBranch;
-      case 'cd':
-        return Rocket;
-      case 'ci+cd':
-        return Layers;
-      default:
-        return LayoutDashboard;
+  // Open Action Modal (from Flow Viewer inspector)
+  const handleRequestAction = useCallback((context: ActionContext) => {
+    setActionContext(context);
+    setActionModalOpen(true);
+  }, []);
+
+  // Confirm action and log to audit
+  const handleConfirmAction = useCallback(async (context: ActionContext, comment: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      await supabase.from('audit_logs').insert({
+        user_id: user?.id,
+        action: context.type,
+        resource_type: 'flow_node',
+        resource_id: context.nodeId,
+        details: {
+          environment: context.environment,
+          nodeName: context.nodeName,
+          requiredRole: context.requiredRole,
+          policyReference: context.policyReference,
+          comment,
+        },
+      });
+    } catch (error) {
+      console.error('Failed to log audit entry:', error);
+      throw error;
     }
-  };
-
-  const FlowModeIcon = getFlowModeIcon(activeFlowMode);
+  }, []);
 
   return (
-    <ReactFlowProvider>
-      <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">
-        {/* Top Bar */}
-        <ControlTowerTopBar onOpenSettings={onOpenSettings} onOpenProfile={onOpenProfile} />
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">
+      {/* Top Bar */}
+      <ControlTowerTopBar onOpenSettings={onOpenSettings} onOpenProfile={onOpenProfile} />
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* OPZENIX Flow Sidebar */}
-          <OpzenixFlowSidebar
-            collapsed={sidebarCollapsed}
-            onCollapsedChange={setSidebarCollapsed}
-            activeEnvironment={activeEnvironment || undefined}
-            activeFlowMode={activeFlowMode || undefined}
-            onSelectEnvironment={handleSelectEnvironment}
-            onViewRBACMatrix={() => setShowRBACMatrix(true)}
-          />
+      {/* Main Content - Strict Screen Separation */}
+      <main className="flex-1 overflow-hidden">
+        <AnimatePresence mode="wait">
+          {currentScreen === 'control-tower' ? (
+            <motion.div
+              key="control-tower"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="h-full"
+            >
+              <ControlTowerScreen onNavigateToFlow={handleNavigateToFlow} />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="flow-viewer"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="h-full"
+            >
+              <FlowViewerScreen
+                environment={flowEnvironment}
+                initialFlowMode={flowMode}
+                onBack={handleBackToControlTower}
+                onRequestAction={handleRequestAction}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
 
-          {/* Main Content */}
-          <main className="flex-1 overflow-hidden flex flex-col">
-            {/* Flow View Header (when viewing a flow) */}
-            <AnimatePresence>
-              {currentView === 'flow-map' && activeEnvironment && activeFlowMode && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="flex items-center justify-between p-3 border-b border-border bg-primary/5"
-                >
-                  <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="sm" onClick={handleBackToDashboard}>
-                      <ArrowLeft className="w-4 h-4 mr-1" />
-                      Control Tower
-                    </Button>
-                    <div className="h-4 w-px bg-border" />
-                    <div className="flex items-center gap-2">
-                      <FlowModeIcon className="w-4 h-4 text-primary" />
-                      <span className="font-medium text-foreground">
-                        ENVIRONMENT: {ENVIRONMENT_DISPLAY_NAMES[activeEnvironment]}
-                      </span>
-                      <span className="text-muted-foreground">|</span>
-                      <span className="font-medium text-foreground">FLOW TYPE: {activeFlowMode.toUpperCase()}</span>
-                    </div>
-                  </div>
+      {/* Bottom Status Bar */}
+      <ControlTowerStatusBar />
 
-                  {/* RBAC Actions */}
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      Role: {dbRole?.toUpperCase() || 'VIEWER'}
-                    </Badge>
-                    <RBACActionsPanel
-                      environment={activeEnvironment as RBACEnvironment}
-                      onApprove={() => console.log('Approve', activeEnvironment)}
-                      onDeploy={() => console.log('Deploy', activeEnvironment)}
-                      onRollback={() => console.log('Rollback', activeEnvironment)}
-                      onBreakGlass={isAdmin ? () => console.log('Break Glass', activeEnvironment) : undefined}
-                    />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Main View Content */}
-            <div className="flex-1 overflow-hidden">
-              <AnimatePresence mode="wait">
-                {currentView === 'dashboard' ? (
-                  <motion.div
-                    key="dashboard"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.2 }}
-                    className="h-full"
-                  >
-                    <WidgetDashboard
-                      onMetricClick={(type) => console.log('Metric clicked:', type)}
-                      onOpenExecutionHistory={() => console.log('Open execution history')}
-                    />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="flow-map"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ duration: 0.2 }}
-                    className="h-full"
-                  >
-                    <OpzenixFlowMap
-                      environment={activeEnvironment || 'dev'}
-                      onNodeSelect={(nodeId, data) => {
-                        console.log('[OPZENIX] Node selected:', nodeId, data);
-                      }}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </main>
-        </div>
-
-        {/* Bottom Status Bar */}
-        <ControlTowerStatusBar />
-
-        {/* RBAC Matrix Sheet */}
-        <Sheet open={showRBACMatrix} onOpenChange={setShowRBACMatrix}>
-          <SheetContent side="right" className="w-[600px] sm:max-w-2xl overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle className="flex items-center gap-2">
-                <Shield className="w-5 h-5" />
-                RBAC Matrix (MVP 1.0.0 LOCKED)
-              </SheetTitle>
-            </SheetHeader>
-            <div className="mt-6">
-              <RBACRoleMatrix />
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
-    </ReactFlowProvider>
+      {/* Action Panel Modal - Opens ONLY from Flow Viewer */}
+      <ActionPanelModal
+        open={actionModalOpen}
+        onClose={() => setActionModalOpen(false)}
+        context={actionContext}
+        onConfirmAction={handleConfirmAction}
+      />
+    </div>
   );
 };
 
