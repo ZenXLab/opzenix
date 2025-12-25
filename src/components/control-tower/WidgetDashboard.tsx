@@ -33,9 +33,13 @@ import {
   Bell,
   Target,
   Timer,
+  Users,
+  CheckCircle,
+  Rocket,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import ClickableMetricCard from '@/components/dashboard/ClickableMetricCard';
 import DeploymentGraphWidget from '@/components/dashboard/widgets/DeploymentGraphWidget';
 import AuditActivityWidget from '@/components/dashboard/widgets/AuditActivityWidget';
@@ -52,12 +56,20 @@ import ComplianceDashboardWidget from '@/components/dashboard/widgets/Compliance
 import SecretVaultWidget from '@/components/dashboard/widgets/SecretVaultWidget';
 import CICDPipelineWidget from '@/components/dashboard/widgets/CICDPipelineWidget';
 import IncidentManagementWidget from '@/components/dashboard/widgets/IncidentManagementWidget';
+import EnvironmentHealthWidget from '@/components/dashboard/widgets/EnvironmentHealthWidget';
+import ApprovalQueueWidget from '@/components/dashboard/widgets/ApprovalQueueWidget';
+import AuditTrailWidget from '@/components/dashboard/widgets/AuditTrailWidget';
+import RBACVisibilityWidget from '@/components/dashboard/widgets/RBACVisibilityWidget';
+import SLOSnapshotWidget from '@/components/dashboard/widgets/SLOSnapshotWidget';
+import WidgetConfigPanel from '@/components/dashboard/widgets/WidgetConfigPanel';
 import EnhancedWidgetPicker from '@/components/dashboard/EnhancedWidgetPicker';
 import DraggableWidget from '@/components/dashboard/DraggableWidget';
 import { ArtifactTraceabilityPanel } from '@/components/artifacts/ArtifactTraceabilityPanel';
 import { useFlowStore } from '@/stores/flowStore';
 import { useWidgetMetrics } from '@/hooks/useWidgetMetrics';
 import { useDashboardLayout } from '@/hooks/useDashboardLayout';
+import { useWidgetRBAC } from '@/hooks/useWidgetRBAC';
+import { WidgetConfig, DEFAULT_WIDGET_CONFIG, OPZENIX_WIDGET_TYPES } from '@/types/opzenix-widgets';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
