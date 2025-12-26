@@ -65,3 +65,7 @@ verify_jwt = false
 verify_jwt = false
 [functions.flow-maps]
 verify_jwt = false
+[functions.opzenix-chat]
+verify_jwt = false
+[functions.waitlist-signup]
+verify_jwt = false
