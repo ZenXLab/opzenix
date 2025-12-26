@@ -6,13 +6,14 @@ import {
   Building2, Cpu, Lock, Puzzle, BookOpen, Github, Cloud,
   Terminal, Users, Briefcase, Mail, Menu, X, ArrowRight,
   LayoutDashboard, CheckCircle2, RotateCcw, Globe, Radio,
-  DollarSign, Layers, Activity, Zap, BarChart3
+  DollarSign, Layers, Activity, Zap, BarChart3, Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import OpzenixLogo from '@/components/brand/OpzenixLogo';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { SettingsModal } from '@/components/settings/SettingsModal';
+import { WaitlistForm } from '@/components/waitlist/WaitlistForm';
 
 interface NavItem {
   label: string;
@@ -148,6 +149,7 @@ export function EnterpriseNavigation() {
   const navigate = useNavigate();
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border/50">
@@ -221,12 +223,24 @@ export function EnterpriseNavigation() {
           <div className="hidden lg:flex items-center gap-2">
             <SettingsModal />
             <ThemeToggle />
-            <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
-              Sign In
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2"
+              onClick={() => setWaitlistOpen(true)}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              Join Waitlist
             </Button>
-            <Button size="sm" className="gap-2" onClick={() => navigate('/auth')}>
-              Request Access
-              <ArrowRight className="w-3.5 h-3.5" />
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => navigate('/auth')}
+              disabled
+              className="opacity-50 cursor-not-allowed"
+              title="Sign in coming soon"
+            >
+              Sign In
             </Button>
           </div>
 
@@ -275,23 +289,28 @@ export function EnterpriseNavigation() {
 
               <div className="pt-4 border-t space-y-2">
                 <Button 
-                  variant="outline" 
-                  className="w-full" 
-                  onClick={() => { navigate('/auth'); setMobileMenuOpen(false); }}
+                  variant="default" 
+                  className="w-full gap-2" 
+                  onClick={() => { setWaitlistOpen(true); setMobileMenuOpen(false); }}
                 >
-                  Sign In
+                  <Sparkles className="w-4 h-4" />
+                  Join Waitlist
                 </Button>
                 <Button 
-                  className="w-full" 
-                  onClick={() => { navigate('/auth'); setMobileMenuOpen(false); }}
+                  variant="outline" 
+                  className="w-full opacity-50 cursor-not-allowed" 
+                  disabled
                 >
-                  Request Access
+                  Sign In (Coming Soon)
                 </Button>
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Waitlist Form Modal */}
+      <WaitlistForm open={waitlistOpen} onOpenChange={setWaitlistOpen} />
     </header>
   );
 }

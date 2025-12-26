@@ -1,25 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Mail, Lock, Eye, EyeOff, ArrowRight, 
-  Loader2, CheckCircle2, AlertCircle,
-  Building2, User, Zap, Shield, GitBranch, RotateCcw
+  Zap, Shield, GitBranch, RotateCcw, Sparkles, ArrowLeft, Clock, Lock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { z } from 'zod';
-import { SocialLoginButtons } from '@/components/auth/SocialLoginButtons';
 import OpzenixLogo from '@/components/brand/OpzenixLogo';
-
-// Validation schemas
-const emailSchema = z.string().email('Please enter a valid email address');
-const passwordSchema = z.string().min(8, 'Password must be at least 8 characters');
+import { WaitlistForm } from '@/components/waitlist/WaitlistForm';
 
 const features = [
   { 
@@ -64,17 +52,8 @@ const testimonials = [
 
 const Auth = () => {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [activeTab, setActiveTab] = useState<'login' | 'signup'>('login');
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
-  
-  // Form state
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [company, setCompany] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
 
   // Rotate testimonials
   useEffect(() => {
@@ -83,112 +62,6 @@ const Auth = () => {
     }, 5000);
     return () => clearInterval(interval);
   }, []);
-
-  // Check if user is already logged in
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        navigate('/app');
-      }
-    };
-    checkSession();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        navigate('/app');
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    
-    const emailResult = emailSchema.safeParse(email);
-    if (!emailResult.success) {
-      newErrors.email = emailResult.error.errors[0].message;
-    }
-    
-    const passwordResult = passwordSchema.safeParse(password);
-    if (!passwordResult.success) {
-      newErrors.password = passwordResult.error.errors[0].message;
-    }
-    
-    if (activeTab === 'signup' && !fullName.trim()) {
-      newErrors.fullName = 'Full name is required';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-    
-    setIsLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-      
-      if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          toast.error('Invalid email or password');
-        } else {
-          toast.error(error.message);
-        }
-        return;
-      }
-      
-      toast.success('Welcome back!');
-    } catch (error) {
-      toast.error('An unexpected error occurred');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-    
-    setIsLoading(true);
-    try {
-      const redirectUrl = `${window.location.origin}/app`;
-      
-      const { error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            full_name: fullName.trim(),
-            company: company.trim() || null,
-          }
-        }
-      });
-      
-      if (error) {
-        if (error.message.includes('already registered')) {
-          toast.error('This email is already registered. Please log in instead.');
-          setActiveTab('login');
-        } else {
-          toast.error(error.message);
-        }
-        return;
-      }
-      
-      toast.success('Account created! Welcome to Opzenix.');
-    } catch (error) {
-      toast.error('An unexpected error occurred');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -308,7 +181,7 @@ const Auth = () => {
         </p>
       </div>
       
-      {/* Right side - Auth forms */}
+      {/* Right side - Waitlist focused */}
       <div className="flex-1 flex items-center justify-center p-8">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -325,259 +198,104 @@ const Auth = () => {
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                key={activeTab}
               >
-                <CardTitle className="text-2xl">
-                  {activeTab === 'login' ? 'Welcome back' : 'Create your account'}
-                </CardTitle>
-                <CardDescription>
-                  {activeTab === 'login' 
-                    ? 'Sign in to access your control tower' 
-                    : 'Start building enterprise pipelines today'}
+                <div className="flex justify-center mb-4">
+                  <div className="p-3 rounded-full bg-primary/10">
+                    <Clock className="h-8 w-8 text-primary" />
+                  </div>
+                </div>
+                <CardTitle className="text-2xl">Coming Soon</CardTitle>
+                <CardDescription className="mt-2">
+                  We're putting the finishing touches on Opzenix. Join the waitlist to be among the first to experience enterprise-grade CI/CD.
                 </CardDescription>
               </motion.div>
             </CardHeader>
             
-            <CardContent>
-              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'signup')}>
-                <TabsList className="grid w-full grid-cols-2 mb-6">
-                  <TabsTrigger value="login">Sign In</TabsTrigger>
-                  <TabsTrigger value="signup">Sign Up</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="login">
-                  <form onSubmit={handleLogin} className="space-y-4">
-                    <motion.div 
-                      className="space-y-2"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.1 }}
-                    >
-                      <Label htmlFor="login-email">Email</Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="login-email"
-                          type="email"
-                          placeholder="you@company.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="pl-10"
-                          disabled={isLoading}
-                        />
-                      </div>
-                      {errors.email && (
-                        <p className="text-xs text-destructive flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
-                          {errors.email}
-                        </p>
-                      )}
-                    </motion.div>
-                    
-                    <motion.div 
-                      className="space-y-2"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.2 }}
-                    >
-                      <Label htmlFor="login-password">Password</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="login-password"
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="••••••••"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="pl-10 pr-10"
-                          disabled={isLoading}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                      {errors.password && (
-                        <p className="text-xs text-destructive flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
-                          {errors.password}
-                        </p>
-                      )}
-                    </motion.div>
-                    
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 }}
-                    >
-                      <Button type="submit" className="w-full gap-2" disabled={isLoading}>
-                        {isLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            Sign In
-                            <ArrowRight className="h-4 w-4" />
-                          </>
-                        )}
-                      </Button>
-                    </motion.div>
-                  </form>
-                </TabsContent>
-                
-                <TabsContent value="signup">
-                  <form onSubmit={handleSignup} className="space-y-4">
-                    <motion.div 
-                      className="space-y-2"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.1 }}
-                    >
-                      <Label htmlFor="signup-name">Full Name</Label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="signup-name"
-                          type="text"
-                          placeholder="John Doe"
-                          value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                          className="pl-10"
-                          disabled={isLoading}
-                        />
-                      </div>
-                      {errors.fullName && (
-                        <p className="text-xs text-destructive flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
-                          {errors.fullName}
-                        </p>
-                      )}
-                    </motion.div>
-                    
-                    <motion.div 
-                      className="space-y-2"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.15 }}
-                    >
-                      <Label htmlFor="signup-company">Company (Optional)</Label>
-                      <div className="relative">
-                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="signup-company"
-                          type="text"
-                          placeholder="Acme Inc."
-                          value={company}
-                          onChange={(e) => setCompany(e.target.value)}
-                          className="pl-10"
-                          disabled={isLoading}
-                        />
-                      </div>
-                    </motion.div>
-                    
-                    <motion.div 
-                      className="space-y-2"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.2 }}
-                    >
-                      <Label htmlFor="signup-email">Email</Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="signup-email"
-                          type="email"
-                          placeholder="you@company.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="pl-10"
-                          disabled={isLoading}
-                        />
-                      </div>
-                      {errors.email && (
-                        <p className="text-xs text-destructive flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
-                          {errors.email}
-                        </p>
-                      )}
-                    </motion.div>
-                    
-                    <motion.div 
-                      className="space-y-2"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.25 }}
-                    >
-                      <Label htmlFor="signup-password">Password</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="signup-password"
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="••••••••"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="pl-10 pr-10"
-                          disabled={isLoading}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                      {errors.password && (
-                        <p className="text-xs text-destructive flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" />
-                          {errors.password}
-                        </p>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        Must be at least 8 characters
-                      </p>
-                    </motion.div>
-                    
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 }}
-                    >
-                      <Button type="submit" className="w-full gap-2" disabled={isLoading}>
-                        {isLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <>
-                            Create Account
-                            <ArrowRight className="h-4 w-4" />
-                          </>
-                        )}
-                      </Button>
-                    </motion.div>
-                    
-                    <p className="text-xs text-center text-muted-foreground">
-                      By signing up, you agree to our Terms of Service and Privacy Policy.
-                    </p>
-                  </form>
-                </TabsContent>
-              </Tabs>
-              
-              <div className="mt-6">
-                <SocialLoginButtons isLoading={isLoading} mode={activeTab} />
+            <CardContent className="space-y-6">
+              {/* Waitlist CTA */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <Button 
+                  size="lg" 
+                  className="w-full gap-2"
+                  onClick={() => setWaitlistOpen(true)}
+                >
+                  <Sparkles className="h-5 w-5" />
+                  Join the Waitlist
+                </Button>
+              </motion.div>
+
+              {/* Divider */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">or</span>
+                </div>
               </div>
+
+              {/* Disabled Sign In */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="space-y-3"
+              >
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  className="w-full gap-2 opacity-50 cursor-not-allowed"
+                  disabled
+                >
+                  <Lock className="h-4 w-4" />
+                  Sign In (Coming Soon)
+                </Button>
+                <p className="text-xs text-center text-muted-foreground">
+                  User registration and login will be available once we launch. Join the waitlist to get early access.
+                </p>
+              </motion.div>
+
+              {/* Benefits */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="bg-muted/50 rounded-lg p-4 space-y-2"
+              >
+                <p className="text-sm font-medium">Waitlist benefits:</p>
+                <ul className="text-xs text-muted-foreground space-y-1">
+                  <li className="flex items-center gap-2">
+                    <Sparkles className="h-3 w-3 text-primary" />
+                    Early access before public launch
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Sparkles className="h-3 w-3 text-primary" />
+                    Exclusive founding member pricing
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Sparkles className="h-3 w-3 text-primary" />
+                    Priority onboarding support
+                  </li>
+                </ul>
+              </motion.div>
             </CardContent>
           </Card>
           
           <p className="text-center text-sm text-muted-foreground mt-6">
-            <a href="/" className="hover:text-primary transition-colors">
-              ← Back to home
-            </a>
+            <Link to="/" className="hover:text-primary transition-colors flex items-center justify-center gap-1">
+              <ArrowLeft className="h-4 w-4" />
+              Back to home
+            </Link>
           </p>
         </motion.div>
       </div>
+
+      {/* Waitlist Form Modal */}
+      <WaitlistForm open={waitlistOpen} onOpenChange={setWaitlistOpen} />
     </div>
   );
 };
